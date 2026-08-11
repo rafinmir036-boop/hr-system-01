@@ -80,7 +80,7 @@
       }
     });
 
-    // Change User Password Logic
+    // Change Password
     window.changeUserPassword = async function(e) {
       e.preventDefault();
       const newPass = document.getElementById('settings-new-pass').value;
@@ -103,7 +103,7 @@
           alert("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!");
           document.getElementById('change-pass-form').reset();
         } catch (err) {
-          alert("পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে: " + err.message + "\n(প্রয়োজনে পুনরায় লগইন করে চেষ্টা করুন)");
+          alert("পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে: " + err.message);
         }
       }
     };
@@ -154,11 +154,11 @@
 
           if (tbody) {
             tbody.innerHTML += `
-              <tr class="border-b hover:bg-gray-50 transition text-sm">
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
                 <td class="px-6 py-4 font-bold text-gray-800">${p.email}</td>
-                <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${getRoleBadge(p.role)}">${p.role}</span></td>
+                <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${getRoleBadge(p.role)}">${p.role}</span></td>
                 <td class="px-6 py-4 text-right">
-                  <button onclick="deletePermissionRole('${id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash-can"></i></button>
+                  <button onclick="deletePermissionRole('${id}')" class="text-red-500 hover:text-red-700 transition"><i class="fa-solid fa-trash-can"></i></button>
                 </td>
               </tr>
             `;
@@ -172,9 +172,9 @@
     }
 
     function getRoleBadge(role) {
-      if (role === 'Admin') return 'bg-purple-100 text-purple-800';
-      if (role === 'Manager') return 'bg-blue-100 text-blue-800';
-      return 'bg-gray-100 text-gray-800';
+      if (role === 'Admin') return 'bg-purple-100 text-purple-700 border border-purple-200';
+      if (role === 'Manager') return 'bg-blue-100 text-blue-700 border border-blue-200';
+      return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
     }
 
     function applyRoleAccessUI() {
@@ -301,24 +301,24 @@
           if(repEmpSelect) repEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
 
           const row = `
-            <tr class="border-b hover:bg-gray-50 transition text-sm">
+            <tr class="border-b hover:bg-slate-50/80 transition text-sm">
               <td class="px-6 py-4 flex items-center space-x-3">
-                <img src="${emp.photoUrl}" alt="Photo" class="w-10 h-10 rounded-full object-cover border">
+                <img src="${emp.photoUrl}" alt="Photo" class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 shadow-sm">
                 <div>
                   <div class="font-bold text-gray-800">${emp.name}</div>
                   <div class="text-xs text-gray-500">${emp.phone || 'N/A'}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 text-gray-600">${emp.email}</td>
-              <td class="px-6 py-4"><span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full text-xs font-semibold">${emp.designation}</span></td>
-              <td class="px-6 py-4 text-gray-600">${emp.department}</td>
+              <td class="px-6 py-4 text-gray-600 font-medium">${emp.email}</td>
+              <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-xs font-bold">${emp.designation}</span></td>
+              <td class="px-6 py-4 text-gray-600 font-medium">${emp.department}</td>
               <td class="px-6 py-4 text-gray-600">${emp.joiningDate || 'N/A'}</td>
-              <td class="px-6 py-4 font-medium text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
+              <td class="px-6 py-4 font-bold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
               <td class="px-6 py-4">
-                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" download="Document" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center space-x-1 font-semibold"><i class="fa-solid fa-file-arrow-down"></i><span>View/Download</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
+                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" download="Document" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-xs flex items-center space-x-1 font-bold"><i class="fa-solid fa-file-arrow-down"></i><span>View Doc</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
               </td>
               <td class="px-6 py-4 text-right">
-                <button onclick="deleteEmployee('${id}')" class="text-red-600 hover:text-red-800 font-semibold">
+                <button onclick="deleteEmployee('${id}')" class="text-rose-500 hover:text-rose-700 transition">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
               </td>
@@ -364,13 +364,13 @@
       if (dueList.length > 0) {
         alertContainer.classList.remove('hidden');
         alertContainer.innerHTML = `
-          <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start space-x-3">
+          <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-l-4 border-amber-500 p-4 rounded-r-2xl shadow-sm flex items-start space-x-3">
             <i class="fa-solid fa-bell text-amber-600 text-xl mt-0.5"></i>
             <div>
-              <h4 class="font-bold text-amber-800 text-sm">Increment Alert! (${dueList.length} Employees Pending)</h4>
-              <p class="text-xs text-amber-700 mt-0.5">১ বছর পূর্ণ হওয়াতে নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়া বাকি রয়েছে:</p>
+              <h4 class="font-bold text-amber-900 text-sm">Increment Alert! (${dueList.length} Employees Pending)</h4>
+              <p class="text-xs text-amber-800 mt-0.5">১ বছর পূর্ণ হওয়াতে নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়া বাকি রয়েছে:</p>
               <div class="mt-2 flex flex-wrap gap-2">
-                ${dueList.map(item => `<span class="bg-amber-200 text-amber-900 px-2 py-1 rounded text-xs font-semibold">${item.name} (${item.designation})</span>`).join('')}
+                ${dueList.map(item => `<span class="bg-amber-200/80 text-amber-900 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300/50">${item.name} (${item.designation})</span>`).join('')}
               </div>
             </div>
           </div>
@@ -394,14 +394,14 @@
 
       dueList.forEach(emp => {
         const row = `
-          <tr class="border-b hover:bg-gray-50 transition text-sm">
+          <tr class="border-b hover:bg-slate-50 transition text-sm">
             <td class="px-6 py-4 font-bold text-gray-800">${emp.name}</td>
             <td class="px-6 py-4 text-gray-600">${emp.designation} (${emp.department})</td>
             <td class="px-6 py-4 text-gray-600">${emp.lastIncrementDate || emp.joiningDate}</td>
             <td class="px-6 py-4 font-semibold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
-            <td class="px-6 py-4"><span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-xs font-semibold">1 Year Completed</span></td>
+            <td class="px-6 py-4"><span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-xs font-bold">1 Year Completed</span></td>
             <td class="px-6 py-4 text-right">
-              <button onclick="openProcessIncModal('${emp.id}', '${emp.name}', ${emp.salary})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold">Process Increment</button>
+              <button onclick="openProcessIncModal('${emp.id}', '${emp.name}', ${emp.salary})" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">Process Increment</button>
             </td>
           </tr>
         `;
@@ -484,9 +484,9 @@
         const currentStatus = todayAttendanceData[emp.id] || 'Not Marked';
 
         const row = `
-          <tr class="border-b hover:bg-gray-50 transition text-sm">
+          <tr class="border-b hover:bg-slate-50 transition text-sm">
             <td class="px-6 py-4 flex items-center space-x-3">
-              <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border">
+              <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm">
               <div>
                 <div class="font-bold text-gray-800">${emp.name}</div>
                 <div class="text-xs text-gray-500">${emp.designation} (${emp.department})</div>
@@ -498,9 +498,9 @@
               </span>
             </td>
             <td class="px-6 py-4 text-right space-x-2">
-              <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Present</button>
-              <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-semibold">Late</button>
-              <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Absent</button>
+              <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Present</button>
+              <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition">Late</button>
+              <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Absent</button>
             </td>
           </tr>
         `;
@@ -509,11 +509,11 @@
     }
 
     function getStatusBadge(status) {
-      if (status === 'Present') return 'bg-green-100 text-green-800';
-      if (status === 'Late') return 'bg-yellow-100 text-yellow-800';
-      if (status === 'Absent') return 'bg-red-100 text-red-800';
-      if (status === 'On Leave') return 'bg-purple-100 text-purple-800';
-      return 'bg-gray-100 text-gray-600';
+      if (status === 'Present') return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+      if (status === 'Late') return 'bg-amber-100 text-amber-800 border border-amber-200';
+      if (status === 'Absent') return 'bg-rose-100 text-rose-800 border border-rose-200';
+      if (status === 'On Leave') return 'bg-purple-100 text-purple-800 border border-purple-200';
+      return 'bg-slate-100 text-slate-600';
     }
 
     window.markAttendance = async function(empId, status) {
@@ -574,15 +574,15 @@
           const id = docSnap.id;
           leaveList.push({ id, ...leave });
 
-          let badgeColor = 'bg-yellow-100 text-yellow-800';
-          if (leave.status === 'Approved') badgeColor = 'bg-green-100 text-green-800';
-          if (leave.status === 'Rejected') badgeColor = 'bg-red-100 text-red-800';
+          let badgeColor = 'bg-amber-100 text-amber-800 border border-amber-200';
+          if (leave.status === 'Approved') badgeColor = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+          if (leave.status === 'Rejected') badgeColor = 'bg-rose-100 text-rose-800 border border-rose-200';
 
           if (tbody) {
             const row = `
-              <tr class="border-b hover:bg-gray-50 transition text-sm">
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
                 <td class="px-6 py-4 font-bold text-gray-800">${leave.employeeName}</td>
-                <td class="px-6 py-4"><span class="bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full text-xs font-semibold">${leave.leaveType}</span></td>
+                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-full text-xs font-bold border">${leave.leaveType}</span></td>
                 <td class="px-6 py-4 text-gray-600">${leave.startDate} to ${leave.endDate}</td>
                 <td class="px-6 py-4 text-gray-600">${leave.reason}</td>
                 <td class="px-6 py-4">
@@ -592,9 +592,9 @@
                 </td>
                 <td class="px-6 py-4 text-right space-x-2">
                   ${leave.status === 'Pending' ? `
-                    <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Approve</button>
-                    <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Reject</button>
-                  ` : '<span class="text-xs text-gray-400">Processed</span>'}
+                    <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Approve</button>
+                    <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Reject</button>
+                  ` : '<span class="text-xs text-gray-400 font-semibold">Processed</span>'}
                 </td>
               </tr>
             `;
@@ -682,17 +682,17 @@
 
           if (tbody) {
             const row = `
-              <tr class="border-b hover:bg-gray-50 transition text-sm">
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
                 <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
-                <td class="px-6 py-4 font-semibold text-blue-600">${pay.month}</td>
+                <td class="px-6 py-4 font-bold text-indigo-600">${pay.month}</td>
                 <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
-                <td class="px-6 py-4 text-green-600">+৳ ${pay.bonus.toLocaleString()}</td>
-                <td class="px-6 py-4 text-orange-600">-৳ ${pay.advance.toLocaleString()}</td>
-                <td class="px-6 py-4 text-red-600">-৳ ${pay.fine.toLocaleString()}</td>
-                <td class="px-6 py-4 font-bold text-gray-900">৳ ${pay.net.toLocaleString()}</td>
-                <td class="px-6 py-4"><span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-semibold">${pay.status}</span></td>
+                <td class="px-6 py-4 text-emerald-600 font-semibold">+৳ ${pay.bonus.toLocaleString()}</td>
+                <td class="px-6 py-4 text-amber-600 font-semibold">-৳ ${pay.advance.toLocaleString()}</td>
+                <td class="px-6 py-4 text-rose-600 font-semibold">-৳ ${pay.fine.toLocaleString()}</td>
+                <td class="px-6 py-4 font-extrabold text-slate-900">৳ ${pay.net.toLocaleString()}</td>
+                <td class="px-6 py-4"><span class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold">${pay.status}</span></td>
                 <td class="px-6 py-4 text-right">
-                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-end space-x-1">
+                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-lg text-xs font-bold flex items-center justify-end space-x-1 transition ml-auto">
                     <i class="fa-solid fa-print"></i><span>Payslip</span>
                   </button>
                 </td>
@@ -792,25 +792,25 @@
 
           if (grid) {
             const card = `
-              <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
+              <div class="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
                 <div class="flex items-start justify-between">
                   <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold flex-shrink-0">
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-bold flex-shrink-0">
                       <i class="fa-solid fa-file-lines text-lg"></i>
                     </div>
                     <div>
                       <h4 class="font-bold text-gray-800 text-sm">${item.title}</h4>
                       <div class="flex items-center space-x-2 mt-1">
-                        <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">${item.category}</span>
-                        <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded"><i class="fa-regular fa-user mr-1"></i>${item.targetEmployee || 'General'}</span>
+                        <span class="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200">${item.category}</span>
+                        <span class="text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full"><i class="fa-regular fa-user mr-1"></i>${item.targetEmployee || 'General'}</span>
                       </div>
                     </div>
                   </div>
-                  <button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                  <button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-rose-600 transition ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
                 </div>
                 <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
                   <span>Date: ${item.uploadedAt}</span>
-                  <a href="${item.fileUrl}" download="${item.title}" target="_blank" class="text-blue-600 hover:underline font-bold flex items-center space-x-1">
+                  <a href="${item.fileUrl}" download="${item.title}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1">
                     <i class="fa-solid fa-download"></i><span>Download</span>
                   </a>
                 </div>
@@ -872,14 +872,14 @@
 
           if (tbody) {
             const row = `
-              <tr class="border-b hover:bg-gray-50 transition text-sm">
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
                 <td class="px-6 py-4 font-bold text-gray-800">${perf.employeeName} <span class="text-xs font-normal text-gray-500">(${perf.designation})</span></td>
                 <td class="px-6 py-4 text-amber-500 font-bold">${stars} (${perf.rating}/5)</td>
-                <td class="px-6 py-4 font-semibold text-blue-600">${perf.kpiScore}%</td>
+                <td class="px-6 py-4 font-bold text-indigo-600">${perf.kpiScore}%</td>
                 <td class="px-6 py-4 text-gray-600">${perf.feedback}</td>
                 <td class="px-6 py-4 text-gray-500 text-xs">${perf.reviewDate}</td>
                 <td class="px-6 py-4 text-right">
-                  <button onclick="deletePerformance('${id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash-can"></i></button>
+                  <button onclick="deletePerformance('${id}')" class="text-rose-500 hover:text-rose-700 transition"><i class="fa-solid fa-trash-can"></i></button>
                 </td>
               </tr>
             `;
@@ -931,12 +931,12 @@
           container.innerHTML = '';
           noticeList.forEach(notice => {
             const card = `
-              <div class="bg-white p-5 rounded-xl border shadow-sm space-y-2 border-l-4 border-l-blue-600">
+              <div class="bg-white p-5 rounded-2xl border shadow-sm space-y-2 border-l-4 border-l-indigo-600">
                 <div class="flex justify-between items-center">
                   <h3 class="font-bold text-gray-800 text-base">${notice.title}</h3>
                   <div class="flex items-center space-x-2">
-                    <span class="text-xs text-gray-400"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
-                    <button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                    <span class="text-xs text-gray-400 font-medium"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
+                    <button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-rose-600 ml-2 transition"><i class="fa-solid fa-trash-can text-sm"></i></button>
                   </div>
                 </div>
                 <p class="text-sm text-gray-600 leading-relaxed">${notice.description}</p>
@@ -981,16 +981,16 @@
       contentBox.innerHTML = `
         <div class="transition-all duration-500 ease-in-out">
           <div class="flex justify-between items-center mb-2">
-            <span class="bg-blue-600 text-white text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">📢 Notice ${currentNoticeIndex + 1} / ${noticeList.length}</span>
-            <span class="text-xs text-blue-200"><i class="fa-regular fa-clock mr-1"></i>${notice.postedDate}</span>
+            <span class="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase px-3 py-1 rounded-full border border-white/20">📢 Notice ${currentNoticeIndex + 1} / ${noticeList.length}</span>
+            <span class="text-xs text-indigo-100 font-medium"><i class="fa-regular fa-clock mr-1"></i>${notice.postedDate}</span>
           </div>
           <h3 class="text-lg font-bold text-white">${notice.title}</h3>
-          <p class="text-sm text-blue-100 mt-1 leading-relaxed line-clamp-2">${notice.description}</p>
+          <p class="text-sm text-indigo-100 mt-1 leading-relaxed line-clamp-2">${notice.description}</p>
         </div>
       `;
 
       dotsBox.innerHTML = noticeList.map((_, i) => `
-        <button onclick="showNoticeSlide(${i})" class="w-2.5 h-2.5 rounded-full transition-all ${i === currentNoticeIndex ? 'bg-white w-6' : 'bg-blue-400/60'}"></button>
+        <button onclick="showNoticeSlide(${i})" class="w-2.5 h-2.5 rounded-full transition-all ${i === currentNoticeIndex ? 'bg-white w-6' : 'bg-indigo-300/50'}"></button>
       `).join('');
     };
 
@@ -1012,7 +1012,7 @@
       }
     };
 
-    // 📊 EXPANDED REPORTS MODULE LOGIC
+    // 📊 REPORTS MODULE LOGIC
     let currentReportTableData = { headers: [], rows: [] };
 
     window.generateReport = function() {
@@ -1094,18 +1094,18 @@
         ]);
       }
 
-      let headRow = '<tr class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">';
-      currentReportTableData.headers.forEach(h => headRow += `<th class="px-6 py-3">${h}</th>`);
+      let headRow = '<tr class="bg-slate-100 text-xs font-bold uppercase text-slate-700 border-b">';
+      currentReportTableData.headers.forEach(h => headRow += `<th class="px-6 py-3.5">${h}</th>`);
       headRow += '</tr>';
       thead.innerHTML = headRow;
 
       if (currentReportTableData.rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${currentReportTableData.headers.length}" class="text-center py-6 text-gray-400 text-sm">কোনো ডাটা পাওয়া যায়নি 🔍</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${currentReportTableData.headers.length}" class="text-center py-6 text-gray-400 text-sm font-medium">কোনো ডাটা পাওয়া যায়নি 🔍</td></tr>`;
         return;
       }
 
       currentReportTableData.rows.forEach(r => {
-        let rowHtml = '<tr class="border-b hover:bg-gray-50 transition text-sm">';
+        let rowHtml = '<tr class="border-b hover:bg-slate-50 transition text-sm">';
         r.forEach(val => rowHtml += `<td class="px-6 py-4">${val}</td>`);
         rowHtml += '</tr>';
         tbody.innerHTML += rowHtml;
@@ -1146,78 +1146,91 @@
     };
   </script>
 </head>
-<body class="bg-gray-100 font-sans antialiased">
+<body class="bg-slate-100 font-sans antialiased text-gray-800">
 
   <!-- 🔐 Login View -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-slate-900 px-4">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-      <div class="text-center mb-6">
-        <i class="fa-solid fa-users-gear text-blue-600 text-4xl mb-2"></i>
-        <h2 class="text-2xl font-bold text-gray-800">HR System Login</h2>
+  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-4">
+    <div class="bg-white/95 backdrop-blur-lg p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/20">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-3">
+          <i class="fa-solid fa-users-gear text-white text-3xl"></i>
+        </div>
+        <h2 class="text-2xl font-black text-gray-800 tracking-tight">HR Management</h2>
+        <p class="text-xs text-gray-500 mt-1 font-medium">সাইন-ইন করে আপনার প্যানেলে প্রবেশ করুন</p>
       </div>
-      <div id="login-error" class="hidden mb-4 p-3 bg-red-100 text-red-700 text-sm rounded-lg"></div>
+      <div id="login-error" class="hidden mb-4 p-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs rounded-xl font-medium"></div>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700">Email Address</label>
-          <input type="email" id="login-email" class="w-full mt-1 p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="admin@22554.com">
+          <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Email Address</label>
+          <input type="email" id="login-email" class="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="admin@22554.com">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Password</label>
-          <input type="password" id="login-password" class="w-full mt-1 p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••">
+          <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Password</label>
+          <input type="password" id="login-password" class="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••••••">
         </div>
-        <button onclick="loginUser()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold transition">Sign In</button>
+        <button onclick="loginUser()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition">Sign In</button>
       </div>
     </div>
   </div>
 
   <!-- 📊 Main App View -->
   <div id="app-screen" class="hidden flex h-screen overflow-hidden">
-    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between flex-shrink-0">
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between flex-shrink-0 shadow-xl">
       <div>
-        <div class="p-5 text-xl font-bold border-b border-slate-800 flex items-center space-x-2">
-          <i class="fa-solid fa-users-gear text-blue-500"></i>
-          <span>HR System</span>
+        <div class="p-6 border-b border-slate-800/80 flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center shadow-md">
+            <i class="fa-solid fa-users-gear text-white text-lg"></i>
+          </div>
+          <div>
+            <span class="text-lg font-black tracking-tight text-white block leading-tight">HR System</span>
+            <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Enterprise Pro</span>
+          </div>
         </div>
-        <nav class="mt-4 px-3 space-y-1 text-sm overflow-y-auto max-h-[calc(100vh-140px)]">
-          <a id="nav-dashboard" href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line w-5"></i><span>Dashboard</span></a>
-          <a id="nav-employees" href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-user-group w-5"></i><span>Employees</span></a>
-          <a id="nav-attendance" href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-clock w-5"></i><span>Attendance</span></a>
-          <a id="nav-leave" href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-pen w-5"></i><span>Leave Requests</span></a>
-          <a id="nav-payroll" href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-sack-dollar w-5"></i><span>Payroll</span></a>
-          <a id="nav-increment" href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line-up w-5"></i><span>Increment</span></a>
-          <a id="nav-documents" href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-folder-open w-5"></i><span>Documents</span></a>
-          <a id="nav-performance" href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullseye w-5"></i><span>Performance</span></a>
-          <a id="nav-notice" href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullhorn w-5"></i><span>Notice Board</span></a>
-          <a id="nav-reports" href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-chart-column w-5"></i><span>Reports</span></a>
-          <a id="nav-settings" href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-gear w-5"></i><span>Settings</span></a>
+        <nav class="mt-4 px-3 space-y-1.5 text-sm overflow-y-auto max-h-[calc(100vh-140px)]">
+          <a id="nav-dashboard" href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group active"><i class="fa-solid fa-chart-line w-5 text-indigo-400"></i><span>Dashboard</span></a>
+          <a id="nav-employees" href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-user-group w-5 text-emerald-400"></i><span>Employees</span></a>
+          <a id="nav-attendance" href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-clock w-5 text-amber-400"></i><span>Attendance</span></a>
+          <a id="nav-leave" href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-file-pen w-5 text-rose-400"></i><span>Leave Requests</span></a>
+          <a id="nav-payroll" href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-sack-dollar w-5 text-teal-400"></i><span>Payroll</span></a>
+          <a id="nav-increment" href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-chart-line-up w-5 text-purple-400"></i><span>Increment</span></a>
+          <a id="nav-documents" href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-folder-open w-5 text-sky-400"></i><span>Documents</span></a>
+          <a id="nav-performance" href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-bullseye w-5 text-pink-400"></i><span>Performance</span></a>
+          <a id="nav-notice" href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-bullhorn w-5 text-orange-400"></i><span>Notice Board</span></a>
+          <a id="nav-reports" href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-file-chart-column w-5 text-cyan-400"></i><span>Reports</span></a>
+          <a id="nav-settings" href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-gear w-5 text-slate-400"></i><span>Settings</span></a>
         </nav>
       </div>
-      <div class="p-4 border-t border-slate-800">
-        <button onclick="logoutUser()" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm transition flex items-center justify-center space-x-2">
+      <div class="p-4 border-t border-slate-800/80">
+        <button onclick="logoutUser()" class="w-full bg-rose-600/10 hover:bg-rose-600 border border-rose-500/30 text-rose-400 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2">
           <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
         </button>
       </div>
     </aside>
 
-    <main class="flex-1 flex flex-col overflow-y-auto bg-gray-50">
-      <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <h1 id="page-title" class="text-xl font-bold text-gray-800">Dashboard</h1>
+    <!-- Main Section -->
+    <main class="flex-1 flex flex-col overflow-y-auto bg-slate-50">
+      <header class="bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-200/80 px-8 py-4 flex justify-between items-center sticky top-0 z-30">
+        <h1 id="page-title" class="text-xl font-black text-gray-800 tracking-tight">Dashboard</h1>
         <div class="flex items-center space-x-3">
-          <span id="user-email" class="text-sm font-medium text-gray-600"></span>
+          <div class="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs">
+            <i class="fa-solid fa-user-shield"></i>
+          </div>
+          <span id="user-email" class="text-xs font-bold text-gray-600"></span>
         </div>
       </header>
 
-      <div class="p-6 space-y-6">
+      <div class="p-8 space-y-6">
         
         <!-- Dashboard Notice Slider Banner -->
-        <div id="dash-notice-slider-container" class="hidden relative bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl shadow-lg p-6 text-white overflow-hidden">
+        <div id="dash-notice-slider-container" class="hidden relative bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-800 rounded-3xl shadow-xl shadow-indigo-500/15 p-6 text-white overflow-hidden border border-white/10">
           <div class="flex justify-between items-center relative z-10">
             <div id="dash-notice-slide-content" class="w-full pr-12">
               <!-- Dynamic Slide Content -->
             </div>
           </div>
 
-          <div class="flex items-center justify-between mt-4 pt-3 border-t border-blue-500/30 relative z-10">
+          <div class="flex items-center justify-between mt-4 pt-3 border-t border-indigo-400/30 relative z-10">
             <div id="dash-notice-dots" class="flex space-x-2">
               <!-- Dots -->
             </div>
@@ -1231,42 +1244,123 @@
         <!-- Alert Box for Pending Increments -->
         <div id="dash-increment-alert" class="hidden"></div>
 
-        <!-- Dashboard Section -->
+        <!-- Dashboard Colorful Cards Section -->
         <section id="sec-dashboard" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div class="bg-white p-5 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-bold uppercase">Total Employees</p><h3 id="dash-total-emp" class="text-2xl font-bold text-gray-800 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-green-500"><p class="text-xs text-gray-500 font-bold uppercase">Present Today</p><h3 id="dash-present-today" class="text-2xl font-bold text-green-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-red-500"><p class="text-xs text-gray-500 font-bold uppercase">Absent Today</p><h3 id="dash-absent-today" class="text-2xl font-bold text-red-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-yellow-500"><p class="text-xs text-gray-500 font-bold uppercase">On Leave</p><h3 id="dash-leave-today" class="text-2xl font-bold text-yellow-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-purple-500"><p class="text-xs text-gray-500 font-bold uppercase">Increment Due</p><h3 id="dash-increment-due" class="text-2xl font-bold text-purple-600 mt-2">0</h3></div>
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
+            
+            <!-- Total Employees -->
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-100 opacity-90">Total Employees</p>
+                  <h3 id="dash-total-emp" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-users text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-indigo-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5"><i class="fa-solid fa-arrow-up mr-1"></i>Active</span>
+                <span>Workforce</span>
+              </div>
+            </div>
+
+            <!-- Present Today -->
+            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100 opacity-90">Present Today</p>
+                  <h3 id="dash-present-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-user-check text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-emerald-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Live</span>
+                <span>Attendance</span>
+              </div>
+            </div>
+
+            <!-- Absent Today -->
+            <div class="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-lg shadow-rose-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-rose-100 opacity-90">Absent Today</p>
+                  <h3 id="dash-absent-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-user-xmark text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-rose-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Noted</span>
+                <span>Unexcused</span>
+              </div>
+            </div>
+
+            <!-- On Leave -->
+            <div class="bg-gradient-to-br from-amber-500 to-orange-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-amber-100 opacity-90">On Leave</p>
+                  <h3 id="dash-leave-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-plane-departure text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-amber-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Approved</span>
+                <span>Leave</span>
+              </div>
+            </div>
+
+            <!-- Increment Due -->
+            <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-3xl text-white shadow-lg shadow-purple-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-purple-100 opacity-90">Increment Due</p>
+                  <h3 id="dash-increment-due" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-chart-line-up text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-purple-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">1 Year</span>
+                <span>Completed</span>
+              </div>
+            </div>
+
           </div>
         </section>
 
         <!-- Employees Section -->
         <section id="sec-employees" class="hidden">
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <div class="p-5 border-b flex justify-between items-center bg-gray-50">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <div>
-                <h2 class="text-lg font-bold text-gray-800">Employee Directory</h2>
-                <p class="text-xs text-gray-500">সব কর্মচারীর বিস্তারিত তালিকা</p>
+                <h2 class="text-lg font-black text-gray-800">Employee Directory</h2>
+                <p class="text-xs text-gray-500 font-medium">সব কর্মচারীর বিস্তারিত তালিকা</p>
               </div>
-              <button onclick="toggleModal('add-emp-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+              <button onclick="toggleModal('add-emp-modal', true)" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
                 <i class="fa-solid fa-plus"></i><span>Add Employee</span>
               </button>
             </div>
 
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee</th>
-                    <th class="px-6 py-3">Email</th>
-                    <th class="px-6 py-3">Designation</th>
-                    <th class="px-6 py-3">Department</th>
-                    <th class="px-6 py-3">Joining Date</th>
-                    <th class="px-6 py-3">Salary</th>
-                    <th class="px-6 py-3">Document</th>
-                    <th class="px-6 py-3 text-right">Action</th>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Email</th>
+                    <th class="px-6 py-4">Designation</th>
+                    <th class="px-6 py-4">Department</th>
+                    <th class="px-6 py-4">Joining Date</th>
+                    <th class="px-6 py-4">Salary</th>
+                    <th class="px-6 py-4">Document</th>
+                    <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody id="emp-table-body">
@@ -1279,22 +1373,22 @@
 
         <!-- Attendance Section -->
         <section id="sec-attendance" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
-            <h2 class="text-lg font-bold text-gray-800">Daily Attendance Sheet</h2>
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Daily Attendance Sheet</h2>
             <div class="flex items-center space-x-2">
               <label class="text-xs font-bold text-gray-600">Select Date:</label>
-              <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+              <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-bold bg-slate-50">
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee Name</th>
-                    <th class="px-6 py-3">Current Status</th>
-                    <th class="px-6 py-3 text-right">Mark Attendance</th>
+                    <th class="px-6 py-4">Employee Name</th>
+                    <th class="px-6 py-4">Current Status</th>
+                    <th class="px-6 py-4 text-right">Mark Attendance</th>
                   </tr>
                 </thead>
                 <tbody id="att-table-body">
@@ -1307,24 +1401,24 @@
 
         <!-- Leave Requests Section -->
         <section id="sec-leave" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
-            <h2 class="text-lg font-bold text-gray-800">Leave Requests Management</h2>
-            <button onclick="toggleModal('add-leave-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Leave Requests Management</h2>
+            <button onclick="toggleModal('add-leave-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
               <i class="fa-solid fa-plus"></i><span>Apply Leave</span>
             </button>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee</th>
-                    <th class="px-6 py-3">Leave Type</th>
-                    <th class="px-6 py-3">Duration</th>
-                    <th class="px-6 py-3">Reason</th>
-                    <th class="px-6 py-3">Status</th>
-                    <th class="px-6 py-3 text-right">Action</th>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Leave Type</th>
+                    <th class="px-6 py-4">Duration</th>
+                    <th class="px-6 py-4">Reason</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody id="leave-table-body">
@@ -1337,27 +1431,27 @@
 
         <!-- Payroll Section -->
         <section id="sec-payroll" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
-            <h2 class="text-lg font-bold text-gray-800">Payroll & Salary Management</h2>
-            <button onclick="toggleModal('add-payroll-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Payroll & Salary Management</h2>
+            <button onclick="toggleModal('add-payroll-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-emerald-500/20">
               <i class="fa-solid fa-plus"></i><span>Generate Salary Slip</span>
             </button>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee</th>
-                    <th class="px-6 py-3">Month</th>
-                    <th class="px-6 py-3">Basic Salary</th>
-                    <th class="px-6 py-3">Bonus</th>
-                    <th class="px-6 py-3">Advance Deduction</th>
-                    <th class="px-6 py-3">Fine Deduction</th>
-                    <th class="px-6 py-3">Net Salary</th>
-                    <th class="px-6 py-3">Status</th>
-                    <th class="px-6 py-3 text-right">Action</th>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Month</th>
+                    <th class="px-6 py-4">Basic Salary</th>
+                    <th class="px-6 py-4">Bonus</th>
+                    <th class="px-6 py-4">Advance Deduction</th>
+                    <th class="px-6 py-4">Fine Deduction</th>
+                    <th class="px-6 py-4">Net Salary</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody id="payroll-table-body">
@@ -1370,24 +1464,24 @@
 
         <!-- Increment Section -->
         <section id="sec-increment" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Increment Due Management</h2>
-              <p class="text-xs text-gray-500">১ বছর পূর্ণ হওয়া কর্মচারীদের তালিকা ও ইনক্রিমেন্ট প্রসেসিং</p>
+              <h2 class="text-lg font-black text-gray-800">Increment Due Management</h2>
+              <p class="text-xs text-gray-500 font-medium">১ বছর পূর্ণ হওয়া কর্মচারীদের তালিকা ও ইনক্রিমেন্ট প্রসেসিং</p>
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee Name</th>
-                    <th class="px-6 py-3">Designation</th>
-                    <th class="px-6 py-3">Last Increment Date</th>
-                    <th class="px-6 py-3">Current Salary</th>
-                    <th class="px-6 py-3">Status</th>
-                    <th class="px-6 py-3 text-right">Action</th>
+                    <th class="px-6 py-4">Employee Name</th>
+                    <th class="px-6 py-4">Designation</th>
+                    <th class="px-6 py-4">Last Increment Date</th>
+                    <th class="px-6 py-4">Current Salary</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody id="inc-table-body">
@@ -1400,44 +1494,44 @@
 
         <!-- 📄 Documents Section -->
         <section id="sec-documents" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Company & Employee Documents</h2>
-              <p class="text-xs text-gray-500">সকল প্রকার অ্যাডভান্স স্যালারি, NID, TIN, VAT, BIN ও নোটিশ ডকুমেন্ট ট্র্যাকিং</p>
+              <h2 class="text-lg font-black text-gray-800">Company & Employee Documents</h2>
+              <p class="text-xs text-gray-500 font-medium">সকল প্রকার অ্যাডভান্স স্যালারি, NID, TIN, VAT, BIN ও নোটিশ ডকুমেন্ট ট্র্যাকিং</p>
             </div>
-            <button onclick="toggleModal('add-doc-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+            <button onclick="toggleModal('add-doc-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
               <i class="fa-solid fa-upload"></i><span>Upload Document</span>
             </button>
           </div>
 
-          <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
             <!-- Dynamic Document Cards -->
           </div>
         </section>
 
         <!-- 🎯 Performance Section -->
         <section id="sec-performance" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Employee Performance Reviews</h2>
-              <p class="text-xs text-gray-500">কর্মচারীদের কাজের পারফরম্যান্স মূল্যায়ন</p>
+              <h2 class="text-lg font-black text-gray-800">Employee Performance Reviews</h2>
+              <p class="text-xs text-gray-500 font-medium">কর্মচারীদের কাজের পারফরম্যান্স মূল্যায়ন</p>
             </div>
-            <button onclick="toggleModal('add-perf-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+            <button onclick="toggleModal('add-perf-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
               <i class="fa-solid fa-plus"></i><span>Add Review</span>
             </button>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
-                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3">Employee</th>
-                    <th class="px-6 py-3">Rating</th>
-                    <th class="px-6 py-3">KPI Score</th>
-                    <th class="px-6 py-3">Feedback</th>
-                    <th class="px-6 py-3">Date</th>
-                    <th class="px-6 py-3 text-right">Action</th>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Rating</th>
+                    <th class="px-6 py-4">KPI Score</th>
+                    <th class="px-6 py-4">Feedback</th>
+                    <th class="px-6 py-4">Date</th>
+                    <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody id="perf-table-body">
@@ -1450,12 +1544,12 @@
 
         <!-- 📢 Notice Board Section -->
         <section id="sec-notice" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Notice Board</h2>
-              <p class="text-xs text-gray-500">কোম্পানির সকল সাধারণ বিজ্ঞপ্তি ও নির্দেশনা</p>
+              <h2 class="text-lg font-black text-gray-800">Notice Board</h2>
+              <p class="text-xs text-gray-500 font-medium">কোম্পানির সকল সাধারণ বিজ্ঞপ্তি ও নির্দেশনা</p>
             </div>
-            <button onclick="toggleModal('add-notice-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+            <button onclick="toggleModal('add-notice-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
               <i class="fa-solid fa-bullhorn"></i><span>Post Notice</span>
             </button>
           </div>
@@ -1467,25 +1561,25 @@
 
         <!-- 📊 EXPANDED REPORTS SECTION -->
         <section id="sec-reports" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Comprehensive HR Reports & Analytics</h2>
-              <p class="text-xs text-gray-500">মাস ও কর্মচারী ভিত্তিক ফিল্টার এবং এক্সেল / PDF এক্সপোর্ট</p>
+              <h2 class="text-lg font-black text-gray-800">Comprehensive HR Reports & Analytics</h2>
+              <p class="text-xs text-gray-500 font-medium">মাস ও কর্মচারী ভিত্তিক ফিল্টার এবং এক্সেল / PDF এক্সপোর্ট</p>
             </div>
             <div class="flex items-center space-x-2">
-              <button onclick="downloadReportExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition shadow-sm">
+              <button onclick="downloadReportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-emerald-500/20">
                 <i class="fa-solid fa-file-excel"></i><span>📥 Excel Download</span>
               </button>
-              <button onclick="printFullReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition shadow-sm">
+              <button onclick="printFullReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-md">
                 <i class="fa-solid fa-print"></i><span>🖨 Print / PDF</span>
               </button>
             </div>
           </div>
 
-          <div class="bg-white p-5 rounded-xl border shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label class="block text-xs font-bold text-gray-700 mb-1">Select Report Category *</label>
-              <select id="rep-type" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium">
+              <select id="rep-type" onchange="generateReport()" class="w-full p-3 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
                 <option value="EMPLOYEE">👥 Employee Reports</option>
                 <option value="ATTENDANCE">🕐 Attendance Reports</option>
                 <option value="LEAVE">📝 Leave Reports</option>
@@ -1502,18 +1596,18 @@
 
             <div>
               <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Month</label>
-              <input type="month" id="rep-filter-month" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+              <input type="month" id="rep-filter-month" onchange="generateReport()" class="w-full p-2.5 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
             </div>
 
             <div>
               <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Employee</label>
-              <select id="rep-filter-emp" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+              <select id="rep-filter-emp" onchange="generateReport()" class="w-full p-3 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
                 <option value="ALL">All Employees</option>
               </select>
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
                 <thead id="rep-table-head">
@@ -1532,52 +1626,52 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
             <!-- General Settings & Change Password Box -->
-            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
               <div>
-                <h2 class="text-lg font-bold text-gray-800 border-b pb-2">General System Settings</h2>
+                <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">General System Settings</h2>
                 <form onsubmit="saveSettings(event)" class="space-y-3 mt-3">
                   <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
-                    <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
-                    <input type="email" value="admin@22554.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="email" value="admin@22554.com" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
                   </div>
                   <div class="pt-2 flex justify-end">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition">Save Settings</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm">Save Settings</button>
                   </div>
                 </form>
               </div>
 
               <!-- Password Change Form -->
-              <div class="pt-4 border-t">
-                <h3 class="text-md font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-blue-600 mr-2"></i>Change My Password</h3>
+              <div class="pt-4 border-t border-slate-100">
+                <h3 class="text-md font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-indigo-600 mr-2"></i>Change My Password</h3>
                 <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
                   <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">New Password *</label>
-                    <input type="password" id="settings-new-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="password" id="settings-new-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                   </div>
                   <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Confirm New Password *</label>
-                    <input type="password" id="settings-confirm-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="password" id="settings-confirm-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                   </div>
-                  <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-semibold transition">Update Password</button>
+                  <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Update Password</button>
                 </form>
               </div>
             </div>
 
             <!-- Role-Based Permissions & Password Assignment Panel -->
-            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">User Role & Access Permissions</h2>
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">User Role & Access Permissions</h2>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
                 <div>
                   <label class="block text-xs font-bold text-gray-700 mb-1">User Email Address *</label>
-                  <input type="email" id="perm-email" required placeholder="e.g. manager@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  <input type="email" id="perm-email" required placeholder="e.g. manager@test.com" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-gray-700 mb-1">Assign Role *</label>
-                  <select id="perm-role" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <select id="perm-role" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
                     <option value="Admin">Admin (Full Control Access)</option>
                     <option value="Manager">Manager (Employee, Attendance, Leave, Performance & Notices)</option>
                     <option value="Employee">Employee (Attendance, Leave, Documents & Notices)</option>
@@ -1585,16 +1679,16 @@
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-gray-700 mb-1">User Password *</label>
-                  <input type="text" id="perm-user-pass" required minlength="6" placeholder="Set password for this user..." class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  <input type="text" id="perm-user-pass" required minlength="6" placeholder="Set password for this user..." class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
-                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-semibold transition">Assign Role & Password</button>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-purple-500/20">Assign Role & Password</button>
               </form>
 
-              <div class="pt-4 border-t">
-                <h4 class="font-bold text-gray-800 text-xs uppercase mb-2">Assigned User Roles</h4>
+              <div class="pt-4 border-t border-slate-100">
+                <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2">Assigned User Roles</h4>
                 <div class="overflow-x-auto max-h-48 overflow-y-auto">
                   <table class="w-full text-left text-xs text-gray-600">
-                    <thead class="bg-gray-100 uppercase text-gray-700 sticky top-0">
+                    <thead class="bg-slate-100 uppercase text-slate-700 sticky top-0">
                       <tr>
                         <th class="px-3 py-2">Email</th>
                         <th class="px-3 py-2">Role</th>
@@ -1617,87 +1711,87 @@
   </div>
 
   <!-- Add Employee Modal -->
-  <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Add New Employee</h3>
+  <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Add New Employee</h3>
         <button onclick="toggleModal('add-emp-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="emp-form" onsubmit="saveEmployee(event)" class="p-5 space-y-4 overflow-y-auto">
+      <form id="emp-form" onsubmit="saveEmployee(event)" class="p-6 space-y-4 overflow-y-auto">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
-          <input type="text" id="emp-name" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <input type="text" id="emp-name" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
         </div>
         
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Email *</label>
-            <input type="email" id="emp-email" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="email" id="emp-email" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Phone Number *</label>
-            <input type="text" id="emp-phone" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="017xxxxxxxx">
+            <input type="text" id="emp-phone" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="017xxxxxxxx">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Profile Photo Upload (JPG/PNG)</label>
-          <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+          <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Designation *</label>
-            <input type="text" id="emp-designation" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Manager">
+            <input type="text" id="emp-designation" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Manager">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Department *</label>
-            <input type="text" id="emp-department" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Operations">
+            <input type="text" id="emp-department" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Operations">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Joining Date *</label>
-            <input type="date" id="emp-joining" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="date" id="emp-joining" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Salary (BDT) *</label>
-            <input type="number" id="emp-salary" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="number" id="emp-salary" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Upload Document / NID / CV (PDF / Document / Image)</label>
-          <input type="file" id="emp-doc-file" accept=".pdf,.doc,.docx,image/*" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+          <input type="file" id="emp-doc-file" accept=".pdf,.doc,.docx,image/*" class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-emp-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" id="save-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Save Employee</button>
+          <button type="button" onclick="toggleModal('add-emp-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" id="save-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Save Employee</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Apply Leave Modal -->
-  <div id="add-leave-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Apply Leave Request</h3>
+  <div id="add-leave-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Apply Leave Request</h3>
         <button onclick="toggleModal('add-leave-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="leave-form" onsubmit="submitLeave(event)" class="p-5 space-y-4">
+      <form id="leave-form" onsubmit="submitLeave(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
-          <select id="leave-emp-id" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+          <select id="leave-emp-id" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="">Select Employee</option>
           </select>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Leave Type *</label>
-          <select id="leave-type" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+          <select id="leave-type" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="Casual Leave">Casual Leave</option>
             <option value="Sick Leave">Sick Leave</option>
             <option value="Annual Leave">Annual Leave</option>
@@ -1708,144 +1802,144 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Start Date *</label>
-            <input type="date" id="leave-start" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="date" id="leave-start" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">End Date *</label>
-            <input type="date" id="leave-end" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="date" id="leave-end" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Reason *</label>
-          <textarea id="leave-reason" required rows="3" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Write reason for leave..."></textarea>
+          <textarea id="leave-reason" required rows="3" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write reason for leave..."></textarea>
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-leave-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Submit Request</button>
+          <button type="button" onclick="toggleModal('add-leave-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Submit Request</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Generate Payroll Modal -->
-  <div id="add-payroll-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Generate Payroll</h3>
+  <div id="add-payroll-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Generate Payroll</h3>
         <button onclick="toggleModal('add-payroll-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="payroll-form" onsubmit="savePayroll(event)" class="p-5 space-y-4">
+      <form id="payroll-form" onsubmit="savePayroll(event)" class="p-6 space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
-            <select id="pay-emp-id" onchange="onPayrollEmpChange()" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+            <select id="pay-emp-id" onchange="onPayrollEmpChange()" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
               <option value="">Select Employee</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Salary Month *</label>
-            <input type="month" id="pay-month" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="month" id="pay-month" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Basic Salary (BDT)</label>
-            <input type="number" id="pay-basic" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 font-bold outline-none">
+            <input type="number" id="pay-basic" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 font-bold outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Bonus / Allowance (BDT)</label>
-            <input type="number" id="pay-bonus" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="number" id="pay-bonus" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Advance Salary Cut (BDT)</label>
-            <input type="number" id="pay-advance" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="number" id="pay-advance" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Fine / Deductions (BDT)</label>
-            <input type="number" id="pay-fine" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            <input type="number" id="pay-fine" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Net Payable Salary (BDT)</label>
-          <input type="number" id="pay-net" readonly class="w-full p-2.5 border rounded-lg text-lg font-bold bg-green-50 text-green-700 outline-none">
+          <input type="number" id="pay-net" readonly class="w-full p-2.5 border border-emerald-300 rounded-xl text-lg font-black bg-emerald-50 text-emerald-700 outline-none">
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-payroll-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Process & Pay</button>
+          <button type="button" onclick="toggleModal('add-payroll-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition">Process & Pay</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Process Increment Modal -->
-  <div id="inc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Process Salary Increment</h3>
+  <div id="inc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Process Salary Increment</h3>
         <button onclick="toggleModal('inc-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form onsubmit="submitIncrement(event)" class="p-5 space-y-4">
+      <form onsubmit="submitIncrement(event)" class="p-6 space-y-4">
         <input type="hidden" id="inc-emp-id">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Employee Name</label>
-          <input type="text" id="inc-emp-name" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 font-bold outline-none">
+          <input type="text" id="inc-emp-name" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 font-bold outline-none">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Current Salary</label>
-            <input type="number" id="inc-curr-salary" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 outline-none">
+            <input type="number" id="inc-curr-salary" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 outline-none">
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Increment Amount *</label>
-            <input type="number" id="inc-amount" oninput="calculateNewIncSalary()" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 2000">
+            <input type="number" id="inc-amount" oninput="calculateNewIncSalary()" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 2000">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">New Updated Salary</label>
-          <input type="number" id="inc-new-salary" readonly class="w-full p-2.5 border rounded-lg text-lg font-bold bg-blue-50 text-blue-700 outline-none">
+          <input type="number" id="inc-new-salary" readonly class="w-full p-2.5 border border-indigo-200 rounded-xl text-lg font-black bg-indigo-50 text-indigo-700 outline-none">
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('inc-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Confirm & Update</button>
+          <button type="button" onclick="toggleModal('inc-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Confirm & Update</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Add Document Modal -->
-  <div id="add-doc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Upload Document</h3>
+  <div id="add-doc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Upload Document</h3>
         <button onclick="toggleModal('add-doc-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="company-doc-form" onsubmit="saveCompanyDoc(event)" class="p-5 space-y-4">
+      <form id="company-doc-form" onsubmit="saveCompanyDoc(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Document Title *</label>
-          <input type="text" id="doc-title" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Advance Salary Voucher / NID Copy">
+          <input type="text" id="doc-title" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Advance Salary Voucher / NID Copy">
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee (Target Employee)</label>
-          <select id="doc-emp-id" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+          <select id="doc-emp-id" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="General">General / All Employees</option>
           </select>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Document Category *</label>
-          <select id="doc-category" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+          <select id="doc-category" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="Advance Salary">Advance Salary Document</option>
             <option value="Personal Document">Personal Document</option>
             <option value="VAT">VAT</option>
@@ -1859,35 +1953,35 @@
 
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Choose File (Image/PDF/Doc) *</label>
-          <input type="file" id="doc-file-input" required class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+          <input type="file" id="doc-file-input" required class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-doc-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Upload & Save</button>
+          <button type="button" onclick="toggleModal('add-doc-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Upload & Save</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Add Performance Modal -->
-  <div id="add-perf-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Add Performance Review</h3>
+  <div id="add-perf-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Add Performance Review</h3>
         <button onclick="toggleModal('add-perf-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="perf-form" onsubmit="savePerformanceReview(event)" class="p-5 space-y-4">
+      <form id="perf-form" onsubmit="savePerformanceReview(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
-          <select id="perf-emp-id" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+          <select id="perf-emp-id" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="">Select Employee</option>
           </select>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">Rating (1 - 5) *</label>
-            <select id="perf-rating" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+            <select id="perf-rating" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
               <option value="5">5 - Excellent ⭐⭐⭐⭐⭐</option>
               <option value="4">4 - Good ⭐⭐⭐⭐</option>
               <option value="3">3 - Average ⭐⭐⭐</option>
@@ -1897,40 +1991,40 @@
           </div>
           <div>
             <label class="block text-xs font-bold text-gray-700 mb-1">KPI Score (%) *</label>
-            <input type="number" id="perf-kpi" min="0" max="100" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 85">
+            <input type="number" id="perf-kpi" min="0" max="100" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 85">
           </div>
         </div>
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Feedback / Notes *</label>
-          <textarea id="perf-feedback" required rows="3" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Write feedback..."></textarea>
+          <textarea id="perf-feedback" required rows="3" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write feedback..."></textarea>
         </div>
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-perf-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Submit Review</button>
+          <button type="button" onclick="toggleModal('add-perf-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Submit Review</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Add Notice Modal -->
-  <div id="add-notice-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
-        <h3 class="font-bold text-gray-800">Post New Notice</h3>
+  <div id="add-notice-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Post New Notice</h3>
         <button onclick="toggleModal('add-notice-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
-      <form id="notice-form" onsubmit="saveNotice(event)" class="p-5 space-y-4">
+      <form id="notice-form" onsubmit="saveNotice(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Notice Title *</label>
-          <input type="text" id="notice-title" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Eid Holiday Announcement">
+          <input type="text" id="notice-title" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Eid Holiday Announcement">
         </div>
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Notice Details *</label>
-          <textarea id="notice-desc" required rows="4" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Write notice details..."></textarea>
+          <textarea id="notice-desc" required rows="4" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write notice details..."></textarea>
         </div>
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-notice-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Publish Notice</button>
+          <button type="button" onclick="toggleModal('add-notice-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Publish Notice</button>
         </div>
       </form>
     </div>

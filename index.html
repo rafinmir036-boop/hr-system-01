@@ -7,6 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -38,6 +41,11 @@
     let currentNoticeIndex = 0;
     let noticeInterval = null;
     let currentUserRole = 'Admin';
+
+    // Chart Instances
+    let statusChartInstance = null;
+    let deptChartInstance = null;
+    let payrollChartInstance = null;
 
     // Auth Functions
     window.loginUser = async function() {
@@ -331,6 +339,7 @@
         renderAttendanceTable();
         checkIncrementDues();
         generateReport();
+        renderDashboardCharts();
       });
     }
 
@@ -339,6 +348,92 @@
         await deleteDoc(doc(db, "employees", id));
       }
     };
+
+    // Render Dynamic Dashboard Charts
+    function renderDashboardCharts() {
+      // 1. Employee Status Semi-Doughnut Chart
+      const statusCtx = document.getElementById('chart-emp-status');
+      if (statusCtx) {
+        if (statusChartInstance) statusChartInstance.destroy();
+
+        statusChartInstance = new Chart(statusCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Active Employees', 'Terminated / On Leave'],
+            datasets: [{
+              data: [employeeList.length, leaveList.length],
+              backgroundColor: ['#84cc16', '#e11d48'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            rotation: -90,
+            circumference: 180,
+            plugins: { legend: { position: 'bottom' } },
+            aspectRatio: 1.8
+          }
+        });
+      }
+
+      // 2. Department Wise Distribution Chart
+      const deptCtx = document.getElementById('chart-dept-dist');
+      if (deptCtx) {
+        if (deptChartInstance) deptChartInstance.destroy();
+
+        let deptMap = {};
+        employeeList.forEach(e => {
+          const d = e.department || 'General';
+          deptMap[d] = (deptMap[d] || 0) + 1;
+        });
+
+        deptChartInstance = new Chart(deptCtx, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(deptMap).length > 0 ? Object.keys(deptMap) : ['Accounts', 'Operations'],
+            datasets: [{
+              data: Object.values(deptMap).length > 0 ? Object.values(deptMap) : [1, 1],
+              backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+
+      // 3. Monthly Payroll Expense Bar Chart
+      const payrollCtx = document.getElementById('chart-payroll-trend');
+      if (payrollCtx) {
+        if (payrollChartInstance) payrollChartInstance.destroy();
+
+        let monthPayrollMap = {};
+        payrollList.forEach(p => {
+          monthPayrollMap[p.month] = (monthPayrollMap[p.month] || 0) + (p.net || 0);
+        });
+
+        const labels = Object.keys(monthPayrollMap).length > 0 ? Object.keys(monthPayrollMap) : ['Jan 2026', 'Feb 2026', 'Mar 2026'];
+        const values = Object.values(monthPayrollMap).length > 0 ? Object.values(monthPayrollMap) : [50000, 65000, 53410];
+
+        payrollChartInstance = new Chart(payrollCtx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Total Net Salary Cost (BDT)',
+              data: values,
+              backgroundColor: '#3b82f6',
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+    }
 
     // Increment 1-Year Logic Check
     function checkIncrementDues() {
@@ -602,6 +697,7 @@
           }
         });
         generateReport();
+        renderDashboardCharts();
       });
     }
 
@@ -702,6 +798,7 @@
           }
         });
         generateReport();
+        renderDashboardCharts();
       });
     }
 
@@ -1330,6 +1427,35 @@
               <div class="mt-4 flex items-center text-[10px] font-bold text-purple-100">
                 <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">1 Year</span>
                 <span>Completed</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Dashboard Interactive Analytics Charts Section -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Chart 1: Employee Status Ratio -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Employee Status Ratio</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-emp-status" class="max-h-48"></canvas>
+              </div>
+            </div>
+
+            <!-- Chart 2: Department Distribution -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Department Wise Distribution</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-dept-dist" class="max-h-48"></canvas>
+              </div>
+            </div>
+
+            <!-- Chart 3: Monthly Payroll Expense -->
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Monthly Payroll Trend</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-payroll-trend" class="max-h-48"></canvas>
               </div>
             </div>
 
@@ -2041,6 +2167,7 @@
       if (targetSec) {
         targetSec.classList.remove('hidden');
         if (sectionId === 'reports') generateReport();
+        if (sectionId === 'dashboard') renderDashboardCharts();
       } else {
         document.getElementById('generic-title').innerText = sectionId.toUpperCase();
         document.getElementById('sec-generic').classList.remove('hidden');

@@ -66,7 +66,7 @@
       }
     });
 
-    // Helper Functions
+    // Helpers
     function processImageFile(file) {
       return new Promise((resolve) => {
         if (!file) resolve('https://via.placeholder.com/150');
@@ -128,6 +128,7 @@
           designation,
           department,
           joiningDate,
+          lastIncrementDate: joiningDate,
           salary: Number(salary),
           docUrl,
           createdAt: new Date().toISOString()
@@ -191,12 +192,119 @@
 
         document.getElementById('dash-total-emp').innerText = employeeList.length;
         renderAttendanceTable();
+        checkIncrementDues();
       });
     }
 
     window.deleteEmployee = async function(id) {
       if (confirm("আপনি কি নিশ্চিত যে এই এমপ্লয়ী ডিলিট করতে চান?")) {
         await deleteDoc(doc(db, "employees", id));
+      }
+    };
+
+    // Increment 1-Year Logic Check
+    function checkIncrementDues() {
+      const today = new Date();
+      let dueList = [];
+
+      employeeList.forEach(emp => {
+        const refDateStr = emp.lastIncrementDate || emp.joiningDate;
+        if (refDateStr) {
+          const refDate = new Date(refDateStr);
+          const diffTime = Math.abs(today - refDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          // 365 Days or more = Increment Due
+          if (diffDays >= 365) {
+            dueList.push({ ...emp, daysCompleted: diffDays });
+          }
+        }
+      });
+
+      document.getElementById('dash-increment-due').innerText = dueList.length;
+
+      // Dashboard Alert Box
+      const alertContainer = document.getElementById('dash-increment-alert');
+      if (dueList.length > 0) {
+        alertContainer.classList.remove('hidden');
+        alertContainer.innerHTML = `
+          <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm flex items-start space-x-3">
+            <i class="fa-solid fa-bell text-amber-600 text-xl mt-0.5"></i>
+            <div>
+              <h4 class="font-bold text-amber-800 text-sm">Increment Alert! (${dueList.length} Employees Pending)</h4>
+              <p class="text-xs text-amber-700 mt-0.5">১ বছর পূর্ণ হওয়াতে নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়া বাকি রয়েছে। মেহেরবানী করে ইনক্রিমেন্ট সেকশন থেকে তা প্রসেস করুন:</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                ${dueList.map(item => `<span class="bg-amber-200 text-amber-900 px-2 py-1 rounded text-xs font-semibold">${item.name} (${item.designation})</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        alertContainer.classList.add('hidden');
+      }
+
+      // Render Increment Section Table
+      renderIncrementTable(dueList);
+    }
+
+    function renderIncrementTable(dueList) {
+      const tbody = document.getElementById('inc-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (dueList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400 text-sm">কোনো কর্মচারীর ইনক্রিমেন্ট বাকি নেই 🎉</td></tr>`;
+        return;
+      }
+
+      dueList.forEach(emp => {
+        const row = `
+          <tr class="border-b hover:bg-gray-50 transition text-sm">
+            <td class="px-6 py-4 font-bold text-gray-800">${emp.name}</td>
+            <td class="px-6 py-4 text-gray-600">${emp.designation} (${emp.department})</td>
+            <td class="px-6 py-4 text-gray-600">${emp.lastIncrementDate || emp.joiningDate}</td>
+            <td class="px-6 py-4 font-semibold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
+            <td class="px-6 py-4"><span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-xs font-semibold">1 Year Completed</span></td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="openProcessIncModal('${emp.id}', '${emp.name}', ${emp.salary})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold">Process Increment</button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    }
+
+    window.openProcessIncModal = function(id, name, currentSalary) {
+      document.getElementById('inc-emp-id').value = id;
+      document.getElementById('inc-emp-name').value = name;
+      document.getElementById('inc-curr-salary').value = currentSalary;
+      document.getElementById('inc-amount').value = '';
+      document.getElementById('inc-new-salary').value = currentSalary;
+      toggleModal('inc-modal', true);
+    };
+
+    window.calculateNewIncSalary = function() {
+      const curr = Number(document.getElementById('inc-curr-salary').value) || 0;
+      const inc = Number(document.getElementById('inc-amount').value) || 0;
+      document.getElementById('inc-new-salary').value = curr + inc;
+    };
+
+    window.submitIncrement = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('inc-emp-id').value;
+      const newSalary = Number(document.getElementById('inc-new-salary').value);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      try {
+        await updateDoc(doc(db, "employees", empId), {
+          salary: newSalary,
+          lastIncrementDate: todayStr
+        });
+
+        toggleModal('inc-modal', false);
+        alert("ইনক্রিমেন্ট সফলভাবে প্রসেস করা হয়েছে!");
+      } catch (err) {
+        alert("Error processing increment: " + err.message);
       }
     };
 
@@ -430,8 +538,6 @@
 
         snapshot.forEach((docSnap) => {
           const pay = docSnap.data();
-          const id = docSnap.id;
-
           const row = `
             <tr class="border-b hover:bg-gray-50 transition text-sm">
               <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
@@ -554,7 +660,11 @@
         </div>
       </header>
 
-      <div class="p-6">
+      <div class="p-6 space-y-6">
+        
+        <!-- Alert Box for Pending Increments -->
+        <div id="dash-increment-alert" class="hidden"></div>
+
         <!-- Dashboard Section -->
         <section id="sec-dashboard" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -562,7 +672,7 @@
             <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-green-500"><p class="text-xs text-gray-500 font-bold uppercase">Present Today</p><h3 id="dash-present-today" class="text-2xl font-bold text-green-600 mt-2">0</h3></div>
             <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-red-500"><p class="text-xs text-gray-500 font-bold uppercase">Absent Today</p><h3 id="dash-absent-today" class="text-2xl font-bold text-red-600 mt-2">0</h3></div>
             <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-yellow-500"><p class="text-xs text-gray-500 font-bold uppercase">On Leave</p><h3 id="dash-leave-today" class="text-2xl font-bold text-yellow-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-purple-500"><p class="text-xs text-gray-500 font-bold uppercase">Increment Due</p><h3 class="text-2xl font-bold text-purple-600 mt-2">0</h3></div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-purple-500"><p class="text-xs text-gray-500 font-bold uppercase">Increment Due</p><h3 id="dash-increment-due" class="text-2xl font-bold text-purple-600 mt-2">0</h3></div>
           </div>
         </section>
 
@@ -686,6 +796,36 @@
                 </thead>
                 <tbody id="payroll-table-body">
                   <!-- Dynamic Payroll Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Increment Section -->
+        <section id="sec-increment" class="hidden space-y-6">
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-bold text-gray-800">Increment Due Management</h2>
+              <p class="text-xs text-gray-500">১ বছর পূর্ণ হওয়া কর্মচারীদের তালিকা ও ইনক্রিমেন্ট প্রসেসিং</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                  <tr>
+                    <th class="px-6 py-3">Employee Name</th>
+                    <th class="px-6 py-3">Designation</th>
+                    <th class="px-6 py-3">Last Increment Date</th>
+                    <th class="px-6 py-3">Current Salary</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="inc-table-body">
+                  <!-- Dynamic Increment Rows -->
                 </tbody>
               </table>
             </div>
@@ -871,9 +1011,47 @@
     </div>
   </div>
 
+  <!-- Process Increment Modal -->
+  <div id="inc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
+        <h3 class="font-bold text-gray-800">Process Salary Increment</h3>
+        <button onclick="toggleModal('inc-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form onsubmit="submitIncrement(event)" class="p-5 space-y-4">
+        <input type="hidden" id="inc-emp-id">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Employee Name</label>
+          <input type="text" id="inc-emp-name" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 font-bold outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Current Salary</label>
+            <input type="number" id="inc-curr-salary" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Increment Amount *</label>
+            <input type="number" id="inc-amount" oninput="calculateNewIncSalary()" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 2000">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">New Updated Salary</label>
+          <input type="number" id="inc-new-salary" readonly class="w-full p-2.5 border rounded-lg text-lg font-bold bg-blue-50 text-blue-700 outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('inc-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Confirm & Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     function showSection(sectionId) {
-      ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'generic'].forEach(id => {
+      ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'increment', 'generic'].forEach(id => {
         const el = document.getElementById('sec-' + id);
         if (el) el.classList.add('hidden');
       });

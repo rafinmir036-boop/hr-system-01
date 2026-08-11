@@ -12,6 +12,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB20hWCqKPSt2aZxVOYa3cz2FVX2MSCs1U",
@@ -26,6 +27,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
     // Auth Functions
     window.loginUser = async function() {
@@ -57,37 +59,65 @@
       }
     });
 
-    // Firestore - Employee Actions
+    // File Upload Helper
+    async function uploadFileToStorage(file, folderName) {
+      if (!file) return null;
+      const fileRef = ref(storage, `${folderName}/${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      return await getDownloadURL(fileRef);
+    }
+
+    // Save Employee Action
     window.saveEmployee = async function(e) {
       e.preventDefault();
-      const name = document.getElementById('emp-name').value;
-      const email = document.getElementById('emp-email').value;
-      const phone = document.getElementById('emp-phone').value;
-      const photoUrl = document.getElementById('emp-photo').value;
-      const designation = document.getElementById('emp-designation').value;
-      const department = document.getElementById('emp-department').value;
-      const joiningDate = document.getElementById('emp-joining').value;
-      const salary = document.getElementById('emp-salary').value;
-      const docUrl = document.getElementById('emp-doc').value;
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.innerText = "Uploading & Saving...";
+      saveBtn.disabled = true;
 
       try {
+        const name = document.getElementById('emp-name').value;
+        const email = document.getElementById('emp-email').value;
+        const phone = document.getElementById('emp-phone').value;
+        const designation = document.getElementById('emp-designation').value;
+        const department = document.getElementById('emp-department').value;
+        const joiningDate = document.getElementById('emp-joining').value;
+        const salary = document.getElementById('emp-salary').value;
+
+        // Files
+        const photoFile = document.getElementById('emp-photo-file').files[0];
+        const docFile = document.getElementById('emp-doc-file').files[0];
+
+        let photoUrl = 'https://via.placeholder.com/150';
+        let docUrl = '#';
+
+        if (photoFile) {
+          photoUrl = await uploadFileToStorage(photoFile, 'profile_photos');
+        }
+
+        if (docFile) {
+          docUrl = await uploadFileToStorage(docFile, 'documents');
+        }
+
         await addDoc(collection(db, "employees"), {
           name,
           email,
           phone,
-          photoUrl: photoUrl || 'https://via.placeholder.com/150',
+          photoUrl,
           designation,
           department,
           joiningDate,
           salary: Number(salary),
-          docUrl: docUrl || '#',
+          docUrl,
           createdAt: new Date().toISOString()
         });
         
         document.getElementById('emp-form').reset();
         toggleModal('add-emp-modal', false);
       } catch (err) {
-        alert("Error adding employee: " + err.message);
+        alert("Error saving employee: " + err.message);
+      } finally {
+        saveBtn.innerText = "Save Employee";
+        saveBtn.disabled = false;
       }
     };
 
@@ -117,7 +147,7 @@
               <td class="px-6 py-4 text-gray-600">${emp.joiningDate || 'N/A'}</td>
               <td class="px-6 py-4 font-medium text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
               <td class="px-6 py-4">
-                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center space-x-1"><i class="fa-solid fa-file-pdf"></i><span>View Doc</span></a>` : '<span class="text-xs text-gray-400">No Doc</span>'}
+                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center space-x-1 font-semibold"><i class="fa-solid fa-file-arrow-down"></i><span>View File</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
               </td>
               <td class="px-6 py-4 text-right">
                 <button onclick="deleteEmployee('${id}')" class="text-red-600 hover:text-red-800 font-semibold">
@@ -166,7 +196,6 @@
 
   <!-- 📊 Main App View -->
   <div id="app-screen" class="hidden flex h-screen overflow-hidden">
-    <!-- Sidebar -->
     <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between flex-shrink-0">
       <div>
         <div class="p-5 text-xl font-bold border-b border-slate-800 flex items-center space-x-2">
@@ -189,7 +218,6 @@
       </div>
     </aside>
 
-    <!-- Main Content Area -->
     <main class="flex-1 flex flex-col overflow-y-auto bg-gray-50">
       <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
         <h1 id="page-title" class="text-xl font-bold text-gray-800">Dashboard</h1>
@@ -199,7 +227,6 @@
       </header>
 
       <div class="p-6">
-        <!-- Dashboard Section -->
         <section id="sec-dashboard" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div class="bg-white p-5 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-bold uppercase">Total Employees</p><h3 id="dash-total-emp" class="text-2xl font-bold text-gray-800 mt-2">0</h3></div>
@@ -210,7 +237,6 @@
           </div>
         </section>
 
-        <!-- Employees Section -->
         <section id="sec-employees" class="hidden">
           <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div class="p-5 border-b flex justify-between items-center bg-gray-50">
@@ -223,7 +249,6 @@
               </button>
             </div>
 
-            <!-- Employee Table -->
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
                 <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
@@ -256,7 +281,7 @@
     </main>
   </div>
 
-  <!-- Add Employee Modal -->
+  <!-- Add Employee Modal with Direct File Upload -->
   <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
       <div class="p-5 border-b flex justify-between items-center bg-gray-50">
@@ -281,8 +306,8 @@
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">Profile Photo URL</label>
-          <input type="url" id="emp-photo" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://example.com/photo.jpg">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Profile Photo Upload (JPG/PNG)</label>
+          <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -308,13 +333,13 @@
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-gray-700 mb-1">Document Link (NID / CV / Passport Link)</label>
-          <input type="url" id="emp-doc" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://drive.google.com/file/...">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Upload Document / NID / CV (PDF / Document / Image)</label>
+          <input type="file" id="emp-doc-file" accept=".pdf,.doc,.docx,image/*" class="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
         </div>
 
         <div class="pt-3 flex justify-end space-x-3 border-t">
           <button type="button" onclick="toggleModal('add-emp-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">Save Employee</button>
+          <button type="submit" id="save-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Save Employee</button>
         </div>
       </form>
     </div>

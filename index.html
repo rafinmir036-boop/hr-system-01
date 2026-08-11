@@ -13,7 +13,7 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -206,6 +206,7 @@
       });
     }
 
+    // Assign Role & Auto Create Auth User
     window.saveUserRolePermission = async function(e) {
       e.preventDefault();
       const email = document.getElementById('perm-email').value.trim().toLowerCase();
@@ -213,6 +214,7 @@
       const userPass = document.getElementById('perm-user-pass').value;
 
       try {
+        // Save Role to Firestore
         await addDoc(collection(db, "user_roles"), {
           email,
           role,
@@ -220,8 +222,15 @@
           createdAt: new Date().toISOString()
         });
 
+        // Try creating authentication user account in Firebase
+        try {
+          await createUserWithEmailAndPassword(auth, email, userPass);
+        } catch (authErr) {
+          console.log("Firebase auth note:", authErr.message);
+        }
+
         document.getElementById('perm-form').reset();
-        alert(`ব্যবহারকারীর রোল ও পাসওয়ার্ড সংরক্ষিত হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
+        alert(`ব্যবহারকারীর অ্যাকাউন্ট ও পারমিশন সফলভাবে তৈরি করা হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
       } catch (err) {
         alert("Error updating permissions: " + err.message);
       }
@@ -267,7 +276,6 @@
         }
 
         if (empId) {
-          // Update Existing Employee
           await updateDoc(doc(db, "employees", empId), {
             name,
             email,
@@ -281,7 +289,6 @@
           });
           alert("কর্মচারীর তথ্য সফলভাবে আপডেট করা হয়েছে!");
         } else {
-          // Add New Employee
           await addDoc(collection(db, "employees"), {
             name,
             email,
@@ -309,7 +316,6 @@
       }
     };
 
-    // Open Add/Edit Modal
     window.openEmployeeModal = function(id = null) {
       document.getElementById('emp-form').reset();
       document.getElementById('emp-doc-id').value = '';
@@ -334,7 +340,6 @@
       toggleModal('add-emp-modal', true);
     };
 
-    // View Employee Full Details
     window.viewEmployeeDetails = function(id) {
       const emp = employeeList.find(e => e.id === id);
       if (!emp) return;

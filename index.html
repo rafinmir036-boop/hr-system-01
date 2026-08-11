@@ -33,9 +33,11 @@
     let leaveList = [];
     let perfList = [];
     let docList = [];
+    let userPermissions = {};
 
     let currentNoticeIndex = 0;
     let noticeInterval = null;
+    let currentUserRole = 'Admin'; // Default Fallback
 
     // Auth Functions
     window.loginUser = async function() {
@@ -64,6 +66,7 @@
         const todayStr = new Date().toISOString().split('T')[0];
         document.getElementById('att-date').value = todayStr;
 
+        loadPermissionsRealtime(user.email);
         loadEmployeesRealtime();
         listenTodayAttendance(todayStr);
         loadLeaveRequestsRealtime();
@@ -108,6 +111,90 @@
         reader.onload = () => resolve(reader.result);
       });
     }
+
+    // Role-Based Permissions Logic
+    function loadPermissionsRealtime(userEmail) {
+      onSnapshot(collection(db, "user_roles"), (snapshot) => {
+        const tbody = document.getElementById('perm-table-body');
+        if (tbody) tbody.innerHTML = '';
+        userPermissions = {};
+
+        snapshot.forEach((docSnap) => {
+          const p = docSnap.data();
+          const id = docSnap.id;
+          userPermissions[p.email.toLowerCase()] = p.role;
+
+          if (tbody) {
+            tbody.innerHTML += `
+              <tr class="border-b hover:bg-gray-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${p.email}</td>
+                <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${getRoleBadge(p.role)}">${p.role}</span></td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="deletePermissionRole('${id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+              </tr>
+            `;
+          }
+        });
+
+        // Set Current User Role
+        const assignedRole = userPermissions[userEmail.toLowerCase()];
+        currentUserRole = assignedRole || (userEmail.includes('admin') ? 'Admin' : 'Employee');
+        applyRoleAccessUI();
+      });
+    }
+
+    function getRoleBadge(role) {
+      if (role === 'Admin') return 'bg-purple-100 text-purple-800';
+      if (role === 'Manager') return 'bg-blue-100 text-blue-800';
+      return 'bg-gray-100 text-gray-800';
+    }
+
+    function applyRoleAccessUI() {
+      const allNavs = ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'increment', 'documents', 'performance', 'notice', 'reports', 'settings'];
+      
+      let allowedNavs = [];
+      if (currentUserRole === 'Admin') {
+        allowedNavs = allNavs;
+      } else if (currentUserRole === 'Manager') {
+        allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports'];
+      } else { // Employee
+        allowedNavs = ['dashboard', 'attendance', 'leave', 'notice', 'documents'];
+      }
+
+      allNavs.forEach(navId => {
+        const navElem = document.getElementById(`nav-${navId}`);
+        if (navElem) {
+          if (allowedNavs.includes(navId)) navElem.classList.remove('hidden');
+          else navElem.classList.add('hidden');
+        }
+      });
+    }
+
+    window.saveUserRolePermission = async function(e) {
+      e.preventDefault();
+      const email = document.getElementById('perm-email').value.trim().toLowerCase();
+      const role = document.getElementById('perm-role').value;
+
+      try {
+        await addDoc(collection(db, "user_roles"), {
+          email,
+          role,
+          createdAt: new Date().toISOString()
+        });
+
+        document.getElementById('perm-form').reset();
+        alert(`পারমিশন সফলভাবে আপডেট হয়েছে! ${email} রোল পেয়েছেন: ${role}`);
+      } catch (err) {
+        alert("Error updating permissions: " + err.message);
+      }
+    };
+
+    window.deletePermissionRole = async function(id) {
+      if (confirm("এই রোল পারমিশন বাতিল করতে চান?")) {
+        await deleteDoc(doc(db, "user_roles", id));
+      }
+    };
 
     // Save Employee
     window.saveEmployee = async function(e) {
@@ -964,7 +1051,7 @@
       else if (type === 'DOCUMENTS') {
         currentReportTableData.headers = ["Document Title", "Category", "Target Employee", "Date Uploaded"];
         
-        filtered = docList;
+        let filtered = docList;
         filtered.forEach(d => {
           currentReportTableData.rows.push([
             d.title, d.category, d.targetEmployee || 'General', d.uploadedAt
@@ -972,20 +1059,17 @@
         });
       }
       else {
-        // Fallback / Other sub-reports placeholder row
         currentReportTableData.headers = ["Metric / Report Item", "Target Scope", "Status / Count", "Remarks"];
         currentReportTableData.rows.push([
           `${type} Comprehensive Report`, selectedEmp === 'ALL' ? 'All Employees' : 'Selected Employee', 'Generated', 'System Filtered Data'
         ]);
       }
 
-      // Render Header
       let headRow = '<tr class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">';
       currentReportTableData.headers.forEach(h => headRow += `<th class="px-6 py-3">${h}</th>`);
       headRow += '</tr>';
       thead.innerHTML = headRow;
 
-      // Render Rows
       if (currentReportTableData.rows.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${currentReportTableData.headers.length}" class="text-center py-6 text-gray-400 text-sm">কোনো ডাটা পাওয়া যায়নি 🔍</td></tr>`;
         return;
@@ -999,7 +1083,6 @@
       });
     };
 
-    // Export Excel (CSV) Action
     window.downloadReportExcel = function() {
       if (!currentReportTableData.rows || currentReportTableData.rows.length === 0) {
         alert("ডাউনলোড করার মতো কোনো ডাটা নেই!");
@@ -1067,17 +1150,17 @@
           <span>HR System</span>
         </div>
         <nav class="mt-4 px-3 space-y-1 text-sm overflow-y-auto max-h-[calc(100vh-140px)]">
-          <a href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line w-5"></i><span>Dashboard</span></a>
-          <a href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-user-group w-5"></i><span>Employees</span></a>
-          <a href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-clock w-5"></i><span>Attendance</span></a>
-          <a href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-pen w-5"></i><span>Leave Requests</span></a>
-          <a href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-sack-dollar w-5"></i><span>Payroll</span></a>
-          <a href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line-up w-5"></i><span>Increment</span></a>
-          <a href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-folder-open w-5"></i><span>Documents</span></a>
-          <a href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullseye w-5"></i><span>Performance</span></a>
-          <a href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullhorn w-5"></i><span>Notice Board</span></a>
-          <a href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-chart-column w-5"></i><span>Reports</span></a>
-          <a href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-gear w-5"></i><span>Settings</span></a>
+          <a id="nav-dashboard" href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line w-5"></i><span>Dashboard</span></a>
+          <a id="nav-employees" href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-user-group w-5"></i><span>Employees</span></a>
+          <a id="nav-attendance" href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-clock w-5"></i><span>Attendance</span></a>
+          <a id="nav-leave" href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-pen w-5"></i><span>Leave Requests</span></a>
+          <a id="nav-payroll" href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-sack-dollar w-5"></i><span>Payroll</span></a>
+          <a id="nav-increment" href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-chart-line-up w-5"></i><span>Increment</span></a>
+          <a id="nav-documents" href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-folder-open w-5"></i><span>Documents</span></a>
+          <a id="nav-performance" href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullseye w-5"></i><span>Performance</span></a>
+          <a id="nav-notice" href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-bullhorn w-5"></i><span>Notice Board</span></a>
+          <a id="nav-reports" href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-file-chart-column w-5"></i><span>Reports</span></a>
+          <a id="nav-settings" href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-gear w-5"></i><span>Settings</span></a>
         </nav>
       </div>
       <div class="p-4 border-t border-slate-800">
@@ -1355,7 +1438,6 @@
 
         <!-- 📊 EXPANDED REPORTS SECTION -->
         <section id="sec-reports" class="hidden space-y-6">
-          <!-- Top Control Header -->
           <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h2 class="text-lg font-bold text-gray-800">Comprehensive HR Reports & Analytics</h2>
@@ -1371,7 +1453,6 @@
             </div>
           </div>
 
-          <!-- Report Filters -->
           <div class="bg-white p-5 rounded-xl border shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label class="block text-xs font-bold text-gray-700 mb-1">Select Report Category *</label>
@@ -1403,7 +1484,6 @@
             </div>
           </div>
 
-          <!-- Generated Dynamic Report Table -->
           <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-gray-600">
@@ -1418,23 +1498,63 @@
           </div>
         </section>
 
-        <!-- ⚙️ Settings Section -->
+        <!-- ⚙️ SETTINGS SECTION WITH ROLE PERMISSIONS -->
         <section id="sec-settings" class="hidden space-y-6">
-          <div class="bg-white p-6 rounded-xl border shadow-sm max-w-2xl">
-            <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">System Settings</h2>
-            <form onsubmit="saveSettings(event)" class="space-y-4">
-              <div>
-                <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
-                <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
+              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">System Settings</h2>
+              <form onsubmit="saveSettings(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
+                  <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
+                  <input type="email" value="admin@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="pt-2 border-t flex justify-end">
+                  <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition">Save General Settings</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Role-Based Permissions Panel -->
+            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
+              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">User Role & Access Permission Settings</h2>
+              <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">User Email Address *</label>
+                  <input type="email" id="perm-email" required placeholder="e.g. manager@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">Assign Role *</label>
+                  <select id="perm-role" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                    <option value="Admin">Admin (Full Control System Access)</option>
+                    <option value="Manager">Manager (Employee, Attendance, Leave, Performance & Notices)</option>
+                    <option value="Employee">Employee (Attendance, Leave, Documents & Notices)</option>
+                  </select>
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-semibold transition">Assign Permission Role</button>
+              </form>
+
+              <div class="pt-4 border-t">
+                <h4 class="font-bold text-gray-800 text-xs uppercase mb-2">Assigned User Roles</h4>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-gray-600">
+                    <thead class="bg-gray-100 uppercase text-gray-700">
+                      <tr>
+                        <th class="px-3 py-2">Email</th>
+                        <th class="px-3 py-2">Role</th>
+                        <th class="px-3 py-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="perm-table-body">
+                      <!-- Dynamic Permissions -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div>
-                <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
-                <input type="email" value="admin@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-              </div>
-              <div class="pt-2 border-t flex justify-end">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition">Save Settings</button>
-              </div>
-            </form>
+            </div>
           </div>
         </section>
 

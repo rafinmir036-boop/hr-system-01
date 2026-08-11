@@ -59,6 +59,7 @@
         loadEmployeesRealtime();
         listenTodayAttendance(todayStr);
         loadLeaveRequestsRealtime();
+        loadPayrollRealtime();
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
@@ -146,8 +147,11 @@
       onSnapshot(collection(db, "employees"), (snapshot) => {
         const tbody = document.getElementById('emp-table-body');
         const leaveSelect = document.getElementById('leave-emp-id');
+        const payEmpSelect = document.getElementById('pay-emp-id');
+
         tbody.innerHTML = '';
         leaveSelect.innerHTML = '<option value="">Select Employee</option>';
+        payEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         employeeList = [];
 
         snapshot.forEach((docSnap) => {
@@ -156,6 +160,7 @@
           employeeList.push({ id, ...emp });
 
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
 
           const row = `
             <tr class="border-b hover:bg-gray-50 transition text-sm">
@@ -195,7 +200,7 @@
       }
     };
 
-    // Attendance Functionalities
+    // Attendance
     let todayAttendanceData = {};
 
     window.loadAttendanceForDate = function() {
@@ -285,7 +290,7 @@
       }
     };
 
-    // Leave Functionalities
+    // Leave
     window.submitLeave = async function(e) {
       e.preventDefault();
       const empId = document.getElementById('leave-emp-id').value;
@@ -361,6 +366,135 @@
       } catch (err) {
         alert("Error updating status: " + err.message);
       }
+    };
+
+    // Payroll System Logic
+    window.onPayrollEmpChange = function() {
+      const empId = document.getElementById('pay-emp-id').value;
+      const emp = employeeList.find(e => e.id === empId);
+      if (emp) {
+        document.getElementById('pay-basic').value = emp.salary || 0;
+        calculateNetSalary();
+      }
+    };
+
+    window.calculateNetSalary = function() {
+      const basic = Number(document.getElementById('pay-basic').value) || 0;
+      const bonus = Number(document.getElementById('pay-bonus').value) || 0;
+      const advance = Number(document.getElementById('pay-advance').value) || 0;
+      const fine = Number(document.getElementById('pay-fine').value) || 0;
+
+      const net = basic + bonus - advance - fine;
+      document.getElementById('pay-net').value = net;
+    };
+
+    window.savePayroll = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('pay-emp-id').value;
+      const month = document.getElementById('pay-month').value;
+      const basic = Number(document.getElementById('pay-basic').value) || 0;
+      const bonus = Number(document.getElementById('pay-bonus').value) || 0;
+      const advance = Number(document.getElementById('pay-advance').value) || 0;
+      const fine = Number(document.getElementById('pay-fine').value) || 0;
+      const net = Number(document.getElementById('pay-net').value) || 0;
+
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "payrolls"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown',
+          designation: emp ? emp.designation : '',
+          month,
+          basic,
+          bonus,
+          advance,
+          fine,
+          net,
+          status: 'Paid',
+          createdDate: new Date().toISOString()
+        });
+
+        document.getElementById('payroll-form').reset();
+        toggleModal('add-payroll-modal', false);
+      } catch (err) {
+        alert("Error generating payroll: " + err.message);
+      }
+    };
+
+    function loadPayrollRealtime() {
+      onSnapshot(collection(db, "payrolls"), (snapshot) => {
+        const tbody = document.getElementById('payroll-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const pay = docSnap.data();
+          const id = docSnap.id;
+
+          const row = `
+            <tr class="border-b hover:bg-gray-50 transition text-sm">
+              <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
+              <td class="px-6 py-4 font-semibold text-blue-600">${pay.month}</td>
+              <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
+              <td class="px-6 py-4 text-green-600">+৳ ${pay.bonus.toLocaleString()}</td>
+              <td class="px-6 py-4 text-orange-600">-৳ ${pay.advance.toLocaleString()}</td>
+              <td class="px-6 py-4 text-red-600">-৳ ${pay.fine.toLocaleString()}</td>
+              <td class="px-6 py-4 font-bold text-gray-900">৳ ${pay.net.toLocaleString()}</td>
+              <td class="px-6 py-4"><span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-semibold">${pay.status}</span></td>
+              <td class="px-6 py-4 text-right">
+                <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-end space-x-1">
+                  <i class="fa-solid fa-print"></i><span>Payslip</span>
+                </button>
+              </td>
+            </tr>
+          `;
+          tbody.innerHTML += row;
+        });
+      });
+    }
+
+    window.printPayslip = function(name, desig, month, basic, bonus, advance, fine, net) {
+      const win = window.open('', '', 'width=800,height=600');
+      win.document.write(`
+        <html>
+        <head>
+          <title>Salary Slip - ${name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; }
+            .ticket { border: 2px solid #333; padding: 25px; border-radius: 10px; max-width: 600px; margin: auto; }
+            h2 { text-align: center; margin-bottom: 5px; }
+            p { text-align: center; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            td, th { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            .total { font-weight: bold; background: #f9f9f9; }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <h2>SALARY PAYSLIP</h2>
+            <p>Month: ${month}</p>
+            <hr>
+            <p style="text-align:left;"><strong>Employee Name:</strong> ${name}<br><strong>Designation:</strong> ${desig}</p>
+            <table>
+              <tr><th>Description</th><th>Amount (BDT)</th></tr>
+              <tr><td>Basic Salary</td><td>৳ ${basic.toLocaleString()}</td></tr>
+              <tr><td>Bonus / Allowance</td><td>+ ৳ ${bonus.toLocaleString()}</td></tr>
+              <tr><td>Advance Deduction</td><td>- ৳ ${advance.toLocaleString()}</td></tr>
+              <tr><td>Fine / Other Deduction</td><td>- ৳ ${fine.toLocaleString()}</td></tr>
+              <tr class="total"><td>Net Payable Amount</td><td>৳ ${net.toLocaleString()}</td></tr>
+            </table>
+            <br><br>
+            <div style="display:flex; justify-content:space-between; margin-top:40px;">
+              <span>_________________<br>Employee Signature</span>
+              <span>_________________<br>Authorized Signature</span>
+            </div>
+          </div>
+          <script>window.print();<\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
     };
   </script>
 </head>
@@ -525,6 +659,39 @@
           </div>
         </section>
 
+        <!-- Payroll Section -->
+        <section id="sec-payroll" class="hidden space-y-6">
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-bold text-gray-800">Payroll & Salary Management</h2>
+            <button onclick="toggleModal('add-payroll-modal', true)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
+              <i class="fa-solid fa-plus"></i><span>Generate Salary Slip</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                  <tr>
+                    <th class="px-6 py-3">Employee</th>
+                    <th class="px-6 py-3">Month</th>
+                    <th class="px-6 py-3">Basic Salary</th>
+                    <th class="px-6 py-3">Bonus</th>
+                    <th class="px-6 py-3">Advance Deduction</th>
+                    <th class="px-6 py-3">Fine Deduction</th>
+                    <th class="px-6 py-3">Net Salary</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="payroll-table-body">
+                  <!-- Dynamic Payroll Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <section id="sec-generic" class="hidden">
           <div class="bg-white p-6 rounded-xl border shadow-sm">
             <h2 id="generic-title" class="text-lg font-bold text-gray-800 mb-2">Module</h2>
@@ -648,9 +815,65 @@
     </div>
   </div>
 
+  <!-- Generate Payroll Modal -->
+  <div id="add-payroll-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+      <div class="p-5 border-b flex justify-between items-center bg-gray-50">
+        <h3 class="font-bold text-gray-800">Generate Payroll</h3>
+        <button onclick="toggleModal('add-payroll-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="payroll-form" onsubmit="savePayroll(event)" class="p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
+            <select id="pay-emp-id" onchange="onPayrollEmpChange()" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+              <option value="">Select Employee</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Salary Month *</label>
+            <input type="month" id="pay-month" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Basic Salary (BDT)</label>
+            <input type="number" id="pay-basic" readonly class="w-full p-2.5 border rounded-lg text-sm bg-gray-100 font-bold outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Bonus / Allowance (BDT)</label>
+            <input type="number" id="pay-bonus" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Advance Salary Cut (BDT)</label>
+            <input type="number" id="pay-advance" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Fine / Deductions (BDT)</label>
+            <input type="number" id="pay-fine" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Net Payable Salary (BDT)</label>
+          <input type="number" id="pay-net" readonly class="w-full p-2.5 border rounded-lg text-lg font-bold bg-green-50 text-green-700 outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-payroll-modal', false)" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">Process & Pay</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     function showSection(sectionId) {
-      ['dashboard', 'employees', 'attendance', 'leave', 'generic'].forEach(id => {
+      ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'generic'].forEach(id => {
         const el = document.getElementById('sec-' + id);
         if (el) el.classList.add('hidden');
       });

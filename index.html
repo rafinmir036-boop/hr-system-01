@@ -40,7 +40,9 @@
 
     let currentNoticeIndex = 0;
     let noticeInterval = null;
-    let currentUserRole = 'Admin';
+    let currentUserRole = 'Employee';
+    let currentUserEmail = '';
+    let myEmployeeProfile = null;
 
     // Chart Instances
     let statusChartInstance = null;
@@ -70,6 +72,7 @@
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
         document.getElementById('user-email').innerText = user.email;
+        currentUserEmail = user.email.toLowerCase();
         
         const todayStr = new Date().toISOString().split('T')[0];
         document.getElementById('att-date').value = todayStr;
@@ -193,8 +196,8 @@
         allowedNavs = allNavs;
       } else if (currentUserRole === 'Manager') {
         allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
-      } else {
-        allowedNavs = ['dashboard', 'attendance', 'leave', 'notice', 'documents', 'settings'];
+      } else { // Employee Access Rules
+        allowedNavs = ['dashboard', 'attendance', 'leave', 'notice', 'documents'];
       }
 
       allNavs.forEach(navId => {
@@ -204,9 +207,23 @@
           else navElem.classList.add('hidden');
         }
       });
+
+      // Show/Hide Dashboard Sections Based on Role
+      const adminDash = document.getElementById('admin-dash-cards');
+      const empDash = document.getElementById('emp-dash-profile');
+      const adminCharts = document.getElementById('dash-charts-container');
+
+      if (currentUserRole === 'Employee') {
+        if (adminDash) adminDash.classList.add('hidden');
+        if (adminCharts) adminCharts.classList.add('hidden');
+        if (empDash) empDash.classList.remove('hidden');
+      } else {
+        if (adminDash) adminDash.classList.remove('hidden');
+        if (adminCharts) adminCharts.classList.remove('hidden');
+        if (empDash) empDash.classList.add('hidden');
+      }
     }
 
-    // Assign Role & Auto Create Auth User
     window.saveUserRolePermission = async function(e) {
       e.preventDefault();
       const email = document.getElementById('perm-email').value.trim().toLowerCase();
@@ -214,7 +231,6 @@
       const userPass = document.getElementById('perm-user-pass').value;
 
       try {
-        // Save Role to Firestore
         await addDoc(collection(db, "user_roles"), {
           email,
           role,
@@ -222,15 +238,14 @@
           createdAt: new Date().toISOString()
         });
 
-        // Try creating authentication user account in Firebase
         try {
           await createUserWithEmailAndPassword(auth, email, userPass);
         } catch (authErr) {
-          console.log("Firebase auth note:", authErr.message);
+          console.log("Auth User exists or info:", authErr.message);
         }
 
         document.getElementById('perm-form').reset();
-        alert(`ব্যবহারকারীর অ্যাকাউন্ট ও পারমিশন সফলভাবে তৈরি করা হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
+        alert(`ব্যবহারকারীর রোল ও পাসওয়ার্ড সংরক্ষিত হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
       } catch (err) {
         alert("Error updating permissions: " + err.message);
       }
@@ -385,6 +400,10 @@
           const id = docSnap.id;
           employeeList.push({ id, ...emp });
 
+          if (emp.email && emp.email.toLowerCase() === currentUserEmail) {
+            myEmployeeProfile = { id, ...emp };
+          }
+
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           perfEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
@@ -422,6 +441,17 @@
         });
 
         document.getElementById('dash-total-emp').innerText = employeeList.length;
+
+        // Render My Employee Profile Card if Employee
+        if (myEmployeeProfile) {
+          document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || 'https://via.placeholder.com/150';
+          document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
+          document.getElementById('emp-p-desig').innerText = `${myEmployeeProfile.designation} (${myEmployeeProfile.department})`;
+          document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
+          document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
+          document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
+        }
+
         renderAttendanceTable();
         checkIncrementDues();
         generateReport();
@@ -437,6 +467,8 @@
 
     // Render Dynamic Dashboard Charts
     function renderDashboardCharts() {
+      if (currentUserRole === 'Employee') return; // Hide for standard employees
+
       const statusCtx = document.getElementById('chart-emp-status');
       if (statusCtx) {
         if (statusChartInstance) statusChartInstance.destroy();
@@ -518,7 +550,7 @@
       }
     }
 
-    // Increment 1-Year Logic Check
+    // Increment Check
     function checkIncrementDues() {
       const today = new Date();
       let dueList = [];
@@ -539,7 +571,7 @@
       document.getElementById('dash-increment-due').innerText = dueList.length;
 
       const alertContainer = document.getElementById('dash-increment-alert');
-      if (dueList.length > 0) {
+      if (dueList.length > 0 && currentUserRole !== 'Employee') {
         alertContainer.classList.remove('hidden');
         alertContainer.innerHTML = `
           <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-l-4 border-amber-500 p-4 rounded-r-2xl shadow-sm flex items-start space-x-3">
@@ -587,40 +619,6 @@
       });
     }
 
-    window.openProcessIncModal = function(id, name, currentSalary) {
-      document.getElementById('inc-emp-id').value = id;
-      document.getElementById('inc-emp-name').value = name;
-      document.getElementById('inc-curr-salary').value = currentSalary;
-      document.getElementById('inc-amount').value = '';
-      document.getElementById('inc-new-salary').value = currentSalary;
-      toggleModal('inc-modal', true);
-    };
-
-    window.calculateNewIncSalary = function() {
-      const curr = Number(document.getElementById('inc-curr-salary').value) || 0;
-      const inc = Number(document.getElementById('inc-amount').value) || 0;
-      document.getElementById('inc-new-salary').value = curr + inc;
-    };
-
-    window.submitIncrement = async function(e) {
-      e.preventDefault();
-      const empId = document.getElementById('inc-emp-id').value;
-      const newSalary = Number(document.getElementById('inc-new-salary').value);
-      const todayStr = new Date().toISOString().split('T')[0];
-
-      try {
-        await updateDoc(doc(db, "employees", empId), {
-          salary: newSalary,
-          lastIncrementDate: todayStr
-        });
-
-        toggleModal('inc-modal', false);
-        alert("ইনক্রিমেন্ট সফলভাবে প্রসেস করা হয়েছে!");
-      } catch (err) {
-        alert("Error processing increment: " + err.message);
-      }
-    };
-
     // Attendance
     let todayAttendanceData = {};
 
@@ -658,7 +656,13 @@
       if (!tbody) return;
       tbody.innerHTML = '';
 
-      employeeList.forEach((emp) => {
+      let listToRender = employeeList;
+      // If Role is Employee, filter only his profile
+      if (currentUserRole === 'Employee' && myEmployeeProfile) {
+        listToRender = [myEmployeeProfile];
+      }
+
+      listToRender.forEach((emp) => {
         const currentStatus = todayAttendanceData[emp.id] || 'Not Marked';
 
         const row = `
@@ -676,9 +680,11 @@
               </span>
             </td>
             <td class="px-6 py-4 text-right space-x-2">
-              <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Present</button>
-              <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition">Late</button>
-              <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Absent</button>
+              ${currentUserRole !== 'Employee' ? `
+                <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Present</button>
+                <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition">Late</button>
+                <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Absent</button>
+              ` : '<span class="text-xs text-slate-400 font-semibold">View Only</span>'}
             </td>
           </tr>
         `;
@@ -757,6 +763,11 @@
           if (leave.status === 'Rejected') badgeColor = 'bg-rose-100 text-rose-800 border border-rose-200';
 
           if (tbody) {
+            // If employee, show only his leaves
+            if (currentUserRole === 'Employee' && myEmployeeProfile && leave.employeeId !== myEmployeeProfile.id) {
+              return;
+            }
+
             const row = `
               <tr class="border-b hover:bg-slate-50 transition text-sm">
                 <td class="px-6 py-4 font-bold text-gray-800">${leave.employeeName}</td>
@@ -769,7 +780,7 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 text-right space-x-2">
-                  ${leave.status === 'Pending' ? `
+                  ${leave.status === 'Pending' && currentUserRole !== 'Employee' ? `
                     <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Approve</button>
                     <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Reject</button>
                   ` : '<span class="text-xs text-gray-400 font-semibold">Processed</span>'}
@@ -971,6 +982,13 @@
           docList.push({ id, ...item });
 
           if (grid) {
+            // Filter Docs for Employee Role
+            if (currentUserRole === 'Employee' && myEmployeeProfile) {
+              if (item.targetEmployee !== 'General' && item.targetEmployee !== myEmployeeProfile.name) {
+                return;
+              }
+            }
+
             const card = `
               <div class="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
                 <div class="flex items-start justify-between">
@@ -986,7 +1004,7 @@
                       </div>
                     </div>
                   </div>
-                  <button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-rose-600 transition ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                  ${currentUserRole !== 'Employee' ? `<button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-rose-600 transition ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>` : ''}
                 </div>
                 <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
                   <span>Date: ${item.uploadedAt}</span>
@@ -1116,7 +1134,7 @@
                   <h3 class="font-bold text-gray-800 text-base">${notice.title}</h3>
                   <div class="flex items-center space-x-2">
                     <span class="text-xs text-gray-400 font-medium"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
-                    <button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-rose-600 ml-2 transition"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                    ${currentUserRole !== 'Employee' ? `<button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-rose-600 ml-2 transition"><i class="fa-solid fa-trash-can text-sm"></i></button>` : ''}
                   </div>
                 </div>
                 <p class="text-sm text-gray-600 leading-relaxed">${notice.description}</p>
@@ -1424,9 +1442,11 @@
         <!-- Alert Box for Pending Increments -->
         <div id="dash-increment-alert" class="hidden"></div>
 
-        <!-- Dashboard Colorful Cards Section -->
+        <!-- Dashboard Section -->
         <section id="sec-dashboard" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
+          
+          <!-- Admin Overview Cards -->
+          <div id="admin-dash-cards" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
             
             <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
@@ -1510,8 +1530,25 @@
 
           </div>
 
+          <!-- Personal Employee Dashboard Profile View -->
+          <div id="emp-dash-profile" class="hidden bg-white p-8 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+            <div class="flex items-center space-x-5 border-b pb-6">
+              <img id="emp-p-photo" src="" class="w-20 h-20 rounded-full object-cover border-4 border-indigo-100 shadow-md">
+              <div>
+                <h2 id="emp-p-name" class="text-2xl font-black text-gray-800"></h2>
+                <span id="emp-p-desig" class="inline-block bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200 mt-1"></span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-sm">
+              <div class="bg-slate-50 p-4 rounded-2xl border space-y-1"><span class="text-xs text-gray-500 font-bold uppercase block">Phone Number</span><span id="emp-p-phone" class="font-extrabold text-gray-800"></span></div>
+              <div class="bg-slate-50 p-4 rounded-2xl border space-y-1"><span class="text-xs text-gray-500 font-bold uppercase block">Joining Date</span><span id="emp-p-joining" class="font-extrabold text-gray-800"></span></div>
+              <div class="bg-slate-50 p-4 rounded-2xl border space-y-1"><span class="text-xs text-gray-500 font-bold uppercase block">Basic Salary</span><span id="emp-p-salary" class="font-extrabold text-emerald-600"></span></div>
+            </div>
+          </div>
+
           <!-- Dashboard Charts -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div id="dash-charts-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <h4 class="font-bold text-gray-800 text-sm mb-4">Employee Status Ratio</h4>
               <div class="relative w-full flex items-center justify-center">
@@ -1697,9 +1734,11 @@
               <h2 class="text-lg font-black text-gray-800">Company & Employee Documents</h2>
               <p class="text-xs text-gray-500 font-medium">সকল প্রকার অ্যাডভান্স স্যালারি, NID, TIN, VAT, BIN ও নোটিশ ডকুমেন্ট ট্র্যাকিং</p>
             </div>
-            <button onclick="toggleModal('add-doc-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
-              <i class="fa-solid fa-upload"></i><span>Upload Document</span>
-            </button>
+            ${currentUserRole !== 'Employee' ? `
+              <button onclick="toggleModal('add-doc-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-upload"></i><span>Upload Document</span>
+              </button>
+            ` : ''}
           </div>
 
           <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -1747,9 +1786,11 @@
               <h2 class="text-lg font-black text-gray-800">Notice Board</h2>
               <p class="text-xs text-gray-500 font-medium">কোম্পানির সকল সাধারণ বিজ্ঞপ্তি ও নির্দেশনা</p>
             </div>
-            <button onclick="toggleModal('add-notice-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
-              <i class="fa-solid fa-bullhorn"></i><span>Post Notice</span>
-            </button>
+            ${currentUserRole !== 'Employee' ? `
+              <button onclick="toggleModal('add-notice-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-bullhorn"></i><span>Post Notice</span>
+              </button>
+            ` : ''}
           </div>
 
           <div id="notice-list" class="space-y-4">
@@ -1857,6 +1898,7 @@
               </div>
             </div>
 
+            ${currentUserRole !== 'Employee' ? `
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
               <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">User Role & Access Permissions</h2>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
@@ -1897,6 +1939,7 @@
                 </div>
               </div>
             </div>
+            ` : ''}
 
           </div>
         </section>

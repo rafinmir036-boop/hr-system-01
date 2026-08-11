@@ -196,7 +196,7 @@
         allowedNavs = allNavs;
       } else if (currentUserRole === 'Manager') {
         allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
-      } else { // Employee Role Restrictions: Only Dashboard & Leave Requests
+      } else { // Employee
         allowedNavs = ['dashboard', 'leave'];
       }
 
@@ -212,15 +212,18 @@
       const adminDash = document.getElementById('admin-dash-cards');
       const empDash = document.getElementById('emp-dash-profile');
       const adminCharts = document.getElementById('dash-charts-container');
+      const leaveEmpSelectBox = document.getElementById('leave-emp-select-box');
 
       if (currentUserRole === 'Employee') {
         if (adminDash) adminDash.classList.add('hidden');
         if (adminCharts) adminCharts.classList.add('hidden');
         if (empDash) empDash.classList.remove('hidden');
+        if (leaveEmpSelectBox) leaveEmpSelectBox.classList.add('hidden');
       } else {
         if (adminDash) adminDash.classList.remove('hidden');
         if (adminCharts) adminCharts.classList.remove('hidden');
         if (empDash) empDash.classList.add('hidden');
+        if (leaveEmpSelectBox) leaveEmpSelectBox.classList.remove('hidden');
       }
     }
 
@@ -442,7 +445,7 @@
 
         document.getElementById('dash-total-emp').innerText = employeeList.length;
 
-        // Render My Employee Personal Dashboard Cards
+        // Personal Employee Profile Card
         if (myEmployeeProfile) {
           document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || 'https://via.placeholder.com/150';
           document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
@@ -451,7 +454,6 @@
           document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
           document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
 
-          // Pre-select employee in Leave Modal
           if (leaveSelect) leaveSelect.value = myEmployeeProfile.id;
         }
 
@@ -466,7 +468,6 @@
     function calculateMyPersonalSummary() {
       if (!myEmployeeProfile) return;
 
-      // Personal Fine & Salary Summary
       let totalFine = 0;
       payrollList.forEach(p => {
         if (p.employeeId === myEmployeeProfile.id) {
@@ -746,7 +747,7 @@
       }
     };
 
-    // Leave
+    // Leave Submit Logic
     window.submitLeave = async function(e) {
       e.preventDefault();
       let empId = document.getElementById('leave-emp-id').value;
@@ -813,11 +814,11 @@
                     ${leave.status}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-right space-x-2">
-                  ${leave.status === 'Pending' && currentUserRole !== 'Employee' ? `
+                <td class="px-6 py-4 text-right">
+                  ${currentUserRole !== 'Employee' && leave.status === 'Pending' ? `
                     <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Approve</button>
                     <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Reject</button>
-                  ` : '<span class="text-xs text-gray-400 font-semibold">Processed</span>'}
+                  ` : `<span class="text-xs font-bold ${leave.status === 'Approved' ? 'text-emerald-600' : (leave.status === 'Rejected' ? 'text-rose-600' : 'text-amber-600')}">${leave.status}</span>`}
                 </td>
               </tr>
             `;
@@ -1567,7 +1568,6 @@
           <!-- Personal Employee Dashboard Profile & Personal Summary Cards -->
           <div id="emp-dash-profile" class="hidden space-y-6">
             
-            <!-- Employee Personal Stats Overview -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
               
               <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-500/20">
@@ -1612,7 +1612,6 @@
 
             </div>
 
-            <!-- Profile Info Box -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
               <div class="flex items-center space-x-5">
                 <img id="emp-p-photo" src="" class="w-20 h-20 rounded-full object-cover border-4 border-indigo-100 shadow-md">
@@ -1741,7 +1740,7 @@
                     <th class="px-6 py-4">Duration</th>
                     <th class="px-6 py-4">Reason</th>
                     <th class="px-6 py-4">Status</th>
-                    <th class="px-6 py-4 text-right">Action</th>
+                    <th class="px-6 py-4 text-right">Action / Status</th>
                   </tr>
                 </thead>
                 <tbody id="leave-table-body">
@@ -1948,7 +1947,7 @@
           </div>
         </section>
 
-        <!-- ⚙️ SETTINGS SECTION WITH ROLE PERMISSIONS & PASSWORD CHANGE -->
+        <!-- ⚙️ SETTINGS SECTION -->
         <section id="sec-settings" class="hidden space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
@@ -2139,9 +2138,11 @@
         <button onclick="toggleModal('add-leave-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
       <form id="leave-form" onsubmit="submitLeave(event)" class="p-6 space-y-4">
-        <div>
+        
+        <!-- Employee Select Dropdown: Hidden for Employee Role -->
+        <div id="leave-emp-select-box">
           <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
-          <select id="leave-emp-id" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+          <select id="leave-emp-id" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
             <option value="">Select Employee</option>
           </select>
         </div>
@@ -2380,7 +2381,7 @@
           <textarea id="notice-desc" required rows="4" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write notice details..."></textarea>
         </div>
         <div class="pt-3 flex justify-end space-x-3 border-t">
-          <button type="button" onclick="toggleModal('add-leave-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="button" onclick="toggleModal('add-notice-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
           <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Publish Notice</button>
         </div>
       </form>

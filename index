@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Management System</title>
+  <!-- Tailwind CSS for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans antialiased">
+
+  <!-- Main Container -->
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between">
+      <div>
+        <div class="p-5 text-xl font-bold border-b border-slate-800 flex items-center space-x-2">
+          <i class="fa-solid fa-users-gear text-blue-500"></i>
+          <span>HR System</span>
+        </div>
+
+        <nav class="mt-4 px-3 space-y-1 text-sm overflow-y-auto max-h-[calc(100vh-120px)]">
+          <a href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-chart-line w-5"></i><span>Dashboard</span>
+          </a>
+          
+          <a href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-user-group w-5"></i><span>Employees</span>
+          </a>
+
+          <a href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-clock w-5"></i><span>Attendance</span>
+          </a>
+
+          <a href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-file-pen w-5"></i><span>Leave Requests</span>
+          </a>
+
+          <a href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-sack-dollar w-5"></i><span>Payroll</span>
+          </a>
+
+          <a href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-chart-line-up w-5"></i><span>Increment</span>
+          </a>
+
+          <a href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-folder-open w-5"></i><span>Documents</span>
+          </a>
+
+          <a href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-bullseye w-5"></i><span>Performance</span>
+          </a>
+
+          <a href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-bullhorn w-5"></i><span>Notice Board</span>
+          </a>
+
+          <a href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-file-chart-column w-5"></i><span>Reports</span>
+          </a>
+
+          <a href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-slate-800 transition">
+            <i class="fa-solid fa-gear w-5"></i><span>Settings</span>
+          </a>
+        </nav>
+      </div>
+
+      <div class="p-4 border-t border-slate-800">
+        <button class="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm transition">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col overflow-y-auto">
+      
+      <!-- Top Header -->
+      <header class="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
+        <h1 id="page-title" class="text-xl font-bold text-gray-800">Dashboard</h1>
+        <div class="flex items-center space-x-4">
+          <span class="text-sm font-medium text-gray-600">Admin Panel</span>
+          <div class="w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">A</div>
+        </div>
+      </header>
+
+      <!-- Dynamic Dynamic Content View -->
+      <div class="p-6">
+
+        <!-- 📊 Dashboard Section -->
+        <section id="sec-dashboard" class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div class="bg-white p-5 rounded-xl border shadow-sm">
+              <p class="text-xs text-gray-500 font-bold uppercase">Total Employees</p>
+              <h3 class="text-2xl font-bold text-gray-800 mt-2">250</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-green-500">
+              <p class="text-xs text-gray-500 font-bold uppercase">Present Today</p>
+              <h3 class="text-2xl font-bold text-green-600 mt-2">230</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-red-500">
+              <p class="text-xs text-gray-500 font-bold uppercase">Absent Today</p>
+              <h3 class="text-2xl font-bold text-red-600 mt-2">12</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-yellow-500">
+              <p class="text-xs text-gray-500 font-bold uppercase">On Leave</p>
+              <h3 class="text-2xl font-bold text-yellow-600 mt-2">8</h3>
+            </div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-purple-500">
+              <p class="text-xs text-gray-500 font-bold uppercase">Increment Due</p>
+              <h3 class="text-2xl font-bold text-purple-600 mt-2">5</h3>
+            </div>
+          </div>
+        </section>
+
+        <!-- 👥 Employees Section -->
+        <section id="sec-employees" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-lg font-bold text-gray-800">Employee List</h2>
+              <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ Add Employee</button>
+            </div>
+            <p class="text-gray-500 text-sm">Employee list table and profile cards will be displayed here.</p>
+          </div>
+        </section>
+
+        <!-- 🕐 Attendance Section -->
+        <section id="sec-attendance" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Daily Attendance & Monthly Report</h2>
+            <p class="text-gray-500 text-sm">Manage daily check-ins and monthly attendance summary here.</p>
+          </div>
+        </section>
+
+        <!-- 📝 Leave Section -->
+        <section id="sec-leave" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Leave Management</h2>
+            <p class="text-gray-500 text-sm">View leave requests, approvals, and history.</p>
+          </div>
+        </section>
+
+        <!-- 💰 Payroll Section -->
+        <section id="sec-payroll" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Payroll & Salary Slips</h2>
+            <p class="text-gray-500 text-sm">Calculate salary, generate payslips, and process payments.</p>
+          </div>
+        </section>
+
+        <!-- 📈 Increment Section -->
+        <section id="sec-increment" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">Increment Management</h2>
+            <p class="text-gray-500 text-sm">Track salary increments and due reviews.</p>
+          </div>
+        </section>
+
+        <!-- Generic Placeholder Section for remaining views -->
+        <section id="sec-generic" class="hidden">
+          <div class="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 id="generic-title" class="text-lg font-bold text-gray-800 mb-2">Module</h2>
+            <p class="text-gray-500 text-sm">This module is under development.</p>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- JavaScript for Navigation Handling -->
+  <script>
+    function showSection(sectionId) {
+      const sections = ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'increment'];
+      
+      // Hide all standard sections
+      sections.forEach(id => {
+        const el = document.getElementById('sec-' + id);
+        if (el) el.classList.add('hidden');
+      });
+
+      const genericSec = document.getElementById('sec-generic');
+      genericSec.classList.add('hidden');
+
+      // Update Page Title
+      const pageTitle = document.getElementById('page-title');
+      pageTitle.innerText = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
+
+      // Show selected section or fallback to generic
+      const targetSec = document.getElementById('sec-' + sectionId);
+      if (targetSec) {
+        targetSec.classList.remove('hidden');
+      } else {
+        document.getElementById('generic-title').innerText = pageTitle.innerText;
+        genericSec.classList.remove('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

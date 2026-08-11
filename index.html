@@ -12,7 +12,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB20hWCqKPSt2aZxVOYa3cz2FVX2MSCs1U",
@@ -27,7 +26,6 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const storage = getStorage(app);
 
     // Auth Functions
     window.loginUser = async function() {
@@ -59,19 +57,19 @@
       }
     });
 
-    // File Upload Helper
-    async function uploadFileToStorage(file, folderName) {
-      if (!file) return null;
-      const fileRef = ref(storage, `${folderName}/${Date.now()}_${file.name}`);
-      await uploadBytes(fileRef, file);
-      return await getDownloadURL(fileRef);
-    }
+    // Convert file to Base64 (No Firebase Storage required)
+    const fileToBase64 = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
 
     // Save Employee Action
     window.saveEmployee = async function(e) {
       e.preventDefault();
       const saveBtn = document.getElementById('save-btn');
-      saveBtn.innerText = "Uploading & Saving...";
+      saveBtn.innerText = "Saving...";
       saveBtn.disabled = true;
 
       try {
@@ -83,7 +81,7 @@
         const joiningDate = document.getElementById('emp-joining').value;
         const salary = document.getElementById('emp-salary').value;
 
-        // Files
+        // File Inputs
         const photoFile = document.getElementById('emp-photo-file').files[0];
         const docFile = document.getElementById('emp-doc-file').files[0];
 
@@ -91,11 +89,11 @@
         let docUrl = '#';
 
         if (photoFile) {
-          photoUrl = await uploadFileToStorage(photoFile, 'profile_photos');
+          photoUrl = await fileToBase64(photoFile);
         }
 
         if (docFile) {
-          docUrl = await uploadFileToStorage(docFile, 'documents');
+          docUrl = await fileToBase64(docFile);
         }
 
         await addDoc(collection(db, "employees"), {
@@ -147,7 +145,7 @@
               <td class="px-6 py-4 text-gray-600">${emp.joiningDate || 'N/A'}</td>
               <td class="px-6 py-4 font-medium text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
               <td class="px-6 py-4">
-                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center space-x-1 font-semibold"><i class="fa-solid fa-file-arrow-down"></i><span>View File</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
+                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" download="Document" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center space-x-1 font-semibold"><i class="fa-solid fa-file-arrow-down"></i><span>View/Download</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
               </td>
               <td class="px-6 py-4 text-right">
                 <button onclick="deleteEmployee('${id}')" class="text-red-600 hover:text-red-800 font-semibold">
@@ -281,7 +279,7 @@
     </main>
   </div>
 
-  <!-- Add Employee Modal with Direct File Upload -->
+  <!-- Add Employee Modal -->
   <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
       <div class="p-5 border-b flex justify-between items-center bg-gray-50">

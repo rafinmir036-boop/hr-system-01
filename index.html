@@ -11,7 +11,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB20hWCqKPSt2aZxVOYa3cz2FVX2MSCs1U",
@@ -26,6 +26,8 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    let employeeList = [];
 
     // Auth Functions
     window.loginUser = async function() {
@@ -50,22 +52,52 @@
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
         document.getElementById('user-email').innerText = user.email;
+        
+        // Set today date input
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('att-date').value = todayStr;
+
         loadEmployeesRealtime();
+        listenTodayAttendance(todayStr);
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
       }
     });
 
-    // Convert file to Base64 (No Firebase Storage required)
-    const fileToBase64 = file => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-    });
+    // Compress & Convert Image
+    function processImageFile(file) {
+      return new Promise((resolve) => {
+        if (!file) resolve('https://via.placeholder.com/150');
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 300;
+            const scaleFactor = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleFactor;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+        };
+      });
+    }
 
-    // Save Employee Action
+    function processDocFile(file) {
+      return new Promise((resolve) => {
+        if (!file) resolve('#');
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+      });
+    }
+
+    // Save Employee
     window.saveEmployee = async function(e) {
       e.preventDefault();
       const saveBtn = document.getElementById('save-btn');
@@ -81,20 +113,11 @@
         const joiningDate = document.getElementById('emp-joining').value;
         const salary = document.getElementById('emp-salary').value;
 
-        // File Inputs
         const photoFile = document.getElementById('emp-photo-file').files[0];
         const docFile = document.getElementById('emp-doc-file').files[0];
 
-        let photoUrl = 'https://via.placeholder.com/150';
-        let docUrl = '#';
-
-        if (photoFile) {
-          photoUrl = await fileToBase64(photoFile);
-        }
-
-        if (docFile) {
-          docUrl = await fileToBase64(docFile);
-        }
+        const photoUrl = await processImageFile(photoFile);
+        const docUrl = await processDocFile(docFile);
 
         await addDoc(collection(db, "employees"), {
           name,
@@ -123,12 +146,12 @@
       onSnapshot(collection(db, "employees"), (snapshot) => {
         const tbody = document.getElementById('emp-table-body');
         tbody.innerHTML = '';
-        let totalCount = 0;
+        employeeList = [];
 
         snapshot.forEach((docSnap) => {
-          totalCount++;
           const emp = docSnap.data();
           const id = docSnap.id;
+          employeeList.push({ id, ...emp });
 
           const row = `
             <tr class="border-b hover:bg-gray-50 transition text-sm">
@@ -157,13 +180,104 @@
           tbody.innerHTML += row;
         });
 
-        document.getElementById('dash-total-emp').innerText = totalCount;
+        document.getElementById('dash-total-emp').innerText = employeeList.length;
+        renderAttendanceTable();
       });
     }
 
     window.deleteEmployee = async function(id) {
       if (confirm("আপনি কি নিশ্চিত যে এই এমপ্লয়ী ডিলিট করতে চান?")) {
         await deleteDoc(doc(db, "employees", id));
+      }
+    };
+
+    // Attendance Functionalities
+    let todayAttendanceData = {};
+
+    window.loadAttendanceForDate = function() {
+      const selectedDate = document.getElementById('att-date').value;
+      listenTodayAttendance(selectedDate);
+    };
+
+    function listenTodayAttendance(dateStr) {
+      onSnapshot(collection(db, `attendance_${dateStr}`), (snapshot) => {
+        todayAttendanceData = {};
+        let presentCount = 0;
+        let absentCount = 0;
+        let leaveCount = 0;
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          todayAttendanceData[docSnap.id] = data.status;
+
+          if (data.status === 'Present' || data.status === 'Late') presentCount++;
+          if (data.status === 'Absent') absentCount++;
+          if (data.status === 'On Leave') leaveCount++;
+        });
+
+        document.getElementById('dash-present-today').innerText = presentCount;
+        document.getElementById('dash-absent-today').innerText = absentCount;
+        document.getElementById('dash-leave-today').innerText = leaveCount;
+
+        renderAttendanceTable();
+      });
+    }
+
+    function renderAttendanceTable() {
+      const tbody = document.getElementById('att-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      employeeList.forEach((emp) => {
+        const currentStatus = todayAttendanceData[emp.id] || 'Not Marked';
+
+        const row = `
+          <tr class="border-b hover:bg-gray-50 transition text-sm">
+            <td class="px-6 py-4 flex items-center space-x-3">
+              <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border">
+              <div>
+                <div class="font-bold text-gray-800">${emp.name}</div>
+                <div class="text-xs text-gray-500">${emp.designation} (${emp.department})</div>
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
+                ${currentStatus}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right space-x-2">
+              <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Present</button>
+              <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs font-semibold">Late</button>
+              <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Absent</button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    }
+
+    function getStatusBadge(status) {
+      if (status === 'Present') return 'bg-green-100 text-green-800';
+      if (status === 'Late') return 'bg-yellow-100 text-yellow-800';
+      if (status === 'Absent') return 'bg-red-100 text-red-800';
+      if (status === 'On Leave') return 'bg-purple-100 text-purple-800';
+      return 'bg-gray-100 text-gray-600';
+    }
+
+    window.markAttendance = async function(empId, status) {
+      const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate) {
+        alert("তারিখ নির্বাচন করুন");
+        return;
+      }
+      try {
+        await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
+          employeeId: empId,
+          status: status,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (err) {
+        alert("Error marking attendance: " + err.message);
       }
     };
   </script>
@@ -225,16 +339,18 @@
       </header>
 
       <div class="p-6">
+        <!-- Dashboard Section -->
         <section id="sec-dashboard" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div class="bg-white p-5 rounded-xl border shadow-sm"><p class="text-xs text-gray-500 font-bold uppercase">Total Employees</p><h3 id="dash-total-emp" class="text-2xl font-bold text-gray-800 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-green-500"><p class="text-xs text-gray-500 font-bold uppercase">Present Today</p><h3 class="text-2xl font-bold text-green-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-red-500"><p class="text-xs text-gray-500 font-bold uppercase">Absent Today</p><h3 class="text-2xl font-bold text-red-600 mt-2">0</h3></div>
-            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-yellow-500"><p class="text-xs text-gray-500 font-bold uppercase">On Leave</p><h3 class="text-2xl font-bold text-yellow-600 mt-2">0</h3></div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-green-500"><p class="text-xs text-gray-500 font-bold uppercase">Present Today</p><h3 id="dash-present-today" class="text-2xl font-bold text-green-600 mt-2">0</h3></div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-red-500"><p class="text-xs text-gray-500 font-bold uppercase">Absent Today</p><h3 id="dash-absent-today" class="text-2xl font-bold text-red-600 mt-2">0</h3></div>
+            <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-yellow-500"><p class="text-xs text-gray-500 font-bold uppercase">On Leave</p><h3 id="dash-leave-today" class="text-2xl font-bold text-yellow-600 mt-2">0</h3></div>
             <div class="bg-white p-5 rounded-xl border shadow-sm border-l-4 border-l-purple-500"><p class="text-xs text-gray-500 font-bold uppercase">Increment Due</p><h3 class="text-2xl font-bold text-purple-600 mt-2">0</h3></div>
           </div>
         </section>
 
+        <!-- Employees Section -->
         <section id="sec-employees" class="hidden">
           <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div class="p-5 border-b flex justify-between items-center bg-gray-50">
@@ -263,6 +379,34 @@
                 </thead>
                 <tbody id="emp-table-body">
                   <!-- Dynamic Rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Attendance Section -->
+        <section id="sec-attendance" class="hidden space-y-6">
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-bold text-gray-800">Daily Attendance Sheet</h2>
+            <div class="flex items-center space-x-2">
+              <label class="text-xs font-bold text-gray-600">Select Date:</label>
+              <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">
+                  <tr>
+                    <th class="px-6 py-3">Employee Name</th>
+                    <th class="px-6 py-3">Current Status</th>
+                    <th class="px-6 py-3 text-right">Mark Attendance</th>
+                  </tr>
+                </thead>
+                <tbody id="att-table-body">
+                  <!-- Dynamic Attendance Rows -->
                 </tbody>
               </table>
             </div>
@@ -345,7 +489,7 @@
 
   <script>
     function showSection(sectionId) {
-      ['dashboard', 'employees', 'generic'].forEach(id => {
+      ['dashboard', 'employees', 'attendance', 'generic'].forEach(id => {
         const el = document.getElementById('sec-' + id);
         if (el) el.classList.add('hidden');
       });

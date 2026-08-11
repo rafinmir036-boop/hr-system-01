@@ -28,6 +28,9 @@
     const db = getFirestore(app);
 
     let employeeList = [];
+    let noticeList = [];
+    let currentNoticeIndex = 0;
+    let noticeInterval = null;
 
     // Auth Functions
     window.loginUser = async function() {
@@ -610,7 +613,7 @@
       win.document.close();
     };
 
-    // 📄 DOCUMENTS MODULE UPDATED
+    // 📄 DOCUMENTS MODULE
     window.saveCompanyDoc = async function(e) {
       e.preventDefault();
       const title = document.getElementById('doc-title').value;
@@ -750,7 +753,7 @@
       }
     };
 
-    // 📢 NOTICE MODULE
+    // 📢 NOTICE MODULE & DASHBOARD SLIDER
     window.saveNotice = async function(e) {
       e.preventDefault();
       const title = document.getElementById('notice-title').value;
@@ -773,29 +776,96 @@
     function loadNoticesRealtime() {
       onSnapshot(collection(db, "notices"), (snapshot) => {
         const container = document.getElementById('notice-list');
-        if (!container) return;
-        container.innerHTML = '';
+        noticeList = [];
 
         snapshot.forEach((docSnap) => {
           const notice = docSnap.data();
           const id = docSnap.id;
-
-          const card = `
-            <div class="bg-white p-5 rounded-xl border shadow-sm space-y-2 border-l-4 border-l-blue-600">
-              <div class="flex justify-between items-center">
-                <h3 class="font-bold text-gray-800 text-base">${notice.title}</h3>
-                <div class="flex items-center space-x-2">
-                  <span class="text-xs text-gray-400"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
-                  <button onclick="deleteNotice('${id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                </div>
-              </div>
-              <p class="text-sm text-gray-600 leading-relaxed">${notice.description}</p>
-            </div>
-          `;
-          container.innerHTML += card;
+          noticeList.push({ id, ...notice });
         });
+
+        // Update Notice Board List View
+        if (container) {
+          container.innerHTML = '';
+          noticeList.forEach(notice => {
+            const card = `
+              <div class="bg-white p-5 rounded-xl border shadow-sm space-y-2 border-l-4 border-l-blue-600">
+                <div class="flex justify-between items-center">
+                  <h3 class="font-bold text-gray-800 text-base">${notice.title}</h3>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-400"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
+                    <button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                  </div>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">${notice.description}</p>
+              </div>
+            `;
+            container.innerHTML += card;
+          });
+        }
+
+        // Render Dashboard Slider
+        renderDashboardNoticeSlider();
       });
     }
+
+    function renderDashboardNoticeSlider() {
+      const sliderContainer = document.getElementById('dash-notice-slider-container');
+      if (!sliderContainer) return;
+
+      if (noticeList.length === 0) {
+        sliderContainer.classList.add('hidden');
+        if (noticeInterval) clearInterval(noticeInterval);
+        return;
+      }
+
+      sliderContainer.classList.remove('hidden');
+      showNoticeSlide(0);
+
+      // Auto Slide Every 5 Seconds
+      if (noticeInterval) clearInterval(noticeInterval);
+      noticeInterval = setInterval(() => {
+        currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
+        showNoticeSlide(currentNoticeIndex);
+      }, 5000);
+    }
+
+    window.showNoticeSlide = function(index) {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = index;
+      const notice = noticeList[currentNoticeIndex];
+
+      const contentBox = document.getElementById('dash-notice-slide-content');
+      const dotsBox = document.getElementById('dash-notice-dots');
+
+      contentBox.innerHTML = `
+        <div class="transition-all duration-500 ease-in-out">
+          <div class="flex justify-between items-center mb-2">
+            <span class="bg-blue-600 text-white text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">📢 Notice ${currentNoticeIndex + 1} / ${noticeList.length}</span>
+            <span class="text-xs text-blue-200"><i class="fa-regular fa-clock mr-1"></i>${notice.postedDate}</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">${notice.title}</h3>
+          <p class="text-sm text-blue-100 mt-1 leading-relaxed line-clamp-2">${notice.description}</p>
+        </div>
+      `;
+
+      // Render Dots Indicator
+      dotsBox.innerHTML = noticeList.map((_, i) => `
+        <button onclick="showNoticeSlide(${i})" class="w-2.5 h-2.5 rounded-full transition-all ${i === currentNoticeIndex ? 'bg-white w-6' : 'bg-blue-400/60'}"></button>
+      `).join('');
+    };
+
+    window.nextNoticeSlide = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
+      showNoticeSlide(currentNoticeIndex);
+    };
+
+    window.prevNoticeSlide = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex - 1 + noticeList.length) % noticeList.length;
+      showNoticeSlide(currentNoticeIndex);
+    };
 
     window.deleteNotice = async function(id) {
       if (confirm("এই নোটিশটি ডিলিট করতে চান?")) {
@@ -909,6 +979,26 @@
 
       <div class="p-6 space-y-6">
         
+        <!-- Dashboard Notice Slider Banner -->
+        <div id="dash-notice-slider-container" class="hidden relative bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl shadow-lg p-6 text-white overflow-hidden">
+          <div class="flex justify-between items-center relative z-10">
+            <div id="dash-notice-slide-content" class="w-full pr-12">
+              <!-- Dynamic Slide Content -->
+            </div>
+          </div>
+
+          <!-- Carousel Controls -->
+          <div class="flex items-center justify-between mt-4 pt-3 border-t border-blue-500/30 relative z-10">
+            <div id="dash-notice-dots" class="flex space-x-2">
+              <!-- Dots -->
+            </div>
+            <div class="flex space-x-2">
+              <button onclick="prevNoticeSlide()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-left"></i></button>
+              <button onclick="nextNoticeSlide()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+
         <!-- Alert Box for Pending Increments -->
         <div id="dash-increment-alert" class="hidden"></div>
 
@@ -1411,7 +1501,7 @@
     </div>
   </div>
 
-  <!-- Add Document Modal UPDATED -->
+  <!-- Add Document Modal -->
   <div id="add-doc-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
       <div class="p-5 border-b flex justify-between items-center bg-gray-50">

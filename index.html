@@ -10,7 +10,7 @@
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -37,7 +37,7 @@
 
     let currentNoticeIndex = 0;
     let noticeInterval = null;
-    let currentUserRole = 'Admin'; // Default Fallback
+    let currentUserRole = 'Admin';
 
     // Auth Functions
     window.loginUser = async function() {
@@ -79,6 +79,34 @@
         document.getElementById('app-screen').classList.add('hidden');
       }
     });
+
+    // Change User Password Logic
+    window.changeUserPassword = async function(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('settings-new-pass').value;
+      const confirmPass = document.getElementById('settings-confirm-pass').value;
+
+      if (newPass !== confirmPass) {
+        alert("পাসওয়ার্ড দুটি মিলছে না!");
+        return;
+      }
+
+      if (newPass.length < 6) {
+        alert("পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে!");
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          await updatePassword(user, newPass);
+          alert("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!");
+          document.getElementById('change-pass-form').reset();
+        } catch (err) {
+          alert("পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে: " + err.message + "\n(প্রয়োজনে পুনরায় লগইন করে চেষ্টা করুন)");
+        }
+      }
+    };
 
     // Helpers
     function processImageFile(file) {
@@ -137,7 +165,6 @@
           }
         });
 
-        // Set Current User Role
         const assignedRole = userPermissions[userEmail.toLowerCase()];
         currentUserRole = assignedRole || (userEmail.includes('admin') ? 'Admin' : 'Employee');
         applyRoleAccessUI();
@@ -157,9 +184,9 @@
       if (currentUserRole === 'Admin') {
         allowedNavs = allNavs;
       } else if (currentUserRole === 'Manager') {
-        allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports'];
-      } else { // Employee
-        allowedNavs = ['dashboard', 'attendance', 'leave', 'notice', 'documents'];
+        allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
+      } else {
+        allowedNavs = ['dashboard', 'attendance', 'leave', 'notice', 'documents', 'settings'];
       }
 
       allNavs.forEach(navId => {
@@ -175,16 +202,18 @@
       e.preventDefault();
       const email = document.getElementById('perm-email').value.trim().toLowerCase();
       const role = document.getElementById('perm-role').value;
+      const userPass = document.getElementById('perm-user-pass').value;
 
       try {
         await addDoc(collection(db, "user_roles"), {
           email,
           role,
+          assignedPassword: userPass,
           createdAt: new Date().toISOString()
         });
 
         document.getElementById('perm-form').reset();
-        alert(`পারমিশন সফলভাবে আপডেট হয়েছে! ${email} রোল পেয়েছেন: ${role}`);
+        alert(`ব্যবহারকারীর রোল ও পাসওয়ার্ড সংরক্ষিত হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
       } catch (err) {
         alert("Error updating permissions: " + err.message);
       }
@@ -1498,29 +1527,49 @@
           </div>
         </section>
 
-        <!-- ⚙️ SETTINGS SECTION WITH ROLE PERMISSIONS -->
+        <!-- ⚙️ SETTINGS SECTION WITH ROLE PERMISSIONS & PASSWORD CHANGE -->
         <section id="sec-settings" class="hidden space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">System Settings</h2>
-              <form onsubmit="saveSettings(event)" class="space-y-4">
-                <div>
-                  <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
-                  <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
-                  <input type="email" value="admin@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div class="pt-2 border-t flex justify-end">
-                  <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition">Save General Settings</button>
-                </div>
-              </form>
+            
+            <!-- General Settings & Change Password Box -->
+            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+              <div>
+                <h2 class="text-lg font-bold text-gray-800 border-b pb-2">General System Settings</h2>
+                <form onsubmit="saveSettings(event)" class="space-y-3 mt-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
+                    <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
+                    <input type="email" value="admin@test.com" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+                  <div class="pt-2 flex justify-end">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition">Save Settings</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Password Change Form -->
+              <div class="pt-4 border-t">
+                <h3 class="text-md font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-blue-600 mr-2"></i>Change My Password</h3>
+                <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">New Password *</label>
+                    <input type="password" id="settings-new-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Confirm New Password *</label>
+                    <input type="password" id="settings-confirm-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+                  <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-xs font-semibold transition">Update Password</button>
+                </form>
+              </div>
             </div>
 
-            <!-- Role-Based Permissions Panel -->
+            <!-- Role-Based Permissions & Password Assignment Panel -->
             <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">User Role & Access Permission Settings</h2>
+              <h2 class="text-lg font-bold text-gray-800 border-b pb-2">User Role & Access Permissions</h2>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
                 <div>
                   <label class="block text-xs font-bold text-gray-700 mb-1">User Email Address *</label>
@@ -1529,19 +1578,23 @@
                 <div>
                   <label class="block text-xs font-bold text-gray-700 mb-1">Assign Role *</label>
                   <select id="perm-role" required class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                    <option value="Admin">Admin (Full Control System Access)</option>
+                    <option value="Admin">Admin (Full Control Access)</option>
                     <option value="Manager">Manager (Employee, Attendance, Leave, Performance & Notices)</option>
                     <option value="Employee">Employee (Attendance, Leave, Documents & Notices)</option>
                   </select>
                 </div>
-                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-semibold transition">Assign Permission Role</button>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">User Password *</label>
+                  <input type="text" id="perm-user-pass" required minlength="6" placeholder="Set password for this user..." class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-semibold transition">Assign Role & Password</button>
               </form>
 
               <div class="pt-4 border-t">
                 <h4 class="font-bold text-gray-800 text-xs uppercase mb-2">Assigned User Roles</h4>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto max-h-48 overflow-y-auto">
                   <table class="w-full text-left text-xs text-gray-600">
-                    <thead class="bg-gray-100 uppercase text-gray-700">
+                    <thead class="bg-gray-100 uppercase text-gray-700 sticky top-0">
                       <tr>
                         <th class="px-3 py-2">Email</th>
                         <th class="px-3 py-2">Role</th>
@@ -1555,6 +1608,7 @@
                 </div>
               </div>
             </div>
+
           </div>
         </section>
 

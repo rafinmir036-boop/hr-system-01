@@ -119,7 +119,7 @@
     // Helpers
     function processImageFile(file) {
       return new Promise((resolve) => {
-        if (!file) resolve('https://via.placeholder.com/150');
+        if (!file) resolve(null);
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = (event) => {
@@ -141,7 +141,7 @@
 
     function processDocFile(file) {
       return new Promise((resolve) => {
-        if (!file) resolve('#');
+        if (!file) resolve(null);
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => resolve(reader.result);
@@ -233,7 +233,7 @@
       }
     };
 
-    // Save Employee
+    // Save or Update Employee
     window.saveEmployee = async function(e) {
       e.preventDefault();
       const saveBtn = document.getElementById('save-btn');
@@ -241,6 +241,7 @@
       saveBtn.disabled = true;
 
       try {
+        const empId = document.getElementById('emp-doc-id').value;
         const name = document.getElementById('emp-name').value;
         const email = document.getElementById('emp-email').value;
         const phone = document.getElementById('emp-phone').value;
@@ -252,24 +253,53 @@
         const photoFile = document.getElementById('emp-photo-file').files[0];
         const docFile = document.getElementById('emp-doc-file').files[0];
 
-        const photoUrl = await processImageFile(photoFile);
-        const docUrl = await processDocFile(docFile);
+        let photoUrl = document.getElementById('emp-existing-photo').value || 'https://via.placeholder.com/150';
+        let docUrl = document.getElementById('emp-existing-doc').value || '#';
 
-        await addDoc(collection(db, "employees"), {
-          name,
-          email,
-          phone,
-          photoUrl,
-          designation,
-          department,
-          joiningDate,
-          lastIncrementDate: joiningDate,
-          salary: Number(salary),
-          docUrl,
-          createdAt: new Date().toISOString()
-        });
+        if (photoFile) {
+          const newPhoto = await processImageFile(photoFile);
+          if (newPhoto) photoUrl = newPhoto;
+        }
+
+        if (docFile) {
+          const newDoc = await processDocFile(docFile);
+          if (newDoc) docUrl = newDoc;
+        }
+
+        if (empId) {
+          // Update Existing Employee
+          await updateDoc(doc(db, "employees", empId), {
+            name,
+            email,
+            phone,
+            photoUrl,
+            designation,
+            department,
+            joiningDate,
+            salary: Number(salary),
+            docUrl
+          });
+          alert("কর্মচারীর তথ্য সফলভাবে আপডেট করা হয়েছে!");
+        } else {
+          // Add New Employee
+          await addDoc(collection(db, "employees"), {
+            name,
+            email,
+            phone,
+            photoUrl,
+            designation,
+            department,
+            joiningDate,
+            lastIncrementDate: joiningDate,
+            salary: Number(salary),
+            docUrl,
+            createdAt: new Date().toISOString()
+          });
+          alert("নতুন কর্মচারী যুক্ত করা হয়েছে!");
+        }
         
         document.getElementById('emp-form').reset();
+        document.getElementById('emp-doc-id').value = '';
         toggleModal('add-emp-modal', false);
       } catch (err) {
         alert("Error saving employee: " + err.message);
@@ -277,6 +307,54 @@
         saveBtn.innerText = "Save Employee";
         saveBtn.disabled = false;
       }
+    };
+
+    // Open Add/Edit Modal
+    window.openEmployeeModal = function(id = null) {
+      document.getElementById('emp-form').reset();
+      document.getElementById('emp-doc-id').value = '';
+      document.getElementById('emp-modal-title').innerText = 'Add New Employee';
+
+      if (id) {
+        const emp = employeeList.find(e => e.id === id);
+        if (emp) {
+          document.getElementById('emp-modal-title').innerText = 'Edit Employee Details';
+          document.getElementById('emp-doc-id').value = emp.id;
+          document.getElementById('emp-name').value = emp.name || '';
+          document.getElementById('emp-email').value = emp.email || '';
+          document.getElementById('emp-phone').value = emp.phone || '';
+          document.getElementById('emp-designation').value = emp.designation || '';
+          document.getElementById('emp-department').value = emp.department || '';
+          document.getElementById('emp-joining').value = emp.joiningDate || '';
+          document.getElementById('emp-salary').value = emp.salary || 0;
+          document.getElementById('emp-existing-photo').value = emp.photoUrl || '';
+          document.getElementById('emp-existing-doc').value = emp.docUrl || '';
+        }
+      }
+      toggleModal('add-emp-modal', true);
+    };
+
+    // View Employee Full Details
+    window.viewEmployeeDetails = function(id) {
+      const emp = employeeList.find(e => e.id === id);
+      if (!emp) return;
+
+      document.getElementById('view-emp-photo').src = emp.photoUrl || 'https://via.placeholder.com/150';
+      document.getElementById('view-emp-name').innerText = emp.name || 'N/A';
+      document.getElementById('view-emp-desig').innerText = `${emp.designation || 'N/A'} (${emp.department || 'N/A'})`;
+      document.getElementById('view-emp-email').innerText = emp.email || 'N/A';
+      document.getElementById('view-emp-phone').innerText = emp.phone || 'N/A';
+      document.getElementById('view-emp-joining').innerText = emp.joiningDate || 'N/A';
+      document.getElementById('view-emp-salary').innerText = `৳ ${emp.salary ? emp.salary.toLocaleString() : 0}`;
+
+      const docBox = document.getElementById('view-emp-doc-box');
+      if (emp.docUrl && emp.docUrl !== '#') {
+        docBox.innerHTML = `<a href="${emp.docUrl}" download="Document" target="_blank" class="inline-flex items-center space-x-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl font-bold text-xs border border-indigo-200 hover:bg-indigo-100 transition"><i class="fa-solid fa-file-arrow-down"></i><span>Download Document</span></a>`;
+      } else {
+        docBox.innerHTML = `<span class="text-xs text-gray-400 font-medium">No document uploaded</span>`;
+      }
+
+      toggleModal('view-emp-modal', true);
     };
 
     function loadEmployeesRealtime() {
@@ -322,11 +400,14 @@
               <td class="px-6 py-4 text-gray-600 font-medium">${emp.department}</td>
               <td class="px-6 py-4 text-gray-600">${emp.joiningDate || 'N/A'}</td>
               <td class="px-6 py-4 font-bold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
-              <td class="px-6 py-4">
-                ${emp.docUrl && emp.docUrl !== '#' ? `<a href="${emp.docUrl}" download="Document" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-xs flex items-center space-x-1 font-bold"><i class="fa-solid fa-file-arrow-down"></i><span>View Doc</span></a>` : '<span class="text-xs text-gray-400">No File</span>'}
-              </td>
-              <td class="px-6 py-4 text-right">
-                <button onclick="deleteEmployee('${id}')" class="text-rose-500 hover:text-rose-700 transition">
+              <td class="px-6 py-4 text-right space-x-1">
+                <button onclick="viewEmployeeDetails('${id}')" title="View Details" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                <button onclick="openEmployeeModal('${id}')" title="Edit Employee" class="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button onclick="deleteEmployee('${id}')" title="Delete" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
               </td>
@@ -351,7 +432,6 @@
 
     // Render Dynamic Dashboard Charts
     function renderDashboardCharts() {
-      // 1. Employee Status Semi-Doughnut Chart
       const statusCtx = document.getElementById('chart-emp-status');
       if (statusCtx) {
         if (statusChartInstance) statusChartInstance.destroy();
@@ -375,7 +455,6 @@
         });
       }
 
-      // 2. Department Wise Distribution Chart
       const deptCtx = document.getElementById('chart-dept-dist');
       if (deptCtx) {
         if (deptChartInstance) deptChartInstance.destroy();
@@ -402,7 +481,6 @@
         });
       }
 
-      // 3. Monthly Payroll Expense Bar Chart
       const payrollCtx = document.getElementById('chart-payroll-trend');
       if (payrollCtx) {
         if (payrollChartInstance) payrollChartInstance.destroy();
@@ -1345,7 +1423,6 @@
         <section id="sec-dashboard" class="space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
             
-            <!-- Total Employees -->
             <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
                 <div>
@@ -1362,7 +1439,6 @@
               </div>
             </div>
 
-            <!-- Present Today -->
             <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
                 <div>
@@ -1379,7 +1455,6 @@
               </div>
             </div>
 
-            <!-- Absent Today -->
             <div class="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-lg shadow-rose-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
                 <div>
@@ -1396,7 +1471,6 @@
               </div>
             </div>
 
-            <!-- On Leave -->
             <div class="bg-gradient-to-br from-amber-500 to-orange-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
                 <div>
@@ -1413,7 +1487,6 @@
               </div>
             </div>
 
-            <!-- Increment Due -->
             <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-3xl text-white shadow-lg shadow-purple-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
               <div class="flex justify-between items-start">
                 <div>
@@ -1432,10 +1505,8 @@
 
           </div>
 
-          <!-- Dashboard Interactive Analytics Charts Section -->
+          <!-- Dashboard Charts -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <!-- Chart 1: Employee Status Ratio -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <h4 class="font-bold text-gray-800 text-sm mb-4">Employee Status Ratio</h4>
               <div class="relative w-full flex items-center justify-center">
@@ -1443,7 +1514,6 @@
               </div>
             </div>
 
-            <!-- Chart 2: Department Distribution -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <h4 class="font-bold text-gray-800 text-sm mb-4">Department Wise Distribution</h4>
               <div class="relative w-full flex items-center justify-center">
@@ -1451,14 +1521,12 @@
               </div>
             </div>
 
-            <!-- Chart 3: Monthly Payroll Expense -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
               <h4 class="font-bold text-gray-800 text-sm mb-4">Monthly Payroll Trend</h4>
               <div class="relative w-full flex items-center justify-center">
                 <canvas id="chart-payroll-trend" class="max-h-48"></canvas>
               </div>
             </div>
-
           </div>
         </section>
 
@@ -1470,7 +1538,7 @@
                 <h2 class="text-lg font-black text-gray-800">Employee Directory</h2>
                 <p class="text-xs text-gray-500 font-medium">সব কর্মচারীর বিস্তারিত তালিকা</p>
               </div>
-              <button onclick="toggleModal('add-emp-modal', true)" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+              <button onclick="openEmployeeModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
                 <i class="fa-solid fa-plus"></i><span>Add Employee</span>
               </button>
             </div>
@@ -1485,7 +1553,6 @@
                     <th class="px-6 py-4">Department</th>
                     <th class="px-6 py-4">Joining Date</th>
                     <th class="px-6 py-4">Salary</th>
-                    <th class="px-6 py-4">Document</th>
                     <th class="px-6 py-4 text-right">Action</th>
                   </tr>
                 </thead>
@@ -1751,7 +1818,6 @@
         <section id="sec-settings" class="hidden space-y-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             
-            <!-- General Settings & Change Password Box -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
               <div>
                 <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">General System Settings</h2>
@@ -1770,7 +1836,6 @@
                 </form>
               </div>
 
-              <!-- Password Change Form -->
               <div class="pt-4 border-t border-slate-100">
                 <h3 class="text-md font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-indigo-600 mr-2"></i>Change My Password</h3>
                 <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
@@ -1787,7 +1852,6 @@
               </div>
             </div>
 
-            <!-- Role-Based Permissions & Password Assignment Panel -->
             <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
               <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">User Role & Access Permissions</h2>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
@@ -1836,14 +1900,45 @@
     </main>
   </div>
 
-  <!-- Add Employee Modal -->
+  <!-- View Employee Details Modal -->
+  <div id="view-emp-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-5">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-black text-gray-800 text-base">Employee Profile Details</h3>
+        <button onclick="toggleModal('view-emp-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="text-center space-y-2">
+        <img id="view-emp-photo" src="" alt="Photo" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 shadow-md mx-auto">
+        <h4 id="view-emp-name" class="font-black text-gray-800 text-lg"></h4>
+        <span id="view-emp-desig" class="inline-block bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200"></span>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border space-y-2 text-xs">
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Email:</span><span id="view-emp-email" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Phone:</span><span id="view-emp-phone" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Joining Date:</span><span id="view-emp-joining" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1"><span class="text-gray-500 font-bold">Basic Salary:</span><span id="view-emp-salary" class="font-black text-emerald-600 text-sm"></span></div>
+      </div>
+
+      <div id="view-emp-doc-box" class="text-center pt-2">
+        <!-- Dynamic Document Link -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Add or Edit Employee Modal -->
   <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
       <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
-        <h3 class="font-black text-gray-800 text-base">Add New Employee</h3>
+        <h3 id="emp-modal-title" class="font-black text-gray-800 text-base">Add New Employee</h3>
         <button onclick="toggleModal('add-emp-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
       <form id="emp-form" onsubmit="saveEmployee(event)" class="p-6 space-y-4 overflow-y-auto">
+        <input type="hidden" id="emp-doc-id">
+        <input type="hidden" id="emp-existing-photo">
+        <input type="hidden" id="emp-existing-doc">
+
         <div>
           <label class="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
           <input type="text" id="emp-name" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">

@@ -29,6 +29,11 @@
 
     let employeeList = [];
     let noticeList = [];
+    let payrollList = [];
+    let leaveList = [];
+    let perfList = [];
+    let docList = [];
+
     let currentNoticeIndex = 0;
     let noticeInterval = null;
 
@@ -157,12 +162,15 @@
         const payEmpSelect = document.getElementById('pay-emp-id');
         const perfEmpSelect = document.getElementById('perf-emp-id');
         const docEmpSelect = document.getElementById('doc-emp-id');
+        const repEmpSelect = document.getElementById('rep-filter-emp');
 
         tbody.innerHTML = '';
         leaveSelect.innerHTML = '<option value="">Select Employee</option>';
         payEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         perfEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         docEmpSelect.innerHTML = '<option value="General">General / All Employees</option>';
+        if(repEmpSelect) repEmpSelect.innerHTML = '<option value="ALL">All Employees</option>';
+        
         employeeList = [];
 
         snapshot.forEach((docSnap) => {
@@ -174,6 +182,7 @@
           payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           perfEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           docEmpSelect.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
+          if(repEmpSelect) repEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
 
           const row = `
             <tr class="border-b hover:bg-gray-50 transition text-sm">
@@ -205,7 +214,7 @@
         document.getElementById('dash-total-emp').innerText = employeeList.length;
         renderAttendanceTable();
         checkIncrementDues();
-        updateReportsData();
+        generateReport();
       });
     }
 
@@ -441,38 +450,42 @@
     function loadLeaveRequestsRealtime() {
       onSnapshot(collection(db, "leaves"), (snapshot) => {
         const tbody = document.getElementById('leave-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
+        leaveList = [];
+        if (tbody) tbody.innerHTML = '';
 
         snapshot.forEach((docSnap) => {
           const leave = docSnap.data();
           const id = docSnap.id;
+          leaveList.push({ id, ...leave });
 
           let badgeColor = 'bg-yellow-100 text-yellow-800';
           if (leave.status === 'Approved') badgeColor = 'bg-green-100 text-green-800';
           if (leave.status === 'Rejected') badgeColor = 'bg-red-100 text-red-800';
 
-          const row = `
-            <tr class="border-b hover:bg-gray-50 transition text-sm">
-              <td class="px-6 py-4 font-bold text-gray-800">${leave.employeeName}</td>
-              <td class="px-6 py-4"><span class="bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full text-xs font-semibold">${leave.leaveType}</span></td>
-              <td class="px-6 py-4 text-gray-600">${leave.startDate} to ${leave.endDate}</td>
-              <td class="px-6 py-4 text-gray-600">${leave.reason}</td>
-              <td class="px-6 py-4">
-                <span class="px-3 py-1 rounded-full text-xs font-bold ${badgeColor}">
-                  ${leave.status}
-                </span>
-              </td>
-              <td class="px-6 py-4 text-right space-x-2">
-                ${leave.status === 'Pending' ? `
-                  <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Approve</button>
-                  <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Reject</button>
-                ` : '<span class="text-xs text-gray-400">Processed</span>'}
-              </td>
-            </tr>
-          `;
-          tbody.innerHTML += row;
+          if (tbody) {
+            const row = `
+              <tr class="border-b hover:bg-gray-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${leave.employeeName}</td>
+                <td class="px-6 py-4"><span class="bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full text-xs font-semibold">${leave.leaveType}</span></td>
+                <td class="px-6 py-4 text-gray-600">${leave.startDate} to ${leave.endDate}</td>
+                <td class="px-6 py-4 text-gray-600">${leave.reason}</td>
+                <td class="px-6 py-4">
+                  <span class="px-3 py-1 rounded-full text-xs font-bold ${badgeColor}">
+                    ${leave.status}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right space-x-2">
+                  ${leave.status === 'Pending' ? `
+                    <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Approve</button>
+                    <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Reject</button>
+                  ` : '<span class="text-xs text-gray-400">Processed</span>'}
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
         });
+        generateReport();
       });
     }
 
@@ -543,30 +556,36 @@
     function loadPayrollRealtime() {
       onSnapshot(collection(db, "payrolls"), (snapshot) => {
         const tbody = document.getElementById('payroll-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
+        payrollList = [];
+        if (tbody) tbody.innerHTML = '';
 
         snapshot.forEach((docSnap) => {
           const pay = docSnap.data();
-          const row = `
-            <tr class="border-b hover:bg-gray-50 transition text-sm">
-              <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
-              <td class="px-6 py-4 font-semibold text-blue-600">${pay.month}</td>
-              <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
-              <td class="px-6 py-4 text-green-600">+৳ ${pay.bonus.toLocaleString()}</td>
-              <td class="px-6 py-4 text-orange-600">-৳ ${pay.advance.toLocaleString()}</td>
-              <td class="px-6 py-4 text-red-600">-৳ ${pay.fine.toLocaleString()}</td>
-              <td class="px-6 py-4 font-bold text-gray-900">৳ ${pay.net.toLocaleString()}</td>
-              <td class="px-6 py-4"><span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-semibold">${pay.status}</span></td>
-              <td class="px-6 py-4 text-right">
-                <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-end space-x-1">
-                  <i class="fa-solid fa-print"></i><span>Payslip</span>
-                </button>
-              </td>
-            </tr>
-          `;
-          tbody.innerHTML += row;
+          const id = docSnap.id;
+          payrollList.push({ id, ...pay });
+
+          if (tbody) {
+            const row = `
+              <tr class="border-b hover:bg-gray-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
+                <td class="px-6 py-4 font-semibold text-blue-600">${pay.month}</td>
+                <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
+                <td class="px-6 py-4 text-green-600">+৳ ${pay.bonus.toLocaleString()}</td>
+                <td class="px-6 py-4 text-orange-600">-৳ ${pay.advance.toLocaleString()}</td>
+                <td class="px-6 py-4 text-red-600">-৳ ${pay.fine.toLocaleString()}</td>
+                <td class="px-6 py-4 font-bold text-gray-900">৳ ${pay.net.toLocaleString()}</td>
+                <td class="px-6 py-4"><span class="bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-xs font-semibold">${pay.status}</span></td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="text-blue-600 hover:text-blue-800 font-semibold text-xs flex items-center justify-end space-x-1">
+                    <i class="fa-solid fa-print"></i><span>Payslip</span>
+                  </button>
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
         });
+        generateReport();
       });
     }
 
@@ -647,40 +666,44 @@
     function loadCompanyDocsRealtime() {
       onSnapshot(collection(db, "company_documents"), (snapshot) => {
         const grid = document.getElementById('docs-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
+        docList = [];
+        if (grid) grid.innerHTML = '';
 
         snapshot.forEach((docSnap) => {
           const item = docSnap.data();
           const id = docSnap.id;
+          docList.push({ id, ...item });
 
-          const card = `
-            <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
-              <div class="flex items-start justify-between">
-                <div class="flex items-center space-x-3">
-                  <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold flex-shrink-0">
-                    <i class="fa-solid fa-file-lines text-lg"></i>
-                  </div>
-                  <div>
-                    <h4 class="font-bold text-gray-800 text-sm">${item.title}</h4>
-                    <div class="flex items-center space-x-2 mt-1">
-                      <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">${item.category}</span>
-                      <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded"><i class="fa-regular fa-user mr-1"></i>${item.targetEmployee || 'General'}</span>
+          if (grid) {
+            const card = `
+              <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold flex-shrink-0">
+                      <i class="fa-solid fa-file-lines text-lg"></i>
+                    </div>
+                    <div>
+                      <h4 class="font-bold text-gray-800 text-sm">${item.title}</h4>
+                      <div class="flex items-center space-x-2 mt-1">
+                        <span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded border border-blue-200">${item.category}</span>
+                        <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded"><i class="fa-regular fa-user mr-1"></i>${item.targetEmployee || 'General'}</span>
+                      </div>
                     </div>
                   </div>
+                  <button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
                 </div>
-                <button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-red-600 ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
+                  <span>Date: ${item.uploadedAt}</span>
+                  <a href="${item.fileUrl}" download="${item.title}" target="_blank" class="text-blue-600 hover:underline font-bold flex items-center space-x-1">
+                    <i class="fa-solid fa-download"></i><span>Download</span>
+                  </a>
+                </div>
               </div>
-              <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
-                <span>Date: ${item.uploadedAt}</span>
-                <a href="${item.fileUrl}" download="${item.title}" target="_blank" class="text-blue-600 hover:underline font-bold flex items-center space-x-1">
-                  <i class="fa-solid fa-download"></i><span>Download</span>
-                </a>
-              </div>
-            </div>
-          `;
-          grid.innerHTML += card;
+            `;
+            grid.innerHTML += card;
+          }
         });
+        generateReport();
       });
     }
 
@@ -721,29 +744,33 @@
     function loadPerformanceRealtime() {
       onSnapshot(collection(db, "performances"), (snapshot) => {
         const tbody = document.getElementById('perf-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
+        perfList = [];
+        if (tbody) tbody.innerHTML = '';
 
         snapshot.forEach((docSnap) => {
           const perf = docSnap.data();
           const id = docSnap.id;
+          perfList.push({ id, ...perf });
 
           const stars = '⭐'.repeat(perf.rating);
 
-          const row = `
-            <tr class="border-b hover:bg-gray-50 transition text-sm">
-              <td class="px-6 py-4 font-bold text-gray-800">${perf.employeeName} <span class="text-xs font-normal text-gray-500">(${perf.designation})</span></td>
-              <td class="px-6 py-4 text-amber-500 font-bold">${stars} (${perf.rating}/5)</td>
-              <td class="px-6 py-4 font-semibold text-blue-600">${perf.kpiScore}%</td>
-              <td class="px-6 py-4 text-gray-600">${perf.feedback}</td>
-              <td class="px-6 py-4 text-gray-500 text-xs">${perf.reviewDate}</td>
-              <td class="px-6 py-4 text-right">
-                <button onclick="deletePerformance('${id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash-can"></i></button>
-              </td>
-            </tr>
-          `;
-          tbody.innerHTML += row;
+          if (tbody) {
+            const row = `
+              <tr class="border-b hover:bg-gray-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${perf.employeeName} <span class="text-xs font-normal text-gray-500">(${perf.designation})</span></td>
+                <td class="px-6 py-4 text-amber-500 font-bold">${stars} (${perf.rating}/5)</td>
+                <td class="px-6 py-4 font-semibold text-blue-600">${perf.kpiScore}%</td>
+                <td class="px-6 py-4 text-gray-600">${perf.feedback}</td>
+                <td class="px-6 py-4 text-gray-500 text-xs">${perf.reviewDate}</td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="deletePerformance('${id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
         });
+        generateReport();
       });
     }
 
@@ -784,7 +811,6 @@
           noticeList.push({ id, ...notice });
         });
 
-        // Update Notice Board List View
         if (container) {
           container.innerHTML = '';
           noticeList.forEach(notice => {
@@ -804,7 +830,6 @@
           });
         }
 
-        // Render Dashboard Slider
         renderDashboardNoticeSlider();
       });
     }
@@ -822,7 +847,6 @@
       sliderContainer.classList.remove('hidden');
       showNoticeSlide(0);
 
-      // Auto Slide Every 5 Seconds
       if (noticeInterval) clearInterval(noticeInterval);
       noticeInterval = setInterval(() => {
         currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
@@ -849,7 +873,6 @@
         </div>
       `;
 
-      // Render Dots Indicator
       dotsBox.innerHTML = noticeList.map((_, i) => `
         <button onclick="showNoticeSlide(${i})" class="w-2.5 h-2.5 rounded-full transition-all ${i === currentNoticeIndex ? 'bg-white w-6' : 'bg-blue-400/60'}"></button>
       `).join('');
@@ -873,37 +896,132 @@
       }
     };
 
-    // 📊 REPORTS MODULE
-    function updateReportsData() {
-      const repEmpTotal = document.getElementById('rep-emp-total');
-      const repSalaryTotal = document.getElementById('rep-salary-total');
-      const repDeptList = document.getElementById('rep-dept-list');
+    // 📊 EXPANDED REPORTS MODULE LOGIC
+    let currentReportTableData = { headers: [], rows: [] };
 
-      if (!repEmpTotal) return;
+    window.generateReport = function() {
+      const type = document.getElementById('rep-type').value;
+      const selectedEmp = document.getElementById('rep-filter-emp').value;
+      const selectedMonth = document.getElementById('rep-filter-month').value;
 
-      repEmpTotal.innerText = employeeList.length;
+      const thead = document.getElementById('rep-table-head');
+      const tbody = document.getElementById('rep-table-body');
+      if (!thead || !tbody) return;
 
-      let totalSal = 0;
-      let deptCounts = {};
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      currentReportTableData = { headers: [], rows: [] };
 
-      employeeList.forEach(e => {
-        totalSal += (e.salary || 0);
-        const dept = e.department || 'Other';
-        deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+      if (type === 'EMPLOYEE') {
+        currentReportTableData.headers = ["Name", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
+        
+        let filtered = employeeList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(e => e.id === selectedEmp);
+
+        filtered.forEach(e => {
+          currentReportTableData.rows.push([
+            e.name, e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A'
+          ]);
+        });
+      } 
+      else if (type === 'PAYROLL') {
+        currentReportTableData.headers = ["Employee Name", "Month", "Basic Salary", "Bonus", "Advance Cut", "Fine Cut", "Net Salary", "Status"];
+        
+        let filtered = payrollList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(p => p.employeeId === selectedEmp);
+        if (selectedMonth) filtered = filtered.filter(p => p.month === selectedMonth);
+
+        filtered.forEach(p => {
+          currentReportTableData.rows.push([
+            p.employeeName, p.month, `৳ ${p.basic.toLocaleString()}`, `৳ ${p.bonus.toLocaleString()}`, `৳ ${p.advance.toLocaleString()}`, `৳ ${p.fine.toLocaleString()}`, `৳ ${p.net.toLocaleString()}`, p.status
+          ]);
+        });
+      }
+      else if (type === 'LEAVE') {
+        currentReportTableData.headers = ["Employee Name", "Leave Type", "Start Date", "End Date", "Reason", "Status"];
+        
+        let filtered = leaveList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(l => l.employeeId === selectedEmp);
+
+        filtered.forEach(l => {
+          currentReportTableData.rows.push([
+            l.employeeName, l.leaveType, l.startDate, l.endDate, l.reason, l.status
+          ]);
+        });
+      }
+      else if (type === 'PERFORMANCE') {
+        currentReportTableData.headers = ["Employee Name", "Designation", "Rating", "KPI Score", "Feedback", "Date"];
+        
+        let filtered = perfList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(p => p.employeeId === selectedEmp);
+
+        filtered.forEach(p => {
+          currentReportTableData.rows.push([
+            p.employeeName, p.designation, `${p.rating}/5 Stars`, `${p.kpiScore}%`, p.feedback, p.reviewDate
+          ]);
+        });
+      }
+      else if (type === 'DOCUMENTS') {
+        currentReportTableData.headers = ["Document Title", "Category", "Target Employee", "Date Uploaded"];
+        
+        filtered = docList;
+        filtered.forEach(d => {
+          currentReportTableData.rows.push([
+            d.title, d.category, d.targetEmployee || 'General', d.uploadedAt
+          ]);
+        });
+      }
+      else {
+        // Fallback / Other sub-reports placeholder row
+        currentReportTableData.headers = ["Metric / Report Item", "Target Scope", "Status / Count", "Remarks"];
+        currentReportTableData.rows.push([
+          `${type} Comprehensive Report`, selectedEmp === 'ALL' ? 'All Employees' : 'Selected Employee', 'Generated', 'System Filtered Data'
+        ]);
+      }
+
+      // Render Header
+      let headRow = '<tr class="bg-gray-100 text-xs font-bold uppercase text-gray-700 border-b">';
+      currentReportTableData.headers.forEach(h => headRow += `<th class="px-6 py-3">${h}</th>`);
+      headRow += '</tr>';
+      thead.innerHTML = headRow;
+
+      // Render Rows
+      if (currentReportTableData.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${currentReportTableData.headers.length}" class="text-center py-6 text-gray-400 text-sm">কোনো ডাটা পাওয়া যায়নি 🔍</td></tr>`;
+        return;
+      }
+
+      currentReportTableData.rows.forEach(r => {
+        let rowHtml = '<tr class="border-b hover:bg-gray-50 transition text-sm">';
+        r.forEach(val => rowHtml += `<td class="px-6 py-4">${val}</td>`);
+        rowHtml += '</tr>';
+        tbody.innerHTML += rowHtml;
+      });
+    };
+
+    // Export Excel (CSV) Action
+    window.downloadReportExcel = function() {
+      if (!currentReportTableData.rows || currentReportTableData.rows.length === 0) {
+        alert("ডাউনলোড করার মতো কোনো ডাটা নেই!");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += currentReportTableData.headers.join(",") + "\n";
+
+      currentReportTableData.rows.forEach(rowArray => {
+        let row = rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",");
+        csvContent += row + "\n";
       });
 
-      repSalaryTotal.innerText = "৳ " + totalSal.toLocaleString();
-
-      repDeptList.innerHTML = '';
-      for (const [dName, count] of Object.entries(deptCounts)) {
-        repDeptList.innerHTML += `
-          <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border text-sm">
-            <span class="font-bold text-gray-700">${dName}</span>
-            <span class="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-xs font-bold">${count} Employees</span>
-          </div>
-        `;
-      }
-    }
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `HR_Report_${document.getElementById('rep-type').value}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
 
     window.printFullReport = function() {
       window.print();
@@ -987,7 +1105,6 @@
             </div>
           </div>
 
-          <!-- Carousel Controls -->
           <div class="flex items-center justify-between mt-4 pt-3 border-t border-blue-500/30 relative z-10">
             <div id="dash-notice-dots" class="flex space-x-2">
               <!-- Dots -->
@@ -1236,36 +1353,67 @@
           </div>
         </section>
 
-        <!-- 📊 Reports Section -->
+        <!-- 📊 EXPANDED REPORTS SECTION -->
         <section id="sec-reports" class="hidden space-y-6">
-          <div class="bg-white p-5 rounded-xl border shadow-sm flex justify-between items-center">
+          <!-- Top Control Header -->
+          <div class="bg-white p-5 rounded-xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">HR Analytics & Reports</h2>
-              <p class="text-xs text-gray-500">সামগ্রিক অর্গানাইজেশনাল পরিসংখ্যান</p>
+              <h2 class="text-lg font-bold text-gray-800">Comprehensive HR Reports & Analytics</h2>
+              <p class="text-xs text-gray-500">মাস ও কর্মচারী ভিত্তিক ফিল্টার এবং এক্সেল / PDF এক্সপোর্ট</p>
             </div>
-            <button onclick="printFullReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition">
-              <i class="fa-solid fa-print"></i><span>Print Summary Report</span>
-            </button>
+            <div class="flex items-center space-x-2">
+              <button onclick="downloadReportExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition shadow-sm">
+                <i class="fa-solid fa-file-excel"></i><span>📥 Excel Download</span>
+              </button>
+              <button onclick="printFullReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 transition shadow-sm">
+                <i class="fa-solid fa-print"></i><span>🖨 Print / PDF</span>
+              </button>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-              <h3 class="font-bold text-gray-800 text-base border-b pb-2">Financial Overhead Overview</h3>
-              <div class="flex justify-between items-center py-2 border-b">
-                <span class="text-sm text-gray-600">Total Active Workforce:</span>
-                <span id="rep-emp-total" class="font-bold text-gray-800">0</span>
-              </div>
-              <div class="flex justify-between items-center py-2 border-b">
-                <span class="text-sm text-gray-600">Total Monthly Salary Cost:</span>
-                <span id="rep-salary-total" class="font-bold text-blue-600 text-lg">৳ 0</span>
-              </div>
+          <!-- Report Filters -->
+          <div class="bg-white p-5 rounded-xl border shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Select Report Category *</label>
+              <select id="rep-type" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium">
+                <option value="EMPLOYEE">👥 Employee Reports</option>
+                <option value="ATTENDANCE">🕐 Attendance Reports</option>
+                <option value="LEAVE">📝 Leave Reports</option>
+                <option value="PAYROLL">💰 Payroll Reports</option>
+                <option value="INCREMENT">📈 Increment Reports</option>
+                <option value="BRANCH">🏪 Branch Reports</option>
+                <option value="PERFORMANCE">🎯 Performance Reports</option>
+                <option value="DOCUMENTS">📄 Document Reports</option>
+                <option value="RESIGNATION">🚪 Resignation Reports</option>
+                <option value="HOLIDAY">📅 Holiday Reports</option>
+                <option value="SUMMARY">📋 Management Summary</option>
+              </select>
             </div>
 
-            <div class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
-              <h3 class="font-bold text-gray-800 text-base border-b pb-2">Department Wise Employee Count</h3>
-              <div id="rep-dept-list" class="space-y-2">
-                <!-- Dynamic Department List -->
-              </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Month</label>
+              <input type="month" id="rep-filter-month" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Employee</label>
+              <select id="rep-filter-emp" onchange="generateReport()" class="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                <option value="ALL">All Employees</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Generated Dynamic Report Table -->
+          <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead id="rep-table-head">
+                  <!-- Dynamic Headers -->
+                </thead>
+                <tbody id="rep-table-body">
+                  <!-- Dynamic Data Rows -->
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -1624,6 +1772,7 @@
       const targetSec = document.getElementById('sec-' + sectionId);
       if (targetSec) {
         targetSec.classList.remove('hidden');
+        if (sectionId === 'reports') generateReport();
       } else {
         document.getElementById('generic-title').innerText = sectionId.toUpperCase();
         document.getElementById('sec-generic').classList.remove('hidden');

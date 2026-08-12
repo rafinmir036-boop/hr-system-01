@@ -1,82 +1,2376 @@
-const fs = require('fs');
-const readline = require('readline');
-const https = require('https');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-const WATCH_FOLDER = 'D:/zk_logs'; 
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-console.log("🚀 ZKBio Time to HR System Sync Agent Active...");
+    const firebaseConfig = {
+      apiKey: "AIzaSyB20hWCqKPSt2aZxVOYa3cz2FVX2MSCs1U",
+      authDomain: "rafin-328ee.firebaseapp.com",
+      projectId: "rafin-328ee",
+      storageBucket: "rafin-328ee.firebasestorage.app",
+      messagingSenderId: "393954293230",
+      appId: "1:393954293230:web:03bb7b058a89c339410aff",
+      measurementId: "G-0HN3Z0SJ3W"
+    };
 
-setInterval(() => {
-  if (!fs.existsSync(WATCH_FOLDER)) return;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-  const files = fs.readdirSync(WATCH_FOLDER);
-  
-  files.forEach(file => {
-    if (file === 'sync.js') return;
+    let employeeList = [];
+    let noticeList = [];
+    let payrollList = [];
+    let leaveList = [];
+    let perfList = [];
+    let docList = [];
+    let userPermissions = {};
 
-    const filePath = path.join(WATCH_FOLDER, file);
-    
-    if (file.endsWith('.txt') || file.endsWith('.csv')) {
-      const fileStream = fs.createReadStream(filePath);
-      const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity
+    let currentNoticeIndex = 0;
+    let noticeInterval = null;
+    let currentUserRole = 'Employee';
+    let currentUserEmail = '';
+    let myEmployeeProfile = null;
+
+    let statusChartInstance = null;
+    let deptChartInstance = null;
+    let payrollChartInstance = null;
+
+    window.loginUser = async function() {
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+      const errBox = document.getElementById('login-error');
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        errBox.classList.add('hidden');
+      } catch (err) {
+        errBox.innerText = "লগইন ব্যর্থ হয়েছে: " + err.message;
+        errBox.classList.remove('hidden');
+      }
+    };
+
+    window.logoutUser = function() {
+      signOut(auth);
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app-screen').classList.remove('hidden');
+        document.getElementById('user-email').innerText = user.email;
+        currentUserEmail = user.email.toLowerCase();
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('att-date').value = todayStr;
+
+        loadPermissionsRealtime(user.email);
+        loadEmployeesRealtime();
+        listenTodayAttendance(todayStr);
+        loadLeaveRequestsRealtime();
+        loadPayrollRealtime();
+        loadCompanyDocsRealtime();
+        loadPerformanceRealtime();
+        loadNoticesRealtime();
+      } else {
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('app-screen').classList.add('hidden');
+      }
+    });
+
+    window.changeUserPassword = async function(e) {
+      e.preventDefault();
+      const newPass = document.getElementById('settings-new-pass').value;
+      const confirmPass = document.getElementById('settings-confirm-pass').value;
+
+      if (newPass !== confirmPass) {
+        alert("পাসওয়ার্ড দুটি মিলছে না!");
+        return;
+      }
+
+      if (newPass.length < 6) {
+        alert("পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে!");
+        return;
+      }
+
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          await updatePassword(user, newPass);
+          alert("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে!");
+          document.getElementById('change-pass-form').reset();
+        } catch (err) {
+          alert("পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে: " + err.message);
+        }
+      }
+    };
+
+    function processImageFile(file) {
+      return new Promise((resolve) => {
+        if (!file) resolve(null);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 300;
+            const scaleFactor = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleFactor;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+        };
+      });
+    }
+
+    function processDocFile(file) {
+      return new Promise((resolve) => {
+        if (!file) resolve(null);
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+      });
+    }
+
+    function loadPermissionsRealtime(userEmail) {
+      onSnapshot(collection(db, "user_roles"), (snapshot) => {
+        const tbody = document.getElementById('perm-table-body');
+        if (tbody) tbody.innerHTML = '';
+        userPermissions = {};
+
+        snapshot.forEach((docSnap) => {
+          const p = docSnap.data();
+          const id = docSnap.id;
+          userPermissions[p.email.toLowerCase()] = p.role;
+
+          if (tbody) {
+            tbody.innerHTML += `
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${p.email}</td>
+                <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${getRoleBadge(p.role)}">${p.role}</span></td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="deletePermissionRole('${id}')" class="text-red-500 hover:text-red-700 transition"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+              </tr>
+            `;
+          }
+        });
+
+        const assignedRole = userPermissions[userEmail.toLowerCase()];
+        currentUserRole = assignedRole || (userEmail.includes('admin') ? 'Admin' : 'Employee');
+        applyRoleAccessUI();
+      });
+    }
+
+    function getRoleBadge(role) {
+      if (role === 'Admin') return 'bg-purple-100 text-purple-700 border border-purple-200';
+      if (role === 'Manager') return 'bg-blue-100 text-blue-700 border border-blue-200';
+      return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+    }
+
+    function applyRoleAccessUI() {
+      const allNavs = ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'increment', 'documents', 'performance', 'notice', 'reports', 'settings'];
+      
+      let allowedNavs = [];
+      if (currentUserRole === 'Admin') {
+        allowedNavs = allNavs;
+      } else if (currentUserRole === 'Manager') {
+        allowedNavs = ['dashboard', 'employees', 'attendance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
+      } else {
+        allowedNavs = ['dashboard', 'leave'];
+      }
+
+      allNavs.forEach(navId => {
+        const navElem = document.getElementById(`nav-${navId}`);
+        if (navElem) {
+          if (allowedNavs.includes(navId)) navElem.classList.remove('hidden');
+          else navElem.classList.add('hidden');
+        }
       });
 
-      rl.on('line', (line) => {
-        if (!line.trim()) return;
-        
-        const parts = line.includes('\t') ? line.split('\t') : line.split(',');
-        
-        if (parts.length >= 2) {
-          const empCode = parts[0].trim();
-          let dateStr = parts[1] ? parts[1].trim() : new Date().toISOString().split('T')[0];
+      const adminDash = document.getElementById('admin-dash-cards');
+      const empDash = document.getElementById('emp-dash-profile');
+      const adminCharts = document.getElementById('dash-charts-container');
+      const leaveEmpSelectBox = document.getElementById('leave-emp-select-box');
 
-          if (dateStr.includes(' ')) {
-            dateStr = dateStr.split(' ')[0];
+      if (currentUserRole === 'Employee') {
+        if (adminDash) adminDash.classList.add('hidden');
+        if (adminCharts) adminCharts.classList.add('hidden');
+        if (empDash) empDash.classList.remove('hidden');
+        if (leaveEmpSelectBox) leaveEmpSelectBox.classList.add('hidden');
+      } else {
+        if (adminDash) adminDash.classList.remove('hidden');
+        if (adminCharts) adminCharts.classList.remove('hidden');
+        if (empDash) empDash.classList.add('hidden');
+        if (leaveEmpSelectBox) leaveEmpSelectBox.classList.remove('hidden');
+      }
+    }
+
+    window.saveUserRolePermission = async function(e) {
+      e.preventDefault();
+      const email = document.getElementById('perm-email').value.trim().toLowerCase();
+      const role = document.getElementById('perm-role').value;
+      const userPass = document.getElementById('perm-user-pass').value;
+
+      try {
+        await addDoc(collection(db, "user_roles"), {
+          email,
+          role,
+          assignedPassword: userPass,
+          createdAt: new Date().toISOString()
+        });
+
+        try {
+          await createUserWithEmailAndPassword(auth, email, userPass);
+        } catch (authErr) {
+          console.log("Auth User exists:", authErr.message);
+        }
+
+        document.getElementById('perm-form').reset();
+        alert(`ব্যবহারকারীর রোল ও পাসওয়ার্ড সংরক্ষিত হয়েছে!\nইমেইল: ${email}\nরোল: ${role}\nপাসওয়ার্ড: ${userPass}`);
+      } catch (err) {
+        alert("Error updating permissions: " + err.message);
+      }
+    };
+
+    window.deletePermissionRole = async function(id) {
+      if (confirm("এই রোল পারমিশন বাতিল করতে চান?")) {
+        await deleteDoc(doc(db, "user_roles", id));
+      }
+    };
+
+    window.saveEmployee = async function(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('save-btn');
+      saveBtn.innerText = "Saving...";
+      saveBtn.disabled = true;
+
+      try {
+        const empId = document.getElementById('emp-doc-id').value;
+        const customEmpCode = document.getElementById('emp-custom-code').value.trim();
+        const name = document.getElementById('emp-name').value;
+        const email = document.getElementById('emp-email').value;
+        const phone = document.getElementById('emp-phone').value;
+        const designation = document.getElementById('emp-designation').value;
+        const department = document.getElementById('emp-department').value;
+        const joiningDate = document.getElementById('emp-joining').value;
+        const salary = document.getElementById('emp-salary').value;
+
+        const photoFile = document.getElementById('emp-photo-file').files[0];
+        const docFile = document.getElementById('emp-doc-file').files[0];
+
+        let photoUrl = document.getElementById('emp-existing-photo').value || 'https://via.placeholder.com/150';
+        let docUrl = document.getElementById('emp-existing-doc').value || '#';
+
+        if (photoFile) {
+          const newPhoto = await processImageFile(photoFile);
+          if (newPhoto) photoUrl = newPhoto;
+        }
+
+        if (docFile) {
+          const newDoc = await processDocFile(docFile);
+          if (newDoc) docUrl = newDoc;
+        }
+
+        if (empId) {
+          await updateDoc(doc(db, "employees", empId), {
+            customEmpCode,
+            name,
+            email,
+            phone,
+            photoUrl,
+            designation,
+            department,
+            joiningDate,
+            salary: Number(salary),
+            docUrl
+          });
+          alert("কর্মচারীর তথ্য সফলভাবে আপডেট করা হয়েছে!");
+        } else {
+          await addDoc(collection(db, "employees"), {
+            customEmpCode,
+            name,
+            email,
+            phone,
+            photoUrl,
+            designation,
+            department,
+            joiningDate,
+            lastIncrementDate: joiningDate,
+            salary: Number(salary),
+            docUrl,
+            createdAt: new Date().toISOString()
+          });
+          alert("নতুন কর্মচারী যুক্ত করা হয়েছে!");
+        }
+        
+        document.getElementById('emp-form').reset();
+        document.getElementById('emp-doc-id').value = '';
+        toggleModal('add-emp-modal', false);
+      } catch (err) {
+        alert("Error saving employee: " + err.message);
+      } finally {
+        saveBtn.innerText = "Save Employee";
+        saveBtn.disabled = false;
+      }
+    };
+
+    window.openEmployeeModal = function(id = null) {
+      document.getElementById('emp-form').reset();
+      document.getElementById('emp-doc-id').value = '';
+      document.getElementById('emp-modal-title').innerText = 'Add New Employee';
+
+      if (id) {
+        const emp = employeeList.find(e => e.id === id);
+        if (emp) {
+          document.getElementById('emp-modal-title').innerText = 'Edit Employee Details';
+          document.getElementById('emp-doc-id').value = emp.id;
+          document.getElementById('emp-custom-code').value = emp.customEmpCode || '';
+          document.getElementById('emp-name').value = emp.name || '';
+          document.getElementById('emp-email').value = emp.email || '';
+          document.getElementById('emp-phone').value = emp.phone || '';
+          document.getElementById('emp-designation').value = emp.designation || '';
+          document.getElementById('emp-department').value = emp.department || '';
+          document.getElementById('emp-joining').value = emp.joiningDate || '';
+          document.getElementById('emp-salary').value = emp.salary || 0;
+          document.getElementById('emp-existing-photo').value = emp.photoUrl || '';
+          document.getElementById('emp-existing-doc').value = emp.docUrl || '';
+        }
+      }
+      toggleModal('add-emp-modal', true);
+    };
+
+    window.viewEmployeeDetails = function(id) {
+      const emp = employeeList.find(e => e.id === id);
+      if (!emp) return;
+
+      document.getElementById('view-emp-photo').src = emp.photoUrl || 'https://via.placeholder.com/150';
+      document.getElementById('view-emp-name').innerText = emp.name || 'N/A';
+      document.getElementById('view-emp-desig').innerText = `ID: ${emp.customEmpCode || 'N/A'} | ${emp.designation || 'N/A'} (${emp.department || 'N/A'})`;
+      document.getElementById('view-emp-email').innerText = emp.email || 'N/A';
+      document.getElementById('view-emp-phone').innerText = emp.phone || 'N/A';
+      document.getElementById('view-emp-joining').innerText = emp.joiningDate || 'N/A';
+      document.getElementById('view-emp-salary').innerText = `৳ ${emp.salary ? emp.salary.toLocaleString() : 0}`;
+
+      const docBox = document.getElementById('view-emp-doc-box');
+      if (emp.docUrl && emp.docUrl !== '#') {
+        docBox.innerHTML = `<a href="${emp.docUrl}" download="Document" target="_blank" class="inline-flex items-center space-x-2 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-xl font-bold text-xs border border-indigo-200 hover:bg-indigo-100 transition"><i class="fa-solid fa-file-arrow-down"></i><span>Download Document</span></a>`;
+      } else {
+        docBox.innerHTML = `<span class="text-xs text-gray-400 font-medium">No document uploaded</span>`;
+      }
+
+      toggleModal('view-emp-modal', true);
+    };
+
+    function loadEmployeesRealtime() {
+      onSnapshot(collection(db, "employees"), (snapshot) => {
+        const tbody = document.getElementById('emp-table-body');
+        const leaveSelect = document.getElementById('leave-emp-id');
+        const payEmpSelect = document.getElementById('pay-emp-id');
+        const perfEmpSelect = document.getElementById('perf-emp-id');
+        const docEmpSelect = document.getElementById('doc-emp-id');
+        const repEmpSelect = document.getElementById('rep-filter-emp');
+
+        tbody.innerHTML = '';
+        leaveSelect.innerHTML = '<option value="">Select Employee</option>';
+        payEmpSelect.innerHTML = '<option value="">Select Employee</option>';
+        perfEmpSelect.innerHTML = '<option value="">Select Employee</option>';
+        docEmpSelect.innerHTML = '<option value="General">General / All Employees</option>';
+        if(repEmpSelect) repEmpSelect.innerHTML = '<option value="ALL">All Employees</option>';
+        
+        employeeList = [];
+
+        snapshot.forEach((docSnap) => {
+          const emp = docSnap.data();
+          const id = docSnap.id;
+          employeeList.push({ id, ...emp });
+
+          if (emp.email && emp.email.toLowerCase() === currentUserEmail) {
+            myEmployeeProfile = { id, ...emp };
           }
 
-          if (empCode) {
-            console.log(`📡 Sending Punch Data: Emp Code [${empCode}] on Date [${dateStr}]`);
-            pushToFirebase(dateStr, empCode, 'Present');
+          leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          perfEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          docEmpSelect.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
+          if(repEmpSelect) repEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+
+          const row = `
+            <tr class="border-b hover:bg-slate-50/80 transition text-sm">
+              <td class="px-6 py-4 flex items-center space-x-3">
+                <img src="${emp.photoUrl}" alt="Photo" class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200 shadow-sm">
+                <div>
+                  <div class="font-bold text-gray-800">${emp.name}</div>
+                  <div class="text-xs text-indigo-600 font-bold">ID: ${emp.customEmpCode || 'N/A'}</div>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-gray-600 font-medium">${emp.email}</td>
+              <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-xs font-bold">${emp.designation}</span></td>
+              <td class="px-6 py-4 text-gray-600 font-medium">${emp.department}</td>
+              <td class="px-6 py-4 text-gray-600">${emp.joiningDate || 'N/A'}</td>
+              <td class="px-6 py-4 font-bold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
+              <td class="px-6 py-4 text-right space-x-1">
+                <button onclick="viewEmployeeDetails('${id}')" title="View Details" class="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+                <button onclick="openEmployeeModal('${id}')" title="Edit Employee" class="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button onclick="deleteEmployee('${id}')" title="Delete" class="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold transition">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+          tbody.innerHTML += row;
+        });
+
+        document.getElementById('dash-total-emp').innerText = employeeList.length;
+
+        if (myEmployeeProfile) {
+          document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || 'https://via.placeholder.com/150';
+          document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
+          document.getElementById('emp-p-desig').innerText = `ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department})`;
+          document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
+          document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
+          document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
+
+          if (leaveSelect) leaveSelect.value = myEmployeeProfile.id;
+        }
+
+        renderAttendanceTable();
+        checkIncrementDues();
+        generateReport();
+        calculateMyPersonalSummary();
+        renderDashboardCharts();
+      });
+    }
+
+    function calculateMyPersonalSummary() {
+      if (!myEmployeeProfile) return;
+
+      let totalFine = 0;
+      payrollList.forEach(p => {
+        if (p.employeeId === myEmployeeProfile.id) {
+          totalFine += (p.fine || 0);
+        }
+      });
+      document.getElementById('emp-p-fine').innerText = `৳ ${totalFine.toLocaleString()}`;
+    }
+
+    window.deleteEmployee = async function(id) {
+      if (confirm("আপনি কি নিশ্চিত যে এই এমপ্লয়ী ডিলিট করতে চান?")) {
+        await deleteDoc(doc(db, "employees", id));
+      }
+    };
+
+    function renderDashboardCharts() {
+      if (currentUserRole === 'Employee') return;
+
+      const statusCtx = document.getElementById('chart-emp-status');
+      if (statusCtx) {
+        if (statusChartInstance) statusChartInstance.destroy();
+
+        statusChartInstance = new Chart(statusCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Active Employees', 'Terminated / On Leave'],
+            datasets: [{
+              data: [employeeList.length, leaveList.length],
+              backgroundColor: ['#84cc16', '#e11d48'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            rotation: -90,
+            circumference: 180,
+            plugins: { legend: { position: 'bottom' } },
+            aspectRatio: 1.8
+          }
+        });
+      }
+
+      const deptCtx = document.getElementById('chart-dept-dist');
+      if (deptCtx) {
+        if (deptChartInstance) deptChartInstance.destroy();
+
+        let deptMap = {};
+        employeeList.forEach(e => {
+          const d = e.department || 'General';
+          deptMap[d] = (deptMap[d] || 0) + 1;
+        });
+
+        deptChartInstance = new Chart(deptCtx, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(deptMap).length > 0 ? Object.keys(deptMap) : ['Accounts', 'Operations'],
+            datasets: [{
+              data: Object.values(deptMap).length > 0 ? Object.values(deptMap) : [1, 1],
+              backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            plugins: { legend: { position: 'bottom' } }
+          }
+        });
+      }
+
+      const payrollCtx = document.getElementById('chart-payroll-trend');
+      if (payrollCtx) {
+        if (payrollChartInstance) payrollChartInstance.destroy();
+
+        let monthPayrollMap = {};
+        payrollList.forEach(p => {
+          monthPayrollMap[p.month] = (monthPayrollMap[p.month] || 0) + (p.net || 0);
+        });
+
+        const labels = Object.keys(monthPayrollMap).length > 0 ? Object.keys(monthPayrollMap) : ['Jan 2026', 'Feb 2026', 'Mar 2026'];
+        const values = Object.values(monthPayrollMap).length > 0 ? Object.values(monthPayrollMap) : [50000, 65000, 53410];
+
+        payrollChartInstance = new Chart(payrollCtx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Total Net Salary Cost (BDT)',
+              data: values,
+              backgroundColor: '#3b82f6',
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+    }
+
+    function checkIncrementDues() {
+      const today = new Date();
+      let dueList = [];
+
+      employeeList.forEach(emp => {
+        const refDateStr = emp.lastIncrementDate || emp.joiningDate;
+        if (refDateStr) {
+          const refDate = new Date(refDateStr);
+          const diffTime = Math.abs(today - refDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays >= 365) {
+            dueList.push({ ...emp, daysCompleted: diffDays });
           }
         }
       });
+
+      document.getElementById('dash-increment-due').innerText = dueList.length;
+
+      const alertContainer = document.getElementById('dash-increment-alert');
+      if (dueList.length > 0 && currentUserRole !== 'Employee') {
+        alertContainer.classList.remove('hidden');
+        alertContainer.innerHTML = `
+          <div class="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-l-4 border-amber-500 p-4 rounded-r-2xl shadow-sm flex items-start space-x-3">
+            <i class="fa-solid fa-bell text-amber-600 text-xl mt-0.5"></i>
+            <div>
+              <h4 class="font-bold text-amber-900 text-sm">Increment Alert! (${dueList.length} Employees Pending)</h4>
+              <p class="text-xs text-amber-800 mt-0.5">১ বছর পূর্ণ হওয়াতে নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়া বাকি রয়েছে:</p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                ${dueList.map(item => `<span class="bg-amber-200/80 text-amber-900 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300/50">${item.name} (${item.designation})</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        alertContainer.classList.add('hidden');
+      }
+
+      renderIncrementTable(dueList);
     }
-  });
-}, 5000);
 
-function pushToFirebase(dateStr, empId, status) {
-  const url = `https://firestore.googleapis.com/v1/projects/rafin-328ee/databases/(default)/documents/attendance_${dateStr}/${empId}`;
-  
-  const payload = JSON.stringify({
-    fields: {
-      employeeId: { stringValue: empId },
-      customEmpCode: { stringValue: empId },
-      status: { stringValue: status },
-      updatedAt: { stringValue: new Date().toISOString() }
+    function renderIncrementTable(dueList) {
+      const tbody = document.getElementById('inc-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (dueList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-gray-400 text-sm">কোনো কর্মচারীর ইনক্রিমেন্ট বাকি নেই 🎉</td></tr>`;
+        return;
+      }
+
+      dueList.forEach(emp => {
+        const row = `
+          <tr class="border-b hover:bg-slate-50 transition text-sm">
+            <td class="px-6 py-4 font-bold text-gray-800">${emp.name}</td>
+            <td class="px-6 py-4 text-gray-600">${emp.designation} (${emp.department})</td>
+            <td class="px-6 py-4 text-gray-600">${emp.lastIncrementDate || emp.joiningDate}</td>
+            <td class="px-6 py-4 font-semibold text-gray-800">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
+            <td class="px-6 py-4"><span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-xs font-bold">1 Year Completed</span></td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="openProcessIncModal('${emp.id}', '${emp.name}', ${emp.salary})" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">Process Increment</button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
     }
-  });
 
-  const req = https.request(url, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(payload)
+    let todayAttendanceData = {};
+
+    window.loadAttendanceForDate = function() {
+      const selectedDate = document.getElementById('att-date').value;
+      listenTodayAttendance(selectedDate);
+    };
+
+    function listenTodayAttendance(dateStr) {
+      onSnapshot(collection(db, `attendance_${dateStr}`), (snapshot) => {
+        todayAttendanceData = {};
+        let presentCount = 0;
+        let absentCount = 0;
+        let leaveCount = 0;
+
+        let myPresentDaysCount = 0;
+        let myAbsentDaysCount = 0;
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const pKey = docSnap.id;
+          todayAttendanceData[pKey] = data.status;
+
+          if (data.status === 'Present' || data.status === 'Late') presentCount++;
+          if (data.status === 'Absent') absentCount++;
+          if (data.status === 'On Leave') leaveCount++;
+        });
+
+        document.getElementById('dash-present-today').innerText = presentCount;
+        document.getElementById('dash-absent-today').innerText = absentCount;
+        document.getElementById('dash-leave-today').innerText = leaveCount;
+
+        renderAttendanceTable();
+      });
     }
-  });
 
-  req.on('response', (res) => {
-    if (res.statusCode === 200) {
-      console.log(`✅ Success: Attendance updated in HR System for ID [${empId}]`);
+    function renderAttendanceTable() {
+      const tbody = document.getElementById('att-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      let listToRender = employeeList;
+      if (currentUserRole === 'Employee' && myEmployeeProfile) {
+        listToRender = [myEmployeeProfile];
+      }
+
+      listToRender.forEach((emp) => {
+        // Multi-level status match: Document ID OR Custom Employee Code
+        const currentStatus = todayAttendanceData[emp.id] || todayAttendanceData[emp.customEmpCode] || 'Not Marked';
+
+        const row = `
+          <tr class="border-b hover:bg-slate-50 transition text-sm">
+            <td class="px-6 py-4 flex items-center space-x-3">
+              <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm">
+              <div>
+                <div class="font-bold text-gray-800">${emp.name}</div>
+                <div class="text-xs text-indigo-600 font-bold">ID: ${emp.customEmpCode || 'N/A'} | ${emp.designation}</div>
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
+                ${currentStatus}
+              </span>
+            </td>
+            <td class="px-6 py-4 text-right space-x-2">
+              ${currentUserRole !== 'Employee' ? `
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Present')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Present</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Late')" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition">Late</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Absent')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Absent</button>
+              ` : '<span class="text-xs text-slate-400 font-semibold">View Only</span>'}
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
     }
-  });
 
-  req.on('error', (e) => {
-    console.error(`❌ Sync Error: ${e.message}`);
-  });
+    function getStatusBadge(status) {
+      if (status === 'Present') return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+      if (status === 'Late') return 'bg-amber-100 text-amber-800 border border-amber-200';
+      if (status === 'Absent') return 'bg-rose-100 text-rose-800 border border-rose-200';
+      if (status === 'On Leave') return 'bg-purple-100 text-purple-800 border border-purple-200';
+      return 'bg-slate-100 text-slate-600';
+    }
 
-  req.write(payload);
-  req.end();
-}
+    window.markAttendance = async function(empId, customEmpCode, status) {
+      const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate) {
+        alert("তারিখ নির্বাচন করুন");
+        return;
+      }
+      try {
+        await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
+          employeeId: empId,
+          customEmpCode: customEmpCode || '',
+          status: status,
+          updatedAt: new Date().toISOString()
+        });
+        if (customEmpCode) {
+          await setDoc(doc(db, `attendance_${selectedDate}`, customEmpCode), {
+            employeeId: empId,
+            customEmpCode: customEmpCode,
+            status: status,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (err) {
+        alert("Error marking attendance: " + err.message);
+      }
+    };
+
+    window.submitLeave = async function(e) {
+      e.preventDefault();
+      let empId = document.getElementById('leave-emp-id').value;
+
+      if (currentUserRole === 'Employee' && myEmployeeProfile) {
+        empId = myEmployeeProfile.id;
+      }
+
+      const type = document.getElementById('leave-type').value;
+      const startDate = document.getElementById('leave-start').value;
+      const endDate = document.getElementById('leave-end').value;
+      const reason = document.getElementById('leave-reason').value;
+
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "leaves"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown',
+          leaveType: type,
+          startDate,
+          endDate,
+          reason,
+          status: 'Pending',
+          appliedAt: new Date().toISOString()
+        });
+
+        document.getElementById('leave-form').reset();
+        toggleModal('add-leave-modal', false);
+        alert("আপনার ছুটির আবেদন সফলভাবে জমা দেওয়া হয়েছে!");
+      } catch (err) {
+        alert("Error applying leave: " + err.message);
+      }
+    };
+
+    function loadLeaveRequestsRealtime() {
+      onSnapshot(collection(db, "leaves"), (snapshot) => {
+        const tbody = document.getElementById('leave-table-body');
+        leaveList = [];
+        if (tbody) tbody.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const leave = docSnap.data();
+          const id = docSnap.id;
+          leaveList.push({ id, ...leave });
+
+          let badgeColor = 'bg-amber-100 text-amber-800 border border-amber-200';
+          if (leave.status === 'Approved') badgeColor = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+          if (leave.status === 'Rejected') badgeColor = 'bg-rose-100 text-rose-800 border border-rose-200';
+
+          if (tbody) {
+            if (currentUserRole === 'Employee' && myEmployeeProfile && leave.employeeId !== myEmployeeProfile.id) {
+              return;
+            }
+
+            const row = `
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${leave.employeeName}</td>
+                <td class="px-6 py-4"><span class="bg-slate-100 text-slate-800 px-2.5 py-1 rounded-full text-xs font-bold border">${leave.leaveType}</span></td>
+                <td class="px-6 py-4 text-gray-600">${leave.startDate} to ${leave.endDate}</td>
+                <td class="px-6 py-4 text-gray-600">${leave.reason}</td>
+                <td class="px-6 py-4">
+                  <span class="px-3 py-1 rounded-full text-xs font-bold ${badgeColor}">
+                    ${leave.status}
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  ${currentUserRole !== 'Employee' && leave.status === 'Pending' ? `
+                    <button onclick="updateLeaveStatus('${id}', 'Approved')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Approve</button>
+                    <button onclick="updateLeaveStatus('${id}', 'Rejected')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">Reject</button>
+                  ` : `<span class="text-xs font-bold ${leave.status === 'Approved' ? 'text-emerald-600' : (leave.status === 'Rejected' ? 'text-rose-600' : 'text-amber-600')}">${leave.status}</span>`}
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
+        });
+        generateReport();
+        renderDashboardCharts();
+      });
+    }
+
+    window.updateLeaveStatus = async function(leaveId, status) {
+      try {
+        await updateDoc(doc(db, "leaves", leaveId), {
+          status: status
+        });
+      } catch (err) {
+        alert("Error updating status: " + err.message);
+      }
+    };
+
+    window.onPayrollEmpChange = function() {
+      const empId = document.getElementById('pay-emp-id').value;
+      const emp = employeeList.find(e => e.id === empId);
+      if (emp) {
+        document.getElementById('pay-basic').value = emp.salary || 0;
+        calculateNetSalary();
+      }
+    };
+
+    window.calculateNetSalary = function() {
+      const basic = Number(document.getElementById('pay-basic').value) || 0;
+      const bonus = Number(document.getElementById('pay-bonus').value) || 0;
+      const advance = Number(document.getElementById('pay-advance').value) || 0;
+      const fine = Number(document.getElementById('pay-fine').value) || 0;
+
+      const net = basic + bonus - advance - fine;
+      document.getElementById('pay-net').value = net;
+    };
+
+    window.savePayroll = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('pay-emp-id').value;
+      const month = document.getElementById('pay-month').value;
+      const basic = Number(document.getElementById('pay-basic').value) || 0;
+      const bonus = Number(document.getElementById('pay-bonus').value) || 0;
+      const advance = Number(document.getElementById('pay-advance').value) || 0;
+      const fine = Number(document.getElementById('pay-fine').value) || 0;
+      const net = Number(document.getElementById('pay-net').value) || 0;
+
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "payrolls"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown',
+          designation: emp ? emp.designation : '',
+          month,
+          basic,
+          bonus,
+          advance,
+          fine,
+          net,
+          status: 'Paid',
+          createdDate: new Date().toISOString()
+        });
+
+        document.getElementById('payroll-form').reset();
+        toggleModal('add-payroll-modal', false);
+      } catch (err) {
+        alert("Error generating payroll: " + err.message);
+      }
+    };
+
+    function loadPayrollRealtime() {
+      onSnapshot(collection(db, "payrolls"), (snapshot) => {
+        const tbody = document.getElementById('payroll-table-body');
+        payrollList = [];
+        if (tbody) tbody.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const pay = docSnap.data();
+          const id = docSnap.id;
+          payrollList.push({ id, ...pay });
+
+          if (tbody) {
+            const row = `
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${pay.employeeName} <span class="text-xs font-normal text-gray-500">(${pay.designation})</span></td>
+                <td class="px-6 py-4 font-bold text-indigo-600">${pay.month}</td>
+                <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
+                <td class="px-6 py-4 text-emerald-600 font-semibold">+৳ ${pay.bonus.toLocaleString()}</td>
+                <td class="px-6 py-4 text-amber-600 font-semibold">-৳ ${pay.advance.toLocaleString()}</td>
+                <td class="px-6 py-4 text-rose-600 font-semibold">-৳ ${pay.fine.toLocaleString()}</td>
+                <td class="px-6 py-4 font-extrabold text-slate-900">৳ ${pay.net.toLocaleString()}</td>
+                <td class="px-6 py-4"><span class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold">${pay.status}</span></td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-lg text-xs font-bold flex items-center justify-end space-x-1 transition ml-auto">
+                    <i class="fa-solid fa-print"></i><span>Payslip</span>
+                  </button>
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
+        });
+        calculateMyPersonalSummary();
+        generateReport();
+        renderDashboardCharts();
+      });
+    }
+
+    window.printPayslip = function(name, desig, month, basic, bonus, advance, fine, net) {
+      const win = window.open('', '', 'width=800,height=600');
+      win.document.write(`
+        <html>
+        <head>
+          <title>Salary Slip - ${name}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; }
+            .ticket { border: 2px solid #333; padding: 25px; border-radius: 10px; max-width: 600px; margin: auto; }
+            h2 { text-align: center; margin-bottom: 5px; }
+            p { text-align: center; color: #666; margin-top: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            td, th { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            .total { font-weight: bold; background: #f9f9f9; }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <h2>SALARY PAYSLIP</h2>
+            <p>Month: ${month}</p>
+            <hr>
+            <p style="text-align:left;"><strong>Employee Name:</strong> ${name}<br><strong>Designation:</strong> ${desig}</p>
+            <table>
+              <tr><th>Description</th><th>Amount (BDT)</th></tr>
+              <tr><td>Basic Salary</td><td>৳ ${basic.toLocaleString()}</td></tr>
+              <tr><td>Bonus / Allowance</td><td>+ ৳ ${bonus.toLocaleString()}</td></tr>
+              <tr><td>Advance Deduction</td><td>- ৳ ${advance.toLocaleString()}</td></tr>
+              <tr><td>Fine / Other Deduction</td><td>- ৳ ${fine.toLocaleString()}</td></tr>
+              <tr class="total"><td>Net Payable Amount</td><td>৳ ${net.toLocaleString()}</td></tr>
+            </table>
+            <br><br>
+            <div style="display:flex; justify-content:space-between; margin-top:40px;">
+              <span>_________________<br>Employee Signature</span>
+              <span>_________________<br>Authorized Signature</span>
+            </div>
+          </div>
+          <script>window.print();<\/script>
+        </body>
+        </html>
+      `);
+      win.document.close();
+    };
+
+    window.saveCompanyDoc = async function(e) {
+      e.preventDefault();
+      const title = document.getElementById('doc-title').value;
+      const category = document.getElementById('doc-category').value;
+      const targetEmp = document.getElementById('doc-emp-id').value;
+      const fileInput = document.getElementById('doc-file-input').files[0];
+
+      if (!fileInput) {
+        alert("মেহেরবানী করে ফাইল নির্বাচন করুন");
+        return;
+      }
+
+      const fileUrl = await processDocFile(fileInput);
+
+      try {
+        await addDoc(collection(db, "company_documents"), {
+          title,
+          category,
+          targetEmployee: targetEmp || 'General',
+          fileUrl,
+          uploadedAt: new Date().toISOString().split('T')[0]
+        });
+
+        document.getElementById('company-doc-form').reset();
+        toggleModal('add-doc-modal', false);
+      } catch (err) {
+        alert("Error saving document: " + err.message);
+      }
+    };
+
+    function loadCompanyDocsRealtime() {
+      onSnapshot(collection(db, "company_documents"), (snapshot) => {
+        const grid = document.getElementById('docs-grid');
+        docList = [];
+        if (grid) grid.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const item = docSnap.data();
+          const id = docSnap.id;
+          docList.push({ id, ...item });
+
+          if (grid) {
+            if (currentUserRole === 'Employee' && myEmployeeProfile) {
+              if (item.targetEmployee !== 'General' && item.targetEmployee !== myEmployeeProfile.name) {
+                return;
+              }
+            }
+
+            const card = `
+              <div class="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-between hover:shadow-md transition">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center font-bold flex-shrink-0">
+                      <i class="fa-solid fa-file-lines text-lg"></i>
+                    </div>
+                    <div>
+                      <h4 class="font-bold text-gray-800 text-sm">${item.title}</h4>
+                      <div class="flex items-center space-x-2 mt-1">
+                        <span class="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full border border-indigo-200">${item.category}</span>
+                        <span class="text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded-full"><i class="fa-regular fa-user mr-1"></i>${item.targetEmployee || 'General'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  ${currentUserRole !== 'Employee' ? `<button onclick="deleteCompanyDoc('${id}')" class="text-gray-400 hover:text-rose-600 transition ml-2"><i class="fa-solid fa-trash-can text-sm"></i></button>` : ''}
+                </div>
+                <div class="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
+                  <span>Date: ${item.uploadedAt}</span>
+                  <a href="${item.fileUrl}" download="${item.title}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-bold flex items-center space-x-1">
+                    <i class="fa-solid fa-download"></i><span>Download</span>
+                  </a>
+                </div>
+              </div>
+            `;
+            grid.innerHTML += card;
+          }
+        });
+        generateReport();
+      });
+    }
+
+    window.deleteCompanyDoc = async function(id) {
+      if (confirm("এই ডকুমেন্টটি ডিলিট করতে চান?")) {
+        await deleteDoc(doc(db, "company_documents", id));
+      }
+    };
+
+    window.savePerformanceReview = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('perf-emp-id').value;
+      const rating = document.getElementById('perf-rating').value;
+      const kpi = document.getElementById('perf-kpi').value;
+      const feedback = document.getElementById('perf-feedback').value;
+
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "performances"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown',
+          designation: emp ? emp.designation : '',
+          rating: Number(rating),
+          kpiScore: Number(kpi),
+          feedback,
+          reviewDate: new Date().toISOString().split('T')[0]
+        });
+
+        document.getElementById('perf-form').reset();
+        toggleModal('add-perf-modal', false);
+      } catch (err) {
+        alert("Error saving review: " + err.message);
+      }
+    };
+
+    function loadPerformanceRealtime() {
+      onSnapshot(collection(db, "performances"), (snapshot) => {
+        const tbody = document.getElementById('perf-table-body');
+        perfList = [];
+        if (tbody) tbody.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const perf = docSnap.data();
+          const id = docSnap.id;
+          perfList.push({ id, ...perf });
+
+          const stars = '⭐'.repeat(perf.rating);
+
+          if (tbody) {
+            const row = `
+              <tr class="border-b hover:bg-slate-50 transition text-sm">
+                <td class="px-6 py-4 font-bold text-gray-800">${perf.employeeName} <span class="text-xs font-normal text-gray-500">(${perf.designation})</span></td>
+                <td class="px-6 py-4 text-amber-500 font-bold">${stars} (${perf.rating}/5)</td>
+                <td class="px-6 py-4 font-bold text-indigo-600">${perf.kpiScore}%</td>
+                <td class="px-6 py-4 text-gray-600">${perf.feedback}</td>
+                <td class="px-6 py-4 text-gray-500 text-xs">${perf.reviewDate}</td>
+                <td class="px-6 py-4 text-right">
+                  <button onclick="deletePerformance('${id}')" class="text-rose-500 hover:text-rose-700 transition"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
+        });
+        generateReport();
+      });
+    }
+
+    window.deletePerformance = async function(id) {
+      if (confirm("এই রিভিউ ডিলিট করতে চান?")) {
+        await deleteDoc(doc(db, "performances", id));
+      }
+    };
+
+    window.saveNotice = async function(e) {
+      e.preventDefault();
+      const title = document.getElementById('notice-title').value;
+      const desc = document.getElementById('notice-desc').value;
+
+      try {
+        await addDoc(collection(db, "notices"), {
+          title,
+          description: desc,
+          postedDate: new Date().toISOString().split('T')[0]
+        });
+
+        document.getElementById('notice-form').reset();
+        toggleModal('add-notice-modal', false);
+      } catch (err) {
+        alert("Error posting notice: " + err.message);
+      }
+    };
+
+    function loadNoticesRealtime() {
+      onSnapshot(collection(db, "notices"), (snapshot) => {
+        const container = document.getElementById('notice-list');
+        noticeList = [];
+
+        snapshot.forEach((docSnap) => {
+          const notice = docSnap.data();
+          const id = docSnap.id;
+          noticeList.push({ id, ...notice });
+        });
+
+        if (container) {
+          container.innerHTML = '';
+          noticeList.forEach(notice => {
+            const card = `
+              <div class="bg-white p-5 rounded-2xl border shadow-sm space-y-2 border-l-4 border-l-indigo-600">
+                <div class="flex justify-between items-center">
+                  <h3 class="font-bold text-gray-800 text-base">${notice.title}</h3>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-400 font-medium"><i class="fa-regular fa-calendar-check mr-1"></i>${notice.postedDate}</span>
+                    ${currentUserRole !== 'Employee' ? `<button onclick="deleteNotice('${notice.id}')" class="text-gray-400 hover:text-rose-600 ml-2 transition"><i class="fa-solid fa-trash-can text-sm"></i></button>` : ''}
+                  </div>
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">${notice.description}</p>
+              </div>
+            `;
+            container.innerHTML += card;
+          });
+        }
+
+        renderDashboardNoticeSlider();
+      });
+    }
+
+    function renderDashboardNoticeSlider() {
+      const sliderContainer = document.getElementById('dash-notice-slider-container');
+      if (!sliderContainer) return;
+
+      if (noticeList.length === 0) {
+        sliderContainer.classList.add('hidden');
+        if (noticeInterval) clearInterval(noticeInterval);
+        return;
+      }
+
+      sliderContainer.classList.remove('hidden');
+      showNoticeSlide(0);
+
+      if (noticeInterval) clearInterval(noticeInterval);
+      noticeInterval = setInterval(() => {
+        currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
+        showNoticeSlide(currentNoticeIndex);
+      }, 5000);
+    }
+
+    window.showNoticeSlide = function(index) {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = index;
+      const notice = noticeList[currentNoticeIndex];
+
+      const contentBox = document.getElementById('dash-notice-slide-content');
+      const dotsBox = document.getElementById('dash-notice-dots');
+
+      contentBox.innerHTML = `
+        <div class="transition-all duration-500 ease-in-out">
+          <div class="flex justify-between items-center mb-2">
+            <span class="bg-white/20 backdrop-blur-md text-white text-[10px] font-bold uppercase px-3 py-1 rounded-full border border-white/20">📢 Notice ${currentNoticeIndex + 1} / ${noticeList.length}</span>
+            <span class="text-xs text-indigo-100 font-medium"><i class="fa-regular fa-clock mr-1"></i>${notice.postedDate}</span>
+          </div>
+          <h3 class="text-lg font-bold text-white">${notice.title}</h3>
+          <p class="text-sm text-indigo-100 mt-1 leading-relaxed line-clamp-2">${notice.description}</p>
+        </div>
+      `;
+
+      dotsBox.innerHTML = noticeList.map((_, i) => `
+        <button onclick="showNoticeSlide(${i})" class="w-2.5 h-2.5 rounded-full transition-all ${i === currentNoticeIndex ? 'bg-white w-6' : 'bg-indigo-300/50'}"></button>
+      `).join('');
+    };
+
+    window.nextNoticeSlide = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
+      showNoticeSlide(currentNoticeIndex);
+    };
+
+    window.prevNoticeSlide = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex - 1 + noticeList.length) % noticeList.length;
+      showNoticeSlide(currentNoticeIndex);
+    };
+
+    window.deleteNotice = async function(id) {
+      if (confirm("এই নোটিশটি ডিলিট করতে চান?")) {
+        await deleteDoc(doc(db, "notices", id));
+      }
+    };
+
+    let currentReportTableData = { headers: [], rows: [] };
+
+    window.generateReport = function() {
+      const type = document.getElementById('rep-type').value;
+      const selectedEmp = document.getElementById('rep-filter-emp').value;
+      const selectedMonth = document.getElementById('rep-filter-month').value;
+
+      const thead = document.getElementById('rep-table-head');
+      const tbody = document.getElementById('rep-table-body');
+      if (!thead || !tbody) return;
+
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      currentReportTableData = { headers: [], rows: [] };
+
+      if (type === 'EMPLOYEE') {
+        currentReportTableData.headers = ["Name", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
+        
+        let filtered = employeeList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(e => e.id === selectedEmp);
+
+        filtered.forEach(e => {
+          currentReportTableData.rows.push([
+            e.name, e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A'
+          ]);
+        });
+      } 
+      else if (type === 'PAYROLL') {
+        currentReportTableData.headers = ["Employee Name", "Month", "Basic Salary", "Bonus", "Advance Cut", "Fine Cut", "Net Salary", "Status"];
+        
+        let filtered = payrollList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(p => p.employeeId === selectedEmp);
+        if (selectedMonth) filtered = filtered.filter(p => p.month === selectedMonth);
+
+        filtered.forEach(p => {
+          currentReportTableData.rows.push([
+            p.employeeName, p.month, `৳ ${p.basic.toLocaleString()}`, `৳ ${p.bonus.toLocaleString()}`, `৳ ${p.advance.toLocaleString()}`, `৳ ${p.fine.toLocaleString()}`, `৳ ${p.net.toLocaleString()}`, p.status
+          ]);
+        });
+      }
+      else if (type === 'LEAVE') {
+        currentReportTableData.headers = ["Employee Name", "Leave Type", "Start Date", "End Date", "Reason", "Status"];
+        
+        let filtered = leaveList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(l => l.employeeId === selectedEmp);
+
+        filtered.forEach(l => {
+          currentReportTableData.rows.push([
+            l.employeeName, l.leaveType, l.startDate, l.endDate, l.reason, l.status
+          ]);
+        });
+      }
+      else if (type === 'PERFORMANCE') {
+        currentReportTableData.headers = ["Employee Name", "Designation", "Rating", "KPI Score", "Feedback", "Date"];
+        
+        let filtered = perfList;
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(p => p.employeeId === selectedEmp);
+
+        filtered.forEach(p => {
+          currentReportTableData.rows.push([
+            p.employeeName, p.designation, `${p.rating}/5 Stars`, `${p.kpiScore}%`, p.feedback, p.reviewDate
+          ]);
+        });
+      }
+      else if (type === 'DOCUMENTS') {
+        currentReportTableData.headers = ["Document Title", "Category", "Target Employee", "Date Uploaded"];
+        
+        let filtered = docList;
+        filtered.forEach(d => {
+          currentReportTableData.rows.push([
+            d.title, d.category, d.targetEmployee || 'General', d.uploadedAt
+          ]);
+        });
+      }
+      else {
+        currentReportTableData.headers = ["Metric / Report Item", "Target Scope", "Status / Count", "Remarks"];
+        currentReportTableData.rows.push([
+          `${type} Comprehensive Report`, selectedEmp === 'ALL' ? 'All Employees' : 'Selected Employee', 'Generated', 'System Filtered Data'
+        ]);
+      }
+
+      let headRow = '<tr class="bg-slate-100 text-xs font-bold uppercase text-slate-700 border-b">';
+      currentReportTableData.headers.forEach(h => headRow += `<th class="px-6 py-3.5">${h}</th>`);
+      headRow += '</tr>';
+      thead.innerHTML = headRow;
+
+      if (currentReportTableData.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${currentReportTableData.headers.length}" class="text-center py-6 text-gray-400 text-sm font-medium">কোনো ডাটা পাওয়া যায়নি 🔍</td></tr>`;
+        return;
+      }
+
+      currentReportTableData.rows.forEach(r => {
+        let rowHtml = '<tr class="border-b hover:bg-slate-50 transition text-sm">';
+        r.forEach(val => rowHtml += `<td class="px-6 py-4">${val}</td>`);
+        rowHtml += '</tr>';
+        tbody.innerHTML += rowHtml;
+      });
+    };
+
+    window.downloadReportExcel = function() {
+      if (!currentReportTableData.rows || currentReportTableData.rows.length === 0) {
+        alert("ডাউনলোড করার মতো কোনো ডাটা নেই!");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += currentReportTableData.headers.join(",") + "\n";
+
+      currentReportTableData.rows.forEach(rowArray => {
+        let row = rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",");
+        csvContent += row + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `HR_Report_${document.getElementById('rep-type').value}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    window.printFullReport = function() {
+      window.print();
+    };
+
+    window.saveSettings = function(e) {
+      e.preventDefault();
+      alert("সেটিংস সফলভাবে সংরক্ষিত হয়েছে!");
+    };
+  </script>
+</head>
+<body class="bg-slate-100 font-sans antialiased text-gray-800">
+
+  <!-- Login View -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 px-4">
+    <div class="bg-white/95 backdrop-blur-lg p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/20">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30 mb-3">
+          <i class="fa-solid fa-users-gear text-white text-3xl"></i>
+        </div>
+        <h2 class="text-2xl font-black text-gray-800 tracking-tight">HR Management</h2>
+        <p class="text-xs text-gray-500 mt-1 font-medium">সাইন-ইন করে আপনার প্যানেলে প্রবেশ করুন</p>
+      </div>
+      <div id="login-error" class="hidden mb-4 p-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs rounded-xl font-medium"></div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Email Address</label>
+          <input type="email" id="login-email" class="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="admin@22554.com">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Password</label>
+          <input type="password" id="login-password" class="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••••••">
+        </div>
+        <button onclick="loginUser()" class="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition">Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App View -->
+  <div id="app-screen" class="hidden flex h-screen overflow-hidden">
+    <aside class="w-64 bg-slate-900 text-white flex flex-col justify-between flex-shrink-0 shadow-xl">
+      <div>
+        <div class="p-6 border-b border-slate-800/80 flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center shadow-md">
+            <i class="fa-solid fa-users-gear text-white text-lg"></i>
+          </div>
+          <div>
+            <span class="text-lg font-black tracking-tight text-white block leading-tight">HR System</span>
+            <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Enterprise Pro</span>
+          </div>
+        </div>
+        <nav class="mt-4 px-3 space-y-1.5 text-sm overflow-y-auto max-h-[calc(100vh-140px)]">
+          <a id="nav-dashboard" href="#" onclick="showSection('dashboard')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group active"><i class="fa-solid fa-chart-line w-5 text-indigo-400"></i><span>Dashboard</span></a>
+          <a id="nav-employees" href="#" onclick="showSection('employees')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-user-group w-5 text-emerald-400"></i><span>Employees</span></a>
+          <a id="nav-attendance" href="#" onclick="showSection('attendance')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-lg font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-clock w-5 text-amber-400"></i><span>Attendance</span></a>
+          <a id="nav-leave" href="#" onclick="showSection('leave')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-file-pen w-5 text-rose-400"></i><span>Leave Requests</span></a>
+          <a id="nav-payroll" href="#" onclick="showSection('payroll')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-sack-dollar w-5 text-teal-400"></i><span>Payroll</span></a>
+          <a id="nav-increment" href="#" onclick="showSection('increment')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-chart-line-up w-5 text-purple-400"></i><span>Increment</span></a>
+          <a id="nav-documents" href="#" onclick="showSection('documents')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-folder-open w-5 text-sky-400"></i><span>Documents</span></a>
+          <a id="nav-performance" href="#" onclick="showSection('performance')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-bullseye w-5 text-pink-400"></i><span>Performance</span></a>
+          <a id="nav-notice" href="#" onclick="showSection('notice')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-bullhorn w-5 text-orange-400"></i><span>Notice Board</span></a>
+          <a id="nav-reports" href="#" onclick="showSection('reports')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-file-chart-column w-5 text-cyan-400"></i><span>Reports</span></a>
+          <a id="nav-settings" href="#" onclick="showSection('settings')" class="flex items-center space-x-3 px-3.5 py-2.5 rounded-xl font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition group"><i class="fa-solid fa-gear w-5 text-slate-400"></i><span>Settings</span></a>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-slate-800/80">
+        <button onclick="logoutUser()" class="w-full bg-rose-600/10 hover:bg-rose-600 border border-rose-500/30 text-rose-400 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col overflow-y-auto bg-slate-50">
+      <header class="bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-200/80 px-8 py-4 flex justify-between items-center sticky top-0 z-30">
+        <h1 id="page-title" class="text-xl font-black text-gray-800 tracking-tight">Dashboard</h1>
+        <div class="flex items-center space-x-3">
+          <div class="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs">
+            <i class="fa-solid fa-user-shield"></i>
+          </div>
+          <span id="user-email" class="text-xs font-bold text-gray-600"></span>
+        </div>
+      </header>
+
+      <div class="p-8 space-y-6">
+        
+        <div id="dash-notice-slider-container" class="hidden relative bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-800 rounded-3xl shadow-xl shadow-indigo-500/15 p-6 text-white overflow-hidden border border-white/10">
+          <div class="flex justify-between items-center relative z-10">
+            <div id="dash-notice-slide-content" class="w-full pr-12">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between mt-4 pt-3 border-t border-indigo-400/30 relative z-10">
+            <div id="dash-notice-dots" class="flex space-x-2">
+            </div>
+            <div class="flex space-x-2">
+              <button onclick="prevNoticeSlide()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-left"></i></button>
+              <button onclick="nextNoticeSlide()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div id="dash-increment-alert" class="hidden"></div>
+
+        <section id="sec-dashboard" class="space-y-6">
+          
+          <div id="admin-dash-cards" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
+            
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-100 opacity-90">Total Employees</p>
+                  <h3 id="dash-total-emp" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-users text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-indigo-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5"><i class="fa-solid fa-arrow-up mr-1"></i>Active</span>
+                <span>Workforce</span>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100 opacity-90">Present Today</p>
+                  <h3 id="dash-present-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-user-check text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-emerald-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Live</span>
+                <span>Attendance</span>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-lg shadow-rose-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-rose-100 opacity-90">Absent Today</p>
+                  <h3 id="dash-absent-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-user-xmark text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-rose-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Noted</span>
+                <span>Unexcused</span>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-amber-500 to-orange-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-amber-100 opacity-90">On Leave</p>
+                  <h3 id="dash-leave-today" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-plane-departure text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-amber-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">Approved</span>
+                <span>Leave</span>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-purple-500 to-violet-600 p-5 rounded-3xl text-white shadow-lg shadow-purple-500/20 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-[11px] font-extrabold uppercase tracking-wider text-purple-100 opacity-90">Increment Due</p>
+                  <h3 id="dash-increment-due" class="text-3xl font-black mt-2">0</h3>
+                </div>
+                <div class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                  <i class="fa-solid fa-chart-line-up text-lg"></i>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center text-[10px] font-bold text-purple-100">
+                <span class="bg-white/20 px-2 py-0.5 rounded-full mr-1.5">1 Year</span>
+                <span>Completed</span>
+              </div>
+            </div>
+
+          </div>
+
+          <div id="emp-dash-profile" class="hidden space-y-6">
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+              
+              <div class="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 rounded-3xl text-white shadow-lg shadow-emerald-500/20">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">My Present Days</p>
+                    <h3 id="emp-p-present" class="text-3xl font-black mt-2">0</h3>
+                  </div>
+                  <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><i class="fa-solid fa-calendar-check text-lg"></i></div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-rose-500 to-pink-600 p-5 rounded-3xl text-white shadow-lg shadow-rose-500/20">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="text-[11px] font-extrabold uppercase tracking-wider text-rose-100">My Absent Days</p>
+                    <h3 id="emp-p-absent" class="text-3xl font-black mt-2">0</h3>
+                  </div>
+                  <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><i class="fa-solid fa-calendar-xmark text-lg"></i></div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-amber-500 to-orange-500 p-5 rounded-3xl text-white shadow-lg shadow-amber-500/20">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="text-[11px] font-extrabold uppercase tracking-wider text-amber-100">Total Deductions / Fine</p>
+                    <h3 id="emp-p-fine" class="text-3xl font-black mt-2">৳ 0</h3>
+                  </div>
+                  <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><i class="fa-solid fa-file-invoice-dollar text-lg"></i></div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 p-5 rounded-3xl text-white shadow-lg shadow-indigo-500/20">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-100">Basic Monthly Salary</p>
+                    <h3 id="emp-p-salary" class="text-3xl font-black mt-2">৳ 0</h3>
+                  </div>
+                  <div class="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><i class="fa-solid fa-wallet text-lg"></i></div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+              <div class="flex items-center space-x-5">
+                <img id="emp-p-photo" src="" class="w-20 h-20 rounded-full object-cover border-4 border-indigo-100 shadow-md">
+                <div>
+                  <h2 id="emp-p-name" class="text-2xl font-black text-gray-800"></h2>
+                  <span id="emp-p-desig" class="inline-block bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200 mt-1"></span>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-4">
+                <div class="text-xs text-slate-500 font-medium">
+                  <div>Phone: <strong id="emp-p-phone" class="text-gray-800"></strong></div>
+                  <div>Joined: <strong id="emp-p-joining" class="text-gray-800"></strong></div>
+                </div>
+                <button onclick="toggleModal('add-leave-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl text-xs font-bold transition shadow-lg shadow-indigo-500/20 flex items-center space-x-2">
+                  <i class="fa-solid fa-plus"></i><span>Apply Leave Request</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <div id="dash-charts-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Employee Status Ratio</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-emp-status" class="max-h-48"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Department Wise Distribution</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-dept-dist" class="max-h-48"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+              <h4 class="font-bold text-gray-800 text-sm mb-4">Monthly Payroll Trend</h4>
+              <div class="relative w-full flex items-center justify-center">
+                <canvas id="chart-payroll-trend" class="max-h-48"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Employees Section -->
+        <section id="sec-employees" class="hidden">
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h2 class="text-lg font-black text-gray-800">Employee Directory</h2>
+                <p class="text-xs text-gray-500 font-medium">সব কর্মচারীর বিস্তারিত তালিকা</p>
+              </div>
+              <button onclick="openEmployeeModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-plus"></i><span>Add Employee</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Email</th>
+                    <th class="px-6 py-4">Designation</th>
+                    <th class="px-6 py-4">Department</th>
+                    <th class="px-6 py-4">Joining Date</th>
+                    <th class="px-6 py-4">Salary</th>
+                    <th class="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="emp-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Attendance Section -->
+        <section id="sec-attendance" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Daily Attendance Sheet</h2>
+            <div class="flex items-center space-x-2">
+              <label class="text-xs font-bold text-gray-600">Select Date:</label>
+              <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-bold bg-slate-50">
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee Name</th>
+                    <th class="px-6 py-4">Current Status</th>
+                    <th class="px-6 py-4 text-right">Mark Attendance</th>
+                  </tr>
+                </thead>
+                <tbody id="att-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Leave Requests Section -->
+        <section id="sec-leave" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Leave Requests Management</h2>
+            <button onclick="toggleModal('add-leave-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+              <i class="fa-solid fa-plus"></i><span>Apply Leave</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Leave Type</th>
+                    <th class="px-6 py-4">Duration</th>
+                    <th class="px-6 py-4">Reason</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action / Status</th>
+                  </tr>
+                </thead>
+                <tbody id="leave-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Payroll Section -->
+        <section id="sec-payroll" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <h2 class="text-lg font-black text-gray-800">Payroll & Salary Management</h2>
+            <button onclick="toggleModal('add-payroll-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-emerald-500/20">
+              <i class="fa-solid fa-plus"></i><span>Generate Salary Slip</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Month</th>
+                    <th class="px-6 py-4">Basic Salary</th>
+                    <th class="px-6 py-4">Bonus</th>
+                    <th class="px-6 py-4">Advance Deduction</th>
+                    <th class="px-6 py-4">Fine Deduction</th>
+                    <th class="px-6 py-4">Net Salary</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="payroll-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Increment Section -->
+        <section id="sec-increment" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-black text-gray-800">Increment Due Management</h2>
+              <p class="text-xs text-gray-500 font-medium">১ বছর পূর্ণ হওয়া কর্মচারীদের তালিকা ও ইনক্রিমেন্ট প্রসেসিং</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee Name</th>
+                    <th class="px-6 py-4">Designation</th>
+                    <th class="px-6 py-4">Last Increment Date</th>
+                    <th class="px-6 py-4">Current Salary</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="inc-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Documents Section -->
+        <section id="sec-documents" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-black text-gray-800">Company & Employee Documents</h2>
+              <p class="text-xs text-gray-500 font-medium">সকল প্রকার অ্যাডভান্স স্যালারি, NID, TIN, VAT, BIN ও নোটিশ ডকুমেন্ট ট্র্যাকিং</p>
+            </div>
+            ${currentUserRole !== 'Employee' ? `
+              <button onclick="toggleModal('add-doc-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-upload"></i><span>Upload Document</span>
+              </button>
+            ` : ''}
+          </div>
+
+          <div id="docs-grid" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          </div>
+        </section>
+
+        <!-- Performance Section -->
+        <section id="sec-performance" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-black text-gray-800">Employee Performance Reviews</h2>
+              <p class="text-xs text-gray-500 font-medium">কর্মচারীদের কাজের পারফরম্যান্স মূল্যায়ন</p>
+            </div>
+            <button onclick="toggleModal('add-perf-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+              <i class="fa-solid fa-plus"></i><span>Add Review</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead class="bg-slate-100/70 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-4">Employee</th>
+                    <th class="px-6 py-4">Rating</th>
+                    <th class="px-6 py-4">KPI Score</th>
+                    <th class="px-6 py-4">Feedback</th>
+                    <th class="px-6 py-4">Date</th>
+                    <th class="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="perf-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notice Board Section -->
+        <section id="sec-notice" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex justify-between items-center">
+            <div>
+              <h2 class="text-lg font-black text-gray-800">Notice Board</h2>
+              <p class="text-xs text-gray-500 font-medium">কোম্পানির সকল সাধারণ বিজ্ঞপ্তি ও নির্দেশনা</p>
+            </div>
+            ${currentUserRole !== 'Employee' ? `
+              <button onclick="toggleModal('add-notice-modal', true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-bullhorn"></i><span>Post Notice</span>
+              </button>
+            ` : ''}
+          </div>
+
+          <div id="notice-list" class="space-y-4">
+          </div>
+        </section>
+
+        <!-- REPORTS SECTION -->
+        <section id="sec-reports" class="hidden space-y-6">
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 class="text-lg font-black text-gray-800">Comprehensive HR Reports & Analytics</h2>
+              <p class="text-xs text-gray-500 font-medium">মাস ও কর্মচারী ভিত্তিক ফিল্টার এবং এক্সেল / PDF এক্সপোর্ট</p>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button onclick="downloadReportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-file-excel"></i><span>📥 Excel Download</span>
+              </button>
+              <button onclick="printFullReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-md">
+                <i class="fa-solid fa-print"></i><span>🖨 Print / PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Select Report Category *</label>
+              <select id="rep-type" onchange="generateReport()" class="w-full p-3 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
+                <option value="EMPLOYEE">👥 Employee Reports</option>
+                <option value="ATTENDANCE">🕐 Attendance Reports</option>
+                <option value="LEAVE">📝 Leave Reports</option>
+                <option value="PAYROLL">💰 Payroll Reports</option>
+                <option value="INCREMENT">📈 Increment Reports</option>
+                <option value="BRANCH">🏪 Branch Reports</option>
+                <option value="PERFORMANCE">🎯 Performance Reports</option>
+                <option value="DOCUMENTS">📄 Document Reports</option>
+                <option value="RESIGNATION">🚪 Resignation Reports</option>
+                <option value="HOLIDAY">📅 Holiday Reports</option>
+                <option value="SUMMARY">📋 Management Summary</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Month</label>
+              <input type="month" id="rep-filter-month" onchange="generateReport()" class="w-full p-2.5 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-700 mb-1">Filter by Employee</label>
+              <select id="rep-filter-emp" onchange="generateReport()" class="w-full p-3 border rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
+                <option value="ALL">All Employees</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-gray-600">
+                <thead id="rep-table-head">
+                </thead>
+                <tbody id="rep-table-body">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS SECTION -->
+        <section id="sec-settings" class="hidden space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-6">
+              <div>
+                <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">General System Settings</h2>
+                <form onsubmit="saveSettings(event)" class="space-y-3 mt-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Company Name</label>
+                    <input type="text" value="Sanvee's HR System" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Admin Alert Email</label>
+                    <input type="email" value="admin@22554.com" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium">
+                  </div>
+                  <div class="pt-2 flex justify-end">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm">Save Settings</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="pt-4 border-t border-slate-100">
+                <h3 class="text-md font-bold text-gray-800 mb-2"><i class="fa-solid fa-key text-indigo-600 mr-2"></i>Change My Password</h3>
+                <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">New Password *</label>
+                    <input type="password" id="settings-new-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Confirm New Password *</label>
+                    <input type="password" id="settings-confirm-pass" required minlength="6" placeholder="••••••••" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Update Password</button>
+                </form>
+              </div>
+            </div>
+
+            ${currentUserRole !== 'Employee' ? `
+            <div class="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
+              <h2 class="text-lg font-black text-gray-800 border-b border-slate-100 pb-2">User Role & Access Permissions</h2>
+              <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">User Email Address *</label>
+                  <input type="email" id="perm-email" required placeholder="e.g. manager@test.com" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">Assign Role *</label>
+                  <select id="perm-role" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
+                    <option value="Admin">Admin (Full Control Access)</option>
+                    <option value="Manager">Manager (Employee, Attendance, Leave, Performance & Notices)</option>
+                    <option value="Employee">Employee (Attendance, Leave, Documents & Notices)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-700 mb-1">User Password *</label>
+                  <input type="text" id="perm-user-pass" required minlength="6" placeholder="Set password for this user..." class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-lg shadow-purple-500/20">Assign Role & Password</button>
+              </form>
+
+              <div class="pt-4 border-t border-slate-100">
+                <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2">Assigned User Roles</h4>
+                <div class="overflow-x-auto max-h-48 overflow-y-auto">
+                  <table class="w-full text-left text-xs text-gray-600">
+                    <thead class="bg-slate-100 uppercase text-slate-700 sticky top-0">
+                      <tr>
+                        <th class="px-3 py-2">Email</th>
+                        <th class="px-3 py-2">Role</th>
+                        <th class="px-3 py-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="perm-table-body">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <div id="view-emp-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-5">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-black text-gray-800 text-base">Employee Profile Details</h3>
+        <button onclick="toggleModal('view-emp-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="text-center space-y-2">
+        <img id="view-emp-photo" src="" alt="Photo" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 shadow-md mx-auto">
+        <h4 id="view-emp-name" class="font-black text-gray-800 text-lg"></h4>
+        <span id="view-emp-desig" class="inline-block bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold border border-indigo-200"></span>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border space-y-2 text-xs">
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Email:</span><span id="view-emp-email" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Phone:</span><span id="view-emp-phone" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1 border-b"><span class="text-gray-500 font-bold">Joining Date:</span><span id="view-emp-joining" class="font-bold text-gray-800"></span></div>
+        <div class="flex justify-between py-1"><span class="text-gray-500 font-bold">Basic Salary:</span><span id="view-emp-salary" class="font-black text-emerald-600 text-sm"></span></div>
+      </div>
+
+      <div id="view-emp-doc-box" class="text-center pt-2">
+      </div>
+    </div>
+  </div>
+
+  <div id="add-emp-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 id="emp-modal-title" class="font-black text-gray-800 text-base">Add New Employee</h3>
+        <button onclick="toggleModal('add-emp-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="emp-form" onsubmit="saveEmployee(event)" class="p-6 space-y-4 overflow-y-auto">
+        <input type="hidden" id="emp-doc-id">
+        <input type="hidden" id="emp-existing-photo">
+        <input type="hidden" id="emp-existing-doc">
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Employee ID / ZKBio ID *</label>
+            <input type="text" id="emp-custom-code" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" placeholder="e.g. 1 or 101">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
+            <input type="text" id="emp-name" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Email *</label>
+            <input type="email" id="emp-email" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Phone Number *</label>
+            <input type="text" id="emp-phone" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="017xxxxxxxx">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Profile Photo Upload (JPG/PNG)</label>
+          <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Designation *</label>
+            <input type="text" id="emp-designation" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Manager">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Department *</label>
+            <input type="text" id="emp-department" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Operations">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Joining Date *</label>
+            <input type="date" id="emp-joining" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Salary (BDT) *</label>
+            <input type="number" id="emp-salary" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Upload Document / NID / CV (PDF / Document / Image)</label>
+          <input type="file" id="emp-doc-file" accept=".pdf,.doc,.docx,image/*" class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-emp-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" id="save-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="add-leave-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Apply Leave Request</h3>
+        <button onclick="toggleModal('add-leave-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="leave-form" onsubmit="submitLeave(event)" class="p-6 space-y-4">
+        
+        <div id="leave-emp-select-box">
+          <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
+          <select id="leave-emp-id" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="">Select Employee</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Leave Type *</label>
+          <select id="leave-type" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="Casual Leave">Casual Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Annual Leave">Annual Leave</option>
+            <option value="Unpaid Leave">Unpaid Leave</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Start Date *</label>
+            <input type="date" id="leave-start" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">End Date *</label>
+            <input type="date" id="leave-end" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Reason *</label>
+          <textarea id="leave-reason" required rows="3" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write reason for leave..."></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-leave-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="add-payroll-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Generate Payroll</h3>
+        <button onclick="toggleModal('add-payroll-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="payroll-form" onsubmit="savePayroll(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
+            <select id="pay-emp-id" onchange="onPayrollEmpChange()" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+              <option value="">Select Employee</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Salary Month *</label>
+            <input type="month" id="pay-month" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Basic Salary (BDT)</label>
+            <input type="number" id="pay-basic" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 font-bold outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Bonus / Allowance (BDT)</label>
+            <input type="number" id="pay-bonus" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Advance Salary Cut (BDT)</label>
+            <input type="number" id="pay-advance" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Fine / Deductions (BDT)</label>
+            <input type="number" id="pay-fine" value="0" oninput="calculateNetSalary()" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Net Payable Salary (BDT)</label>
+          <input type="number" id="pay-net" readonly class="w-full p-2.5 border border-emerald-300 rounded-xl text-lg font-black bg-emerald-50 text-emerald-700 outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-payroll-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition">Process & Pay</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="inc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Process Salary Increment</h3>
+        <button onclick="toggleModal('inc-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form onsubmit="submitIncrement(event)" class="p-6 space-y-4">
+        <input type="hidden" id="inc-emp-id">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Employee Name</label>
+          <input type="text" id="inc-emp-name" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 font-bold outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Current Salary</label>
+            <input type="number" id="inc-curr-salary" readonly class="w-full p-2.5 border rounded-xl text-sm bg-slate-100 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Increment Amount *</label>
+            <input type="number" id="inc-amount" oninput="calculateNewIncSalary()" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 2000">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">New Updated Salary</label>
+          <input type="number" id="inc-new-salary" readonly class="w-full p-2.5 border border-indigo-200 rounded-xl text-lg font-black bg-indigo-50 text-indigo-700 outline-none">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('inc-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Confirm & Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="add-doc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Upload Document</h3>
+        <button onclick="toggleModal('add-doc-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="company-doc-form" onsubmit="saveCompanyDoc(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Document Title *</label>
+          <input type="text" id="doc-title" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Advance Salary Voucher / NID Copy">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee (Target Employee)</label>
+          <select id="doc-emp-id" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="General">General / All Employees</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Document Category *</label>
+          <select id="doc-category" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="Advance Salary">Advance Salary Document</option>
+            <option value="Personal Document">Personal Document</option>
+            <option value="VAT">VAT</option>
+            <option value="BIN">BIN</option>
+            <option value="TIN">TIN</option>
+            <option value="NID">NID</option>
+            <option value="Notice">Notice</option>
+            <option value="Policy / General">Policy / General</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Choose File (Image/PDF/Doc) *</label>
+          <input type="file" id="doc-file-input" required class="w-full p-2 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-doc-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Upload & Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="add-perf-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Add Performance Review</h3>
+        <button onclick="toggleModal('add-perf-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="perf-form" onsubmit="savePerformanceReview(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Select Employee *</label>
+          <select id="perf-emp-id" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="">Select Employee</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Rating (1 - 5) *</label>
+            <select id="perf-rating" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+              <option value="5">5 - Excellent ⭐⭐⭐⭐⭐</option>
+              <option value="4">4 - Good ⭐⭐⭐⭐</option>
+              <option value="3">3 - Average ⭐⭐⭐</option>
+              <option value="2">2 - Below Average ⭐⭐</option>
+              <option value="1">1 - Poor ⭐</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-700 mb-1">KPI Score (%) *</label>
+            <input type="number" id="perf-kpi" min="0" max="100" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. 85">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Feedback / Notes *</label>
+          <textarea id="perf-feedback" required rows="3" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write feedback..."></textarea>
+        </div>
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-perf-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Submit Review</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="add-notice-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <h3 class="font-black text-gray-800 text-base">Post New Notice</h3>
+        <button onclick="toggleModal('add-notice-modal', false)" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <form id="notice-form" onsubmit="saveNotice(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Notice Title *</label>
+          <input type="text" id="notice-title" required class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. Eid Holiday Announcement">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">Notice Details *</label>
+          <textarea id="notice-desc" required rows="4" class="w-full p-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write notice details..."></textarea>
+        </div>
+        <div class="pt-3 flex justify-end space-x-3 border-t">
+          <button type="button" onclick="toggleModal('add-leave-modal', false)" class="px-4 py-2 border rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">Publish Notice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function showSection(sectionId) {
+      ['dashboard', 'employees', 'attendance', 'leave', 'payroll', 'increment', 'documents', 'performance', 'notice', 'reports', 'settings', 'generic'].forEach(id => {
+        const el = document.getElementById('sec-' + id);
+        if (el) el.classList.add('hidden');
+      });
+      document.getElementById('page-title').innerText = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
+      const targetSec = document.getElementById('sec-' + sectionId);
+      if (targetSec) {
+        targetSec.classList.remove('hidden');
+        if (sectionId === 'reports') generateReport();
+        if (sectionId === 'dashboard') renderDashboardCharts();
+      } else {
+        document.getElementById('generic-title').innerText = sectionId.toUpperCase();
+        document.getElementById('sec-generic').classList.remove('hidden');
+      }
+    }
+
+    function toggleModal(modalId, show) {
+      const modal = document.getElementById(modalId);
+      if (show) modal.classList.remove('hidden');
+      else modal.classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

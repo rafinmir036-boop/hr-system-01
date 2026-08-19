@@ -1,3 +1,6 @@
+সম্পূর্ণ আপডেটেড কোডটি নিচে দেওয়া হলো। আপনি এটি কপি করে সরাসরি আপনার ফাইলে পেস্ট করতে পারেন:
+
+```html
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -84,6 +87,8 @@
     let statusChartInstance = null;
     let deptChartInstance = null;
     let payrollChartInstance = null;
+
+    let parsedBulkEmployees = [];
 
     window.showToast = function(icon, title) {
       Swal.fire({
@@ -245,6 +250,7 @@
       const docUploadBtn = document.getElementById('doc-upload-btn');
       const noticePostBtn = document.getElementById('notice-post-btn');
       const roleAccessSettings = document.getElementById('sec-settings-roles');
+      const empBulkBtn = document.getElementById('emp-bulk-btn');
 
       if (currentUserRole === 'Employee') {
         if (adminDash) adminDash.classList.add('hidden');
@@ -256,6 +262,7 @@
         if (docUploadBtn) docUploadBtn.classList.add('hidden');
         if (noticePostBtn) noticePostBtn.classList.add('hidden');
         if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
+        if (empBulkBtn) empBulkBtn.classList.add('hidden');
         
         const payHeading = document.getElementById('payroll-section-heading');
         if(payHeading) payHeading.innerText = 'My Salary Slips & Payslips (আমার বেতন বিবরণী)';
@@ -269,6 +276,7 @@
         if (docUploadBtn) docUploadBtn.classList.remove('hidden');
         if (noticePostBtn) noticePostBtn.classList.remove('hidden');
         if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
+        if (empBulkBtn) empBulkBtn.classList.remove('hidden');
 
         const payHeading = document.getElementById('payroll-section-heading');
         if(payHeading) payHeading.innerText = 'Payroll & Salary Management';
@@ -339,7 +347,7 @@
                 <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-xs" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
                 <div>
                   <div class="font-bold text-slate-800 text-sm">${emp.name}</div>
-                  <div class="text-[11px] text-indigo-600 font-semibold">Device / Machine ID: ${emp.customEmpCode || 'N/A'}</div>
+                  <div class="text-[11px] text-indigo-600 font-semibold">Machine / Finger ID: <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">${emp.customEmpCode || 'N/A'}</span></div>
                 </div>
               </td>
               <td class="px-6 py-4 text-slate-600 font-medium">${emp.email}</td>
@@ -360,7 +368,7 @@
         if (myEmployeeProfile) {
           document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
           document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
-          document.getElementById('emp-p-desig').innerText = `ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department})`;
+          document.getElementById('emp-p-desig').innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department})`;
           document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
           document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
           document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
@@ -431,7 +439,7 @@
               <img src="${emp.photoUrl}" alt="Photo" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
               <div>
                 <div class="font-bold text-slate-800">${emp.name}</div>
-                <div class="text-[11px] text-indigo-600 font-semibold">Machine ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation}</div>
+                <div class="text-[11px] text-indigo-600 font-semibold">Machine ID: <span class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation}</div>
               </div>
             </td>
             <td class="px-6 py-4">
@@ -515,14 +523,12 @@
           line = line.trim();
           if (!line) continue;
 
-          // Parse various ZK logs format: ID, Time or Tab/Comma separated
           const tokens = line.split(/[\t,; ]+/);
-          const candidateId = tokens[0]; // Usually first column is Employee Machine ID
+          const candidateId = tokens[0];
           const timeToken = tokens.find(t => t.includes(':')) || '10:00:00';
 
           const emp = employeeList.find(e => e.customEmpCode == candidateId || e.id == candidateId);
           if (emp) {
-            // Determine if late (e.g. after 09:30:00)
             const isLate = timeToken > '09:30:00';
             const status = isLate ? 'Late' : 'Present';
 
@@ -541,6 +547,188 @@
         Swal.fire('সিঙ্ক সম্পন্ন!', `মোট ${matchedCount} জন কর্মচারীর বায়োমেট্রিক উপস্থিতি আপডেট হয়েছে!`, 'success');
       };
       reader.readAsText(file);
+    };
+
+    // ==========================================
+    // BULK CSV EMPLOYEE IMPORT SYSTEM
+    // ==========================================
+    window.downloadSampleEmployeeCSV = function() {
+      const sampleHeaders = "Machine_ID,Name,Email,Phone,Designation,Department,Joining_Date,Salary\n";
+      const sampleRows = 
+        "1,Tanvir Islam Soaib,tanvir@example.com,01711111111,Software Engineer,IT,2024-01-01,45000\n" +
+        "6,Rafin Mir,rafin@gmail.com,01822222222,Accounts Manager,Accounts,2022-11-07,40000\n" +
+        "16,Ssnim Ahmed,ssnim@gmail.com,01933333333,Courier Senior Executive,Courier,2024-02-15,30000\n" +
+        "21,Ashikur Rahman,ashik@example.com,01644444444,Operations Officer,Operations,2023-05-10,35000\n" +
+        "47,Naim Khan,naim@example.com,01555555555,HR Executive,HR,2024-03-01,28000\n";
+
+      const csvBlob = new Blob(["\uFEFF" + sampleHeaders + sampleRows], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(csvBlob);
+      link.download = "ZKTeco_Employee_Import_Template.csv";
+      link.click();
+    };
+
+    window.handleBulkEmployeeCSVSelect = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const text = event.target.result;
+        parseEmployeeCSV(text);
+      };
+      reader.readAsText(file);
+    };
+
+    function parseEmployeeCSV(csvText) {
+      const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length < 2) {
+        showToast('warning', 'CSV ফাইলে কোনো পর্যাপ্ত ডাটা নেই');
+        return;
+      }
+
+      parsedBulkEmployees = [];
+      const headerLine = lines[0].toLowerCase();
+      const headers = headerLine.split(/[,;\t]/).map(h => h.trim().replace(/^["']|["']$/g, ''));
+
+      // Find column indexes dynamically
+      const idIdx = headers.findIndex(h => h.includes('id') || h.includes('pin') || h.includes('code') || h.includes('badge') || h.includes('machine'));
+      const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('first'));
+      const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
+      const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('tel') || h.includes('contact'));
+      const desigIdx = headers.findIndex(h => h.includes('desig') || h.includes('title') || h.includes('position') || h.includes('role'));
+      const deptIdx = headers.findIndex(h => h.includes('dept') || h.includes('department'));
+      const joinIdx = headers.findIndex(h => h.includes('join') || h.includes('date') || h.includes('hire'));
+      const salaryIdx = headers.findIndex(h => h.includes('salary') || h.includes('basic') || h.includes('pay') || h.includes('amount'));
+
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(/[,;\t]/).map(col => col.trim().replace(/^["']|["']$/g, ''));
+        if (row.length === 0 || !row[0]) continue;
+
+        const customEmpCode = (idIdx !== -1 && row[idIdx]) ? row[idIdx] : (row[0] || `EMP-${i}`);
+        const name = (nameIdx !== -1 && row[nameIdx]) ? row[nameIdx] : (row[1] || 'Employee ' + customEmpCode);
+        const email = (emailIdx !== -1 && row[emailIdx]) ? row[emailIdx] : `emp${customEmpCode}@company.com`;
+        const phone = (phoneIdx !== -1 && row[phoneIdx]) ? row[phoneIdx] : '01700000000';
+        const designation = (desigIdx !== -1 && row[desigIdx]) ? row[desigIdx] : 'Staff';
+        const department = (deptIdx !== -1 && row[deptIdx]) ? row[deptIdx] : 'General';
+        const joiningDate = (joinIdx !== -1 && row[joinIdx]) ? row[joinIdx] : new Date().toISOString().split('T')[0];
+        const salary = (salaryIdx !== -1 && row[salaryIdx]) ? (Number(row[salaryIdx].replace(/[^0-9.]/g, '')) || 25000) : 25000;
+
+        parsedBulkEmployees.push({
+          customEmpCode,
+          name,
+          email,
+          phone,
+          designation,
+          department,
+          joiningDate,
+          salary,
+          photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`,
+          docUrl: '#'
+        });
+      }
+
+      renderBulkPreviewTable();
+    }
+
+    function renderBulkPreviewTable() {
+      const tbody = document.getElementById('bulk-preview-tbody');
+      const countLabel = document.getElementById('bulk-parsed-count');
+      const commitBtn = document.getElementById('bulk-commit-btn');
+      const previewBox = document.getElementById('bulk-preview-box');
+
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (parsedBulkEmployees.length === 0) {
+        if (previewBox) previewBox.classList.add('hidden');
+        if (commitBtn) commitBtn.disabled = true;
+        return;
+      }
+
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (commitBtn) commitBtn.disabled = false;
+      if (countLabel) countLabel.innerText = `মোট ${parsedBulkEmployees.length} জন কর্মচারী প্রস্তুত`;
+
+      parsedBulkEmployees.forEach((emp, index) => {
+        const row = `
+          <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
+            <td class="px-4 py-2.5 font-bold text-indigo-700">${emp.customEmpCode}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name}</td>
+            <td class="px-4 py-2.5 text-slate-600">${emp.designation}</td>
+            <td class="px-4 py-2.5 text-slate-600">${emp.department}</td>
+            <td class="px-4 py-2.5 text-slate-600">${emp.email}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right">
+              <button onclick="removeBulkParsedItem(${index})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    }
+
+    window.removeBulkParsedItem = function(index) {
+      parsedBulkEmployees.splice(index, 1);
+      renderBulkPreviewTable();
+    };
+
+    window.commitBulkEmployeeUpload = async function() {
+      if (parsedBulkEmployees.length === 0) {
+        showToast('warning', 'আপলোড করার জন্য কোনো কর্মচারী পাওয়া যায়নি');
+        return;
+      }
+
+      Swal.fire({
+        title: 'ডাটাবেজে যুক্ত হচ্ছে...',
+        html: `মোট <strong>${parsedBulkEmployees.length}</strong> জন কর্মচারীকে যুক্ত করা হচ্ছে। অপেক্ষা করুন...`,
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      try {
+        for (let emp of parsedBulkEmployees) {
+          const existing = employeeList.find(e => e.customEmpCode == emp.customEmpCode);
+
+          if (existing) {
+            await updateDoc(doc(db, "employees", existing.id), {
+              name: emp.name,
+              email: emp.email,
+              phone: emp.phone,
+              designation: emp.designation,
+              department: emp.department,
+              joiningDate: emp.joiningDate,
+              salary: Number(emp.salary)
+            });
+            updatedCount++;
+          } else {
+            await addDoc(collection(db, "employees"), {
+              customEmpCode: emp.customEmpCode,
+              name: emp.name,
+              email: emp.email,
+              phone: emp.phone,
+              photoUrl: emp.photoUrl,
+              designation: emp.designation,
+              department: emp.department,
+              joiningDate: emp.joiningDate,
+              lastIncrementDate: emp.joiningDate,
+              salary: Number(emp.salary),
+              docUrl: '#',
+              createdAt: new Date().toISOString()
+            });
+            addedCount++;
+          }
+        }
+
+        parsedBulkEmployees = [];
+        toggleModal('bulk-emp-modal', false);
+        Swal.fire('সফল!', `🎉 মোট ${addedCount} জন নতুন কর্মচারী যুক্ত হয়েছে এবং ${updatedCount} জনের তথ্য আপডেট করা হয়েছে!`, 'success');
+      } catch (err) {
+        Swal.fire('ব্যর্থ!', err.message, 'error');
+      }
     };
 
     // Advance Salary logic
@@ -1293,7 +1481,7 @@
       if (!emp) return;
       document.getElementById('view-emp-photo').src = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff`;
       document.getElementById('view-emp-name').innerText = emp.name || 'N/A';
-      document.getElementById('view-emp-desig').innerText = `ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation || 'N/A'} (${emp.department || 'N/A'})`;
+      document.getElementById('view-emp-desig').innerText = `Machine ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation || 'N/A'} (${emp.department || 'N/A'})`;
       document.getElementById('view-emp-email').innerText = emp.email || 'N/A';
       document.getElementById('view-emp-phone').innerText = emp.phone || 'N/A';
       document.getElementById('view-emp-joining').innerText = emp.joiningDate || 'N/A';
@@ -1483,10 +1671,10 @@
         });
       }
       else if (type === 'EMPLOYEE') {
-        currentReportTableData.headers = ["Name", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
+        currentReportTableData.headers = ["Machine ID", "Name", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
         let filtered = (selectedEmp !== 'ALL') ? employeeList.filter(e => e.id === selectedEmp) : employeeList;
         filtered.forEach(e => {
-          currentReportTableData.rows.push([e.name, e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A']);
+          currentReportTableData.rows.push([e.customEmpCode || 'N/A', e.name, e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A']);
         });
       } 
       else if (type === 'PAYROLL') {
@@ -1793,17 +1981,24 @@
           </div>
         </section>
 
-        <!-- Employees Section (Admin/Manager) -->
+        <!-- Employees Section (Enhanced with Bulk Import) -->
         <section id="sec-employees" class="hidden">
           <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/40">
+            <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/40">
               <div>
                 <h2 class="text-base font-bold text-slate-800">Employee Directory</h2>
-                <p class="text-xs text-slate-500">সকল কর্মচারীদের তালিকা ও মেশিন আইডি</p>
+                <p class="text-xs text-slate-500">সকল কর্মচারীদের তালিকা ও ZKTeco মেশিন আইডি</p>
               </div>
-              <button onclick="openEmployeeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
-                <i class="fa-solid fa-user-plus text-xs"></i><span>Add Employee</span>
-              </button>
+              <div class="flex items-center space-x-2.5">
+                <button id="emp-bulk-btn" onclick="toggleModal('bulk-emp-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
+                  <i class="fa-solid fa-file-csv text-sm"></i>
+                  <span>Bulk Import (CSV)</span>
+                </button>
+                <button onclick="openEmployeeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
+                  <i class="fa-solid fa-user-plus text-xs"></i>
+                  <span>Add Employee</span>
+                </button>
+              </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -1840,7 +2035,6 @@
             </div>
             
             <div class="flex items-center space-x-3 w-full sm:w-auto">
-              <!-- ZKTeco File Upload Option -->
               <label class="cursor-pointer bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
                 <i class="fa-solid fa-file-import text-indigo-400"></i>
                 <span>Import ZK Log (CSV)</span>
@@ -2128,6 +2322,83 @@
   </div>
 
   <!-- Modals -->
+
+  <!-- BULK EMPLOYEE CSV IMPORT MODAL -->
+  <div id="bulk-emp-modal" class="hidden fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden p-6 space-y-5">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="font-bold text-slate-800 text-base">Bulk Employee Import (CSV / ZKTeco)</h3>
+          <p class="text-xs text-slate-500">একসাথে সকল কর্মচারীদের ডাটা বা ZKTeco তালিকা আপলোড করুন</p>
+        </div>
+        <button onclick="toggleModal('bulk-emp-modal', false)" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Download Sample Template Box -->
+        <div class="bg-indigo-50/70 border border-indigo-200/80 p-4 rounded-2xl flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+              <i class="fa-solid fa-file-csv"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-indigo-950 text-xs">Standard CSV Format</h4>
+              <p class="text-[11px] text-indigo-700">স্যাম্পল ফাইল ডাউনলোড করে কর্মচারীদের আইডি ও নাম বসিয়ে নিন</p>
+            </div>
+          </div>
+          <button type="button" onclick="downloadSampleEmployeeCSV()" class="bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-300 px-3.5 py-1.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center space-x-1.5">
+            <i class="fa-solid fa-download"></i><span>Download Template</span>
+          </button>
+        </div>
+
+        <!-- File Upload Area -->
+        <div class="border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-slate-50 transition cursor-pointer relative">
+          <input type="file" accept=".csv,.txt,.xlsx" onchange="handleBulkEmployeeCSVSelect(event)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+          <div class="space-y-2">
+            <div class="w-12 h-12 bg-white text-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-sm border border-slate-200">
+              <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-indigo-600">Click to upload</span> <span class="text-xs text-slate-500">or drag and drop your CSV file</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Supported: .csv, .txt (Comma, Semicolon, or Tab Separated)</p>
+          </div>
+        </div>
+
+        <!-- Parsed Preview Box -->
+        <div id="bulk-preview-box" class="hidden space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span id="bulk-parsed-count" class="font-bold text-slate-700"></span>
+            <span class="text-[11px] text-slate-400">একই Machine ID থাকলে তা স্বয়ংক্রিয়ভাবে আপডেট হবে</span>
+          </div>
+          <div class="overflow-x-auto max-h-48 border border-slate-200 rounded-xl bg-white">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0">
+                <tr>
+                  <th class="px-4 py-2">ID</th>
+                  <th class="px-4 py-2">Name</th>
+                  <th class="px-4 py-2">Designation</th>
+                  <th class="px-4 py-2">Department</th>
+                  <th class="px-4 py-2">Email</th>
+                  <th class="px-4 py-2">Salary</th>
+                  <th class="px-4 py-2 text-right">Remove</th>
+                </tr>
+              </thead>
+              <tbody id="bulk-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+          <button type="button" onclick="toggleModal('bulk-emp-modal', false)" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600">Cancel</button>
+          <button type="button" id="bulk-commit-btn" disabled onclick="commitBulkEmployeeUpload()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-sm transition">
+            <i class="fa-solid fa-check mr-1.5"></i>Confirm & Import to System
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Advance Salary Record Modal -->
   <div id="add-adv-modal" class="hidden fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
@@ -2532,3 +2803,4 @@
   </script>
 </body>
 </html>
+```

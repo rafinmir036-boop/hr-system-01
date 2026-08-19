@@ -1,15 +1,20 @@
+Viewed index.html:1-800
+
+এখানে সম্পূর্ণ আপডেট করা কোড দেওয়া হলো:
+
+```html
 <!DOCTYPE html>
 <html lang="bn">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HRMS Enterprise - Multi-Branch Management & Biometric Automation</title>
+  <title>HRMS Enterprise - Human Resource Management Suite</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
   <!-- Google Fonts: Plus Jakarta Sans & Hind Siliguri -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.preconnect.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
@@ -39,7 +44,7 @@
       background: #94a3b8;
     }
     .sidebar-active {
-      background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.03) 100%);
+      background: #1e1b4b !important;
       color: #818cf8 !important;
       border-left: 3.5px solid #6366f1;
     }
@@ -103,7 +108,7 @@
     };
 
     window.loginUser = async function() {
-      const email = document.getElementById('login-email').value;
+      const email = document.getElementById('login-email').value.trim();
       const pass = document.getElementById('login-password').value;
       const btn = document.getElementById('login-btn');
       
@@ -119,10 +124,44 @@
         await signInWithEmailAndPassword(auth, email, pass);
         showToast('success', 'লগইন সফল হয়েছে!');
       } catch (err) {
+        // If the user does not exist in Firebase Auth yet, auto-create the account
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-login-credentials') {
+          try {
+            await createUserWithEmailAndPassword(auth, email, pass);
+            showToast('success', 'নতুন একাউন্ট স্বয়ংক্রিয়ভাবে সক্রিয় ও লগইন সফল হয়েছে!');
+            return;
+          } catch (signUpErr) {
+            if (signUpErr.code === 'auth/email-already-in-use') {
+              Swal.fire({
+                icon: 'error',
+                title: 'লগইন ব্যর্থ হয়েছে',
+                text: 'পাসওয়ার্ডটি সঠিক নয়। অনুগ্রহ করে অ্যাডমিনের দেওয়া সঠিক পাসওয়ার্ড দিয়ে চেষ্টা করুন।',
+                confirmButtonColor: '#4f46e5'
+              });
+              return;
+            } else if (signUpErr.code === 'auth/weak-password') {
+              Swal.fire({
+                icon: 'warning',
+                title: 'দুর্বল পাসওয়ার্ড',
+                text: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।',
+                confirmButtonColor: '#4f46e5'
+              });
+              return;
+            }
+          }
+        }
+
+        let errMsg = err.message;
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+          errMsg = 'ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। অনুগ্রহ করে পুনরায় চেক করুন।';
+        } else if (err.code === 'auth/invalid-email') {
+          errMsg = 'ইমেইল ফরম্যাটটি সঠিক নয়।';
+        }
+
         Swal.fire({
           icon: 'error',
           title: 'লগইন ব্যর্থ হয়েছে',
-          text: err.message,
+          text: errMsg,
           confirmButtonColor: '#4f46e5'
         });
       } finally {
@@ -279,12 +318,10 @@
     window.isItemInActiveBranch = function(itemBranch) {
       if (currentUserRole === 'Employee') return true;
       
-      // If user is a Branch Manager, they ONLY see their assigned branch
       if (currentUserRole === 'Manager') {
         return currentUserBranch === 'ALL' || itemBranch === currentUserBranch;
       }
 
-      // If user is Admin, they see based on the top header branch dropdown
       if (currentUserRole === 'Admin') {
         if (selectedActiveBranch === 'ALL') return true;
         return itemBranch === selectedActiveBranch;
@@ -437,7 +474,6 @@
         if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.remove('hidden');
       } else {
-        // Manager or Employee cannot change branches globally
         if (headerBranchContainer) headerBranchContainer.classList.add('hidden');
         if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.add('hidden');
@@ -526,7 +562,6 @@
             myEmployeeProfile = { id, ...emp };
           }
 
-          // Filter by active branch for selects
           if (!isItemInActiveBranch(emp.branch)) return;
 
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
@@ -542,7 +577,7 @@
                 <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-xs" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
                 <div>
                   <div class="font-bold text-slate-800 text-sm">${emp.name}</div>
-                  <div class="text-[11px] text-indigo-600 font-semibold">Machine / Finger ID: <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">${emp.customEmpCode || 'N/A'}</span></div>
+                  <div class="text-[11px] text-indigo-600 font-semibold">ID: <span class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation}</div>
                 </div>
               </td>
               <td class="px-6 py-4 text-slate-600 font-medium">${emp.email}</td>
@@ -637,26 +672,19 @@
               <img src="${emp.photoUrl}" alt="Photo" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
               <div>
                 <div class="font-bold text-slate-800">${emp.name}</div>
-                <div class="text-[11px] text-indigo-600 font-semibold">Machine ID: <span class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation} <span class="bg-slate-100 text-slate-600 font-bold px-1.5 rounded ml-1">🏢 ${emp.branch || 'Head Office'}</span></div>
+                <div class="text-[11px] text-slate-500 font-semibold">ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation} <span class="bg-slate-100 text-slate-600 font-bold px-1.5 rounded ml-1">🏢 ${emp.branch || 'Head Office'}</span></div>
               </div>
             </td>
             <td class="px-6 py-4">
-              <div class="font-bold text-slate-700 flex items-center space-x-1.5">
-                <i class="fa-regular fa-clock text-slate-400 text-xs"></i>
-                <span>${punchTime}</span>
-              </div>
-              <span class="text-[10px] text-slate-400 font-medium">${method}</span>
-            </td>
-            <td class="px-6 py-4">
-              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${getStatusBadge(currentStatus)}">
+              <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
                 ${currentStatus}
               </span>
             </td>
             <td class="px-6 py-4 text-right space-x-1.5">
               ${currentUserRole !== 'Employee' ? `
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Present')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition">Present</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Late')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition">Late</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Absent')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition">Absent</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Present')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Present</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Late')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-xs">Late</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Absent')" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Absent</button>
               ` : '<span class="text-xs text-slate-400 font-semibold">Biometric Verified</span>'}
             </td>
           </tr>
@@ -1358,10 +1386,16 @@
     // Employee Increment Logic
     function checkIncrementDues() {
       const tbody = document.getElementById('increment-table-body');
-      if(!tbody) return;
-      tbody.innerHTML = '';
+      const incAlertBox = document.getElementById('increment-alert-box');
+      const incAlertList = document.getElementById('inc-alert-list');
+      const incAlertCount = document.getElementById('inc-alert-count');
+      const dashIncDue = document.getElementById('dash-inc-due');
+
+      if(tbody) tbody.innerHTML = '';
+      if(incAlertList) incAlertList.innerHTML = '';
 
       const today = new Date();
+      let dueCount = 0;
 
       employeeList.forEach(emp => {
         if (!isItemInActiveBranch(emp.branch)) return;
@@ -1372,28 +1406,48 @@
         const diffMonths = (today.getFullYear() - lastIncDate.getFullYear()) * 12 + (today.getMonth() - lastIncDate.getMonth());
         const isEligible = diffMonths >= 12;
 
-        const row = `
-          <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
-            <td class="px-6 py-4 font-bold text-slate-800">${emp.name} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${emp.branch || 'Head Office'}</span></td>
-            <td class="px-6 py-4 text-slate-600">${emp.designation}</td>
-            <td class="px-6 py-4 text-slate-600">${emp.lastIncrementDate || emp.joiningDate || 'Initial'}</td>
-            <td class="px-6 py-4 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
-            <td class="px-6 py-4">
-              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${isEligible ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}">
-                ${isEligible ? '1 Year Completed (Eligible)' : `${12 - diffMonths} Months Remaining`}
+        if (isEligible) {
+          dueCount++;
+          if (incAlertList) {
+            incAlertList.innerHTML += `
+              <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 shadow-2xs">
+                <span>${emp.name} (${emp.designation})</span>
               </span>
-            </td>
-            <td class="px-6 py-4 text-right">
-              ${isEligible && currentUserRole === 'Admin' ? `
-                <button onclick="promptIncrementModal('${emp.id}', ${emp.salary})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition">
-                  <i class="fa-solid fa-arrow-trend-up mr-1"></i> Apply Increment
-                </button>
-              ` : '<span class="text-slate-400 font-medium text-xs">Not Due</span>'}
-            </td>
-          </tr>
-        `;
-        tbody.innerHTML += row;
+            `;
+          }
+        }
+
+        if (tbody) {
+          const row = `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+              <td class="px-6 py-4 font-bold text-slate-800">${emp.name} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${emp.branch || 'Head Office'}</span></td>
+              <td class="px-6 py-4 text-slate-600">${emp.designation}</td>
+              <td class="px-6 py-4 text-slate-600">${emp.lastIncrementDate || emp.joiningDate || 'Initial'}</td>
+              <td class="px-6 py-4 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
+              <td class="px-6 py-4">
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${isEligible ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600'}">
+                  ${isEligible ? '১ বছর পূর্ণ' : `${12 - diffMonths} Months Remaining`}
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                ${isEligible && currentUserRole === 'Admin' ? `
+                  <button onclick="promptIncrementModal('${emp.id}', ${emp.salary})" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs">
+                    Process Increment
+                  </button>
+                ` : '<span class="text-slate-400 font-medium text-xs">Not Due</span>'}
+              </td>
+            </tr>
+          `;
+          tbody.innerHTML += row;
+        }
       });
+
+      if (dashIncDue) dashIncDue.innerText = dueCount;
+      if (incAlertCount) incAlertCount.innerText = dueCount;
+      if (incAlertBox) {
+        if (dueCount > 0) incAlertBox.classList.remove('hidden');
+        else incAlertBox.classList.add('hidden');
+      }
     }
 
     window.promptIncrementModal = async function(empId, currentSalary) {
@@ -1450,24 +1504,29 @@
     }
 
     function renderNotices() {
-      const container = document.getElementById('notice-slider-content');
+      const heroTitle = document.getElementById('notice-hero-title');
+      const heroDesc = document.getElementById('notice-hero-desc');
+      const noticeDate = document.getElementById('notice-date');
+      const noticeBadge = document.getElementById('notice-badge');
       const listContainer = document.getElementById('notices-full-list');
-      if(!container) return;
 
       if(noticeList.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-500 font-medium">কোনো সাম্প্রতিক নোটিশ নেই।</p>';
+        if (heroTitle) heroTitle.innerText = 'কোনো নোটিশ নেই';
+        if (heroDesc) heroDesc.innerText = 'বর্তমানে প্রদর্শনের জন্য কোনো অফিশিয়াল নোটিশ নেই।';
+        if (noticeDate) noticeDate.innerText = '--';
+        if (noticeBadge) noticeBadge.innerText = '📢 NOTICE 0 OF 0';
         if(listContainer) listContainer.innerHTML = '<p class="text-xs text-slate-500">কোনো নোটিশ পাওয়া যায়নি।</p>';
         return;
       }
 
-      currentNoticeIndex = 0;
+      if (currentNoticeIndex >= noticeList.length) currentNoticeIndex = 0;
       updateNoticeSlider();
 
       if(noticeInterval) clearInterval(noticeInterval);
       noticeInterval = setInterval(() => {
         currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
         updateNoticeSlider();
-      }, 5000);
+      }, 6000);
 
       if(listContainer) {
         listContainer.innerHTML = '';
@@ -1486,17 +1545,30 @@
     }
 
     function updateNoticeSlider() {
-      const container = document.getElementById('notice-slider-content');
-      if(!container || noticeList.length === 0) return;
+      if(noticeList.length === 0) return;
       const n = noticeList[currentNoticeIndex];
-      container.innerHTML = `
-        <div class="transition-all duration-300">
-          <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full mb-1 inline-block">Official Announcement</span>
-          <h4 class="font-bold text-slate-800 text-sm">${n.title}</h4>
-          <p class="text-xs text-slate-600 mt-1 line-clamp-2">${n.description}</p>
-        </div>
-      `;
+      const heroTitle = document.getElementById('notice-hero-title');
+      const heroDesc = document.getElementById('notice-hero-desc');
+      const noticeDate = document.getElementById('notice-date');
+      const noticeBadge = document.getElementById('notice-badge');
+
+      if (heroTitle) heroTitle.innerText = n.title;
+      if (heroDesc) heroDesc.innerText = n.description;
+      if (noticeDate) noticeDate.innerText = new Date(n.postedDate).toISOString().split('T')[0];
+      if (noticeBadge) noticeBadge.innerText = `📢 NOTICE ${currentNoticeIndex + 1} OF ${noticeList.length}`;
     }
+
+    window.nextNotice = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
+      updateNoticeSlider();
+    };
+
+    window.prevNotice = function() {
+      if (noticeList.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex - 1 + noticeList.length) % noticeList.length;
+      updateNoticeSlider();
+    };
 
     window.saveNewNotice = async function(e) {
       e.preventDefault();
@@ -1639,6 +1711,15 @@
       if(!email) return;
 
       try {
+        // Proactively create user in Firebase Auth in background using secondary app instance so admin remains logged in
+        try {
+          const secApp = initializeApp(firebaseConfig, "TempAuth_" + Date.now());
+          const secAuth = getAuth(secApp);
+          await createUserWithEmailAndPassword(secAuth, email, tempPass);
+        } catch (authErr) {
+          console.log("Firebase Auth user creation note:", authErr.code);
+        }
+
         await addDoc(collection(db, "user_roles"), {
           email: email,
           role: role,
@@ -1648,7 +1729,12 @@
         });
 
         document.getElementById('perm-form').reset();
-        showToast('success', `ভূমিকা সংরক্ষণ সফল: ${email} -> ${role} (${branch})`);
+        Swal.fire({
+          icon: 'success',
+          title: 'রোল পারমিশন সফল হয়েছে!',
+          html: `ইমেইল: <b>${email}</b><br>রোল: <b>${role}</b><br>ব্রাঞ্চ: <b>${branch}</b><br>পাসওয়ার্ড: <b>${tempPass}</b><br><br><span class="text-xs text-emerald-700 font-semibold">ম্যানেজার এখন সরাসরি এই ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করতে পারবে!</span>`,
+          confirmButtonColor: '#4f46e5'
+        });
       } catch(err) {
         showToast('error', err.message);
       }
@@ -1901,10 +1987,15 @@
       if(target) target.classList.remove('hidden');
 
       const navButtons = document.querySelectorAll('#sidebar-nav button');
-      navButtons.forEach(b => b.classList.remove('sidebar-active', 'bg-indigo-50/10', 'text-indigo-400'));
+      navButtons.forEach(b => b.classList.remove('sidebar-active'));
 
       const activeBtn = document.getElementById(`nav-${secId}`);
       if(activeBtn) activeBtn.classList.add('sidebar-active');
+
+      const pageTitle = document.getElementById('page-title');
+      if (pageTitle) {
+        pageTitle.innerText = secId.charAt(0).toUpperCase() + secId.slice(1);
+      }
 
       if(secId === 'dashboard') {
         renderDashboardCharts();
@@ -2056,7 +2147,7 @@
           </div>
           <div>
             <h2 class="font-extrabold text-sm text-white tracking-wide">HRMS Pro</h2>
-            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Enterprise Suite</p>
+            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">MANAGEMENT SUITE</p>
           </div>
         </div>
 
@@ -2066,37 +2157,37 @@
             <i class="fa-solid fa-chart-pie text-indigo-400 w-4"></i><span>Dashboard</span>
           </button>
           <button id="nav-employees" onclick="switchNav('employees')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-user-group text-indigo-400 w-4"></i><span>Employees</span>
+            <i class="fa-solid fa-user-group text-emerald-400 w-4"></i><span>Employees</span>
           </button>
           <button id="nav-attendance" onclick="switchNav('attendance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-clock text-indigo-400 w-4"></i><span>Attendance</span>
+            <i class="fa-solid fa-clock text-amber-400 w-4"></i><span>Attendance</span>
           </button>
           <button id="nav-advance" onclick="switchNav('advance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
             <i class="fa-solid fa-hand-holding-dollar text-emerald-400 w-4"></i><span>Advance Salary</span>
           </button>
           <button id="nav-leave" onclick="switchNav('leave')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-calendar-check text-indigo-400 w-4"></i><span>Leave Requests</span>
+            <i class="fa-solid fa-calendar-check text-rose-400 w-4"></i><span>Leave Requests</span>
           </button>
           <button id="nav-payroll" onclick="switchNav('payroll')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-money-check-dollar text-indigo-400 w-4"></i><span>Payroll / Slips</span>
+            <i class="fa-solid fa-money-check-dollar text-teal-400 w-4"></i><span>Payroll</span>
           </button>
           <button id="nav-increment" onclick="switchNav('increment')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-arrow-trend-up text-indigo-400 w-4"></i><span>Increment</span>
+            <i class="fa-solid fa-arrow-trend-up text-violet-400 w-4"></i><span>Increment</span>
           </button>
           <button id="nav-documents" onclick="switchNav('documents')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-folder-closed text-indigo-400 w-4"></i><span>Documents</span>
+            <i class="fa-solid fa-folder-closed text-sky-400 w-4"></i><span>Documents</span>
           </button>
           <button id="nav-performance" onclick="switchNav('performance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-star text-indigo-400 w-4"></i><span>Performance</span>
+            <i class="fa-solid fa-star text-pink-400 w-4"></i><span>Performance</span>
           </button>
           <button id="nav-notice" onclick="switchNav('notice')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-bullhorn text-indigo-400 w-4"></i><span>Notice Board</span>
+            <i class="fa-solid fa-bullhorn text-orange-400 w-4"></i><span>Notice Board</span>
           </button>
           <button id="nav-reports" onclick="switchNav('reports')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-file-invoice text-indigo-400 w-4"></i><span>Reports & Analytics</span>
+            <i class="fa-solid fa-file-invoice text-blue-400 w-4"></i><span>Reports & Analytics</span>
           </button>
           <button id="nav-settings" onclick="switchNav('settings')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-gear text-indigo-400 w-4"></i><span>Settings</span>
+            <i class="fa-solid fa-gear text-slate-400 w-4"></i><span>Settings</span>
           </button>
         </nav>
       </div>
@@ -2116,8 +2207,8 @@
       <header class="bg-white border-b border-slate-200/80 px-6 py-4 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-10 shadow-xs">
         <div class="flex items-center space-x-4">
           <div>
-            <h1 class="text-lg font-bold text-slate-900">Enterprise HR Portal</h1>
-            <p class="text-xs text-slate-500 font-medium">Smart Multi-Branch Automation & Realtime Biometric System</p>
+            <h1 id="page-title" class="text-xl font-black text-slate-800 tracking-tight">Dashboard</h1>
+            <p id="page-subtitle" class="text-xs text-slate-400 font-medium">Real-time enterprise metrics & operations</p>
           </div>
         </div>
 
@@ -2131,7 +2222,7 @@
           </div>
 
           <span id="user-branch-badge" class="hidden text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full"></span>
-          <span id="user-role-badge" class="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200">Admin</span>
+          <span id="user-role-badge" class="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200">ADMIN</span>
 
           <div class="flex items-center space-x-2 pl-2 border-l border-slate-200">
             <div id="header-user-avatar" class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
@@ -2148,56 +2239,89 @@
       <!-- View Containers -->
       <div class="p-6 space-y-6 flex-1">
 
+        <!-- Top Notice Slider Banner (Original Dark Indigo Gradient Look) -->
+        <div class="relative bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl overflow-hidden shadow-xl border border-indigo-900/40">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <span id="notice-badge" class="bg-indigo-500/30 text-indigo-300 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full tracking-wider border border-indigo-400/30">📢 NOTICE 1 OF 1</span>
+            </div>
+            <span id="notice-date" class="text-xs text-indigo-300 font-semibold">2026-08-11</span>
+          </div>
+          <div id="notice-slide-area" class="space-y-1">
+            <h3 id="notice-hero-title" class="text-lg font-bold text-white tracking-wide">Lunch</h3>
+            <p id="notice-hero-desc" class="text-xs text-slate-300">Ajke hote sokol er lunch time ak 2:00PM</p>
+          </div>
+          <div class="flex items-center justify-between mt-4">
+            <div class="flex space-x-1.5" id="notice-dots">
+              <span class="w-6 h-1.5 bg-white rounded-full"></span>
+            </div>
+            <div class="flex space-x-2">
+              <button onclick="prevNotice()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-left"></i></button>
+              <button onclick="nextNotice()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Increment Alert Banner (Original Yellow/Amber Look) -->
+        <div id="increment-alert-box" class="hidden bg-amber-50/90 border-l-4 border-amber-500 p-5 rounded-2xl shadow-xs space-y-2">
+          <div class="flex items-center space-x-3">
+            <div class="text-amber-600 text-lg"><i class="fa-solid fa-bell"></i></div>
+            <div>
+              <h4 class="font-bold text-amber-900 text-sm">Increment Alert (<span id="inc-alert-count">0</span> জন অপেক্ষমাণ)</h4>
+              <p class="text-xs text-amber-700">১ বছর পূর্ণ হওয়ায় নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়ার সময় হয়েছে:</p>
+            </div>
+          </div>
+          <div id="inc-alert-list" class="flex flex-wrap gap-2 pt-1"></div>
+        </div>
+
         <!-- 1. DASHBOARD VIEW -->
         <section id="sec-dashboard" class="space-y-6">
-          
-          <!-- Notice Slider on Dashboard -->
-          <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-indigo-500/10 border border-amber-200/80 p-4 rounded-2xl flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <i class="fa-solid fa-bullhorn text-sm"></i>
-              </div>
-              <div id="notice-slider-content">
-                <p class="text-xs text-slate-500 font-medium">নোটিশ লোড হচ্ছে...</p>
-              </div>
-            </div>
-            <button onclick="switchNav('notice')" class="px-3 py-1.5 bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 rounded-xl text-xs font-bold transition shrink-0 shadow-xs">
-              All Notices
-            </button>
-          </div>
 
-          <!-- Admin Metric Cards -->
-          <div id="admin-dash-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Admin Metric Cards (5 Original Cards) -->
+          <div id="admin-dash-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Employees</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL WORKFORCE</p>
                 <h3 id="dash-total-emp" class="text-2xl font-black text-slate-900 mt-1">0</h3>
+                <span class="text-[11px] text-emerald-600 font-bold flex items-center mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Active registered members</span>
               </div>
               <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-users"></i></div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Present Today</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">PRESENT TODAY</p>
                 <h3 id="dash-present-today" class="text-2xl font-black text-emerald-600 mt-1">0</h3>
+                <span class="text-[11px] text-emerald-600 font-bold flex items-center mt-1"><i class="fa-solid fa-chart-line mr-1"></i>Live daily check-ins</span>
               </div>
               <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-user-check"></i></div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Absent Today</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">ABSENT TODAY</p>
                 <h3 id="dash-absent-today" class="text-2xl font-black text-rose-600 mt-1">0</h3>
+                <span class="text-[11px] text-rose-500 font-bold flex items-center mt-1">Noted unexcused logs</span>
               </div>
               <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-user-xmark"></i></div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">On Leave Today</p>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">ON LEAVE</p>
                 <h3 id="dash-leave-today" class="text-2xl font-black text-amber-600 mt-1">0</h3>
+                <span class="text-[11px] text-amber-600 font-bold flex items-center mt-1">Approved leaves today</span>
               </div>
               <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-calendar-day"></i></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">INCREMENT DUE</p>
+                <h3 id="dash-inc-due" class="text-2xl font-black text-purple-600 mt-1">0</h3>
+                <span class="text-[11px] text-purple-600 font-bold flex items-center mt-1">1 Year+ eligible count</span>
+              </div>
+              <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-award"></i></div>
             </div>
           </div>
 
@@ -2298,11 +2422,12 @@
         <section id="sec-attendance" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h2 class="text-base font-bold text-slate-800">Biometric Attendance Machine Log</h2>
-              <p class="text-xs text-slate-500">ZKTeco বায়োমেট্রিক পাঞ্চ ডাটা ও উপস্থিতি পর্যবেক্ষণ</p>
+              <h2 class="text-base font-bold text-slate-800">Daily Attendance Log</h2>
+              <p class="text-xs text-slate-500">কর্মচারীদের দৈনিক উপস্থিতি ট্র্যাকিং</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-bold text-slate-700">তারিখ:</span>
               <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 focus:bg-white outline-none">
               
               <!-- ZKTeco log punch file import -->
@@ -2319,10 +2444,9 @@
               <table class="w-full text-left text-xs text-slate-600">
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3.5">Employee & Machine ID</th>
-                    <th class="px-6 py-3.5">Punch Time</th>
-                    <th class="px-6 py-3.5">Today Status</th>
-                    <th class="px-6 py-3.5 text-right">Manual Action / Override</th>
+                    <th class="px-6 py-3.5">EMPLOYEE NAME</th>
+                    <th class="px-6 py-3.5">STATUS</th>
+                    <th class="px-6 py-3.5 text-right">MARK ACTION</th>
                   </tr>
                 </thead>
                 <tbody id="att-table-body"></tbody>
@@ -2479,12 +2603,12 @@
               <table class="w-full text-left text-xs text-slate-600">
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
-                    <th class="px-6 py-3.5">Employee Name</th>
-                    <th class="px-6 py-3.5">Designation</th>
-                    <th class="px-6 py-3.5">Last Increment</th>
-                    <th class="px-6 py-3.5">Current Salary</th>
-                    <th class="px-6 py-3.5">Status (Eligibility)</th>
-                    <th class="px-6 py-3.5 text-right">Action</th>
+                    <th class="px-6 py-3.5">EMPLOYEE NAME</th>
+                    <th class="px-6 py-3.5">DESIGNATION</th>
+                    <th class="px-6 py-3.5">LAST INCREMENT / JOINING</th>
+                    <th class="px-6 py-3.5">CURRENT SALARY</th>
+                    <th class="px-6 py-3.5">STATUS</th>
+                    <th class="px-6 py-3.5 text-right">ACTION</th>
                   </tr>
                 </thead>
                 <tbody id="increment-table-body"></tbody>
@@ -2639,37 +2763,37 @@
 
             <!-- Role & Branch Manager Assignment Card (Admin Only) -->
             <div id="sec-settings-roles" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Manager & Role Access (ব্রাঞ্চ অ্যাসাইনমেন্ট)</h3>
+              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Role & User Access</h3>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">User Email *</label>
-                  <input type="email" id="perm-email" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="manager.gulshan@hrms.com">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">User Email</label>
+                  <input type="email" id="perm-email" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="manager@hrms.com">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Role *</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Role</label>
                     <select id="perm-role" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
+                      <option value="Admin">Admin (Full Control)</option>
                       <option value="Manager">Branch Manager</option>
-                      <option value="Admin">Super Admin (All Branches)</option>
                       <option value="Employee">Employee (Self Portal)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Assigned Branch *</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Assigned Branch</label>
                     <select id="perm-branch" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-bold text-indigo-700">
                       <option value="ALL">All Branches</option>
                     </select>
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">Temporary Password *</label>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Temporary Password</label>
                   <input type="text" id="perm-user-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Save Role & Branch</button>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Save Role</button>
               </form>
 
               <div class="pt-3 border-t border-slate-100">
-                <h4 class="font-bold text-slate-700 text-xs mb-2">Assigned Roles & Branches</h4>
+                <h4 class="font-bold text-slate-700 text-xs mb-2">Assigned Roles</h4>
                 <div class="overflow-x-auto max-h-40 overflow-y-auto">
                   <table class="w-full text-left text-xs text-slate-600"><tbody id="perm-table-body"></tbody></table>
                 </div>
@@ -2688,15 +2812,15 @@
               <form id="branch-form" onsubmit="saveNewBranch(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div>
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">Branch Name *</label>
-                  <input type="text" id="branch-new-name" required placeholder="e.g. Dhanmondi Branch" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <input type="text" id="branch-new-name" required placeholder="e.g. Gulshan Sanvee's" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">Branch Code</label>
-                  <input type="text" id="branch-new-code" placeholder="e.g. DHN-01" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <input type="text" id="branch-new-code" placeholder="e.g. 101" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
                   <label class="block text-[11px] font-bold text-slate-700 mb-1">City / Location</label>
-                  <input type="text" id="branch-new-city" placeholder="e.g. Dhaka" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <input type="text" id="branch-new-city" placeholder="e.g. Police plaza, level - 4" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div class="flex items-end">
                   <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg text-xs font-bold transition shadow-sm">
@@ -3122,3 +3246,5 @@
 </body>
 </html>
 ```
+
+উক্ত সম্পূর্ণ কোডটি আপনার লোকাল ফাইলে সেভ করা আছে: [index.html](file:///c:/Users/PC/Downloads/123452/index.html)।

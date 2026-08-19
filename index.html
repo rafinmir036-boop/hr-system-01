@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   
   <!-- Google Fonts: Plus Jakarta Sans & Hind Siliguri -->
-  <link rel="preconnect" href="https://fonts.preconnect.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
@@ -294,6 +294,18 @@
         }
         bulkBranchSelect.innerHTML = opts;
       }
+
+      const noticeBranchSelect = document.getElementById('notice-target-branch');
+      if (noticeBranchSelect) {
+        let opts = `<option value="ALL">🌐 All Branches & Head Office (সবার জন্য)</option>`;
+        opts += `<option value="Head Office">🏢 Head Office Only (শুধুমাত্র হেড অফিস)</option>`;
+        branchList.forEach(b => {
+          if (b !== 'Head Office') {
+            opts += `<option value="${b}">📍 Only: ${b}</option>`;
+          }
+        });
+        noticeBranchSelect.innerHTML = opts;
+      }
     }
 
     window.onHeaderBranchChange = function() {
@@ -307,12 +319,14 @@
       generateReport();
       renderDashboardCharts();
       loadEmployeesRealtime();
+      renderNotices();
       showToast('info', `ফিল্টার করা হয়েছে: ${selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch}`);
     };
 
     window.isItemInActiveBranch = function(itemBranch) {
       if (currentUserRole === 'Employee') return true;
       
+      // If user is a Branch Manager, they ONLY see their assigned branch
       if (currentUserRole === 'Manager') {
         return currentUserBranch === 'ALL' || itemBranch === currentUserBranch;
       }
@@ -422,6 +436,7 @@
         }
 
         applyRoleAccessUI();
+        renderNotices();
       });
     }
 
@@ -609,6 +624,7 @@
         generateReport();
         calculateMyPersonalSummary();
         renderDashboardCharts();
+        renderNotices();
       });
     }
 
@@ -1487,7 +1503,34 @@
       }
     };
 
-    // Notice Board Realtime
+    // Notice Board Visibility & Branch Filter Engine
+    window.isNoticeVisibleToCurrentUser = function(n) {
+      const target = n.targetBranch || 'ALL';
+      if (target === 'ALL') {
+        if (currentUserRole === 'Admin' && selectedActiveBranch !== 'ALL') {
+          return true; // Global notices are always visible, or when specific branch is selected
+        }
+        return true;
+      }
+
+      if (currentUserRole === 'Admin') {
+        if (selectedActiveBranch === 'ALL') return true;
+        return target === selectedActiveBranch;
+      }
+
+      if (currentUserRole === 'Manager') {
+        if (currentUserBranch === 'ALL') return true;
+        return target === currentUserBranch;
+      }
+
+      if (currentUserRole === 'Employee') {
+        const myBranch = myEmployeeProfile ? (myEmployeeProfile.branch || 'Head Office') : 'Head Office';
+        return target === myBranch;
+      }
+
+      return false;
+    };
+
     function loadNoticesRealtime() {
       onSnapshot(collection(db, "notices"), (snapshot) => {
         noticeList = [];
@@ -1505,80 +1548,125 @@
       const noticeBadge = document.getElementById('notice-badge');
       const listContainer = document.getElementById('notices-full-list');
 
-      if(noticeList.length === 0) {
+      const visibleNotices = noticeList.filter(isNoticeVisibleToCurrentUser);
+
+      if (visibleNotices.length === 0) {
         if (heroTitle) heroTitle.innerText = 'কোনো নোটিশ নেই';
-        if (heroDesc) heroDesc.innerText = 'বর্তমানে প্রদর্শনের জন্য কোনো অফিশিয়াল নোটিশ নেই।';
+        if (heroDesc) heroDesc.innerText = 'আপনার ব্রাঞ্চের জন্য বর্তমানে প্রদর্শনের কোনো সক্রিয় নোটিশ নেই।';
         if (noticeDate) noticeDate.innerText = '--';
         if (noticeBadge) noticeBadge.innerText = '📢 NOTICE 0 OF 0';
-        if(listContainer) listContainer.innerHTML = '<p class="text-xs text-slate-500">কোনো নোটিশ পাওয়া যায়নি।</p>';
+        if (listContainer) listContainer.innerHTML = '<p class="text-xs text-slate-500 py-6 col-span-2 text-center font-medium">আপনার ব্রাঞ্চের জন্য কোনো সক্রিয় নোটিশ পাওয়া যায়নি।</p>';
         return;
       }
 
-      if (currentNoticeIndex >= noticeList.length) currentNoticeIndex = 0;
-      updateNoticeSlider();
+      if (currentNoticeIndex >= visibleNotices.length) currentNoticeIndex = 0;
+      updateNoticeSlider(visibleNotices);
 
-      if(noticeInterval) clearInterval(noticeInterval);
+      if (noticeInterval) clearInterval(noticeInterval);
       noticeInterval = setInterval(() => {
-        currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
-        updateNoticeSlider();
+        const currentVisibles = noticeList.filter(isNoticeVisibleToCurrentUser);
+        if (currentVisibles.length > 0) {
+          currentNoticeIndex = (currentNoticeIndex + 1) % currentVisibles.length;
+          updateNoticeSlider(currentVisibles);
+        }
       }, 6000);
 
-      if(listContainer) {
+      if (listContainer) {
         listContainer.innerHTML = '';
-        noticeList.forEach(n => {
+        visibleNotices.forEach(n => {
+          const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
+          const isHeadOffice = n.targetBranch === 'Head Office';
+          const badgeColor = isGlobal 
+            ? 'bg-blue-100 text-blue-800 border-blue-200' 
+            : (isHeadOffice ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200');
+          const branchLabel = isGlobal ? '🌐 All Branches & Head Office' : `🏢 ${n.targetBranch} Only`;
+
           listContainer.innerHTML += `
-            <div class="p-4 rounded-xl border border-slate-100 bg-slate-50 space-y-1">
-              <div class="flex justify-between items-center">
-                <h4 class="font-bold text-slate-800 text-sm">${n.title}</h4>
-                <span class="text-[10px] text-slate-400 font-semibold">${new Date(n.postedDate).toLocaleDateString()}</span>
+            <div class="p-5 rounded-2xl border border-slate-200/80 bg-white space-y-2 shadow-2xs hover:shadow-xs transition">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${badgeColor} mb-1.5">
+                    ${branchLabel}
+                  </span>
+                  <h4 class="font-bold text-slate-800 text-sm">${n.title}</h4>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                  <span class="text-[10px] text-slate-400 font-semibold">${new Date(n.postedDate).toLocaleDateString()}</span>
+                  ${currentUserRole !== 'Employee' ? `
+                    <button onclick="deleteNoticeRecord('${n.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition ml-1" title="Delete Notice">
+                      <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                  ` : ''}
+                </div>
               </div>
-              <p class="text-xs text-slate-600">${n.description}</p>
+              <p class="text-xs text-slate-600 leading-relaxed">${n.description}</p>
             </div>
           `;
         });
       }
     }
 
-    function updateNoticeSlider() {
-      if(noticeList.length === 0) return;
-      const n = noticeList[currentNoticeIndex];
+    function updateNoticeSlider(visibleNotices) {
+      if (!visibleNotices || visibleNotices.length === 0) return;
+      const n = visibleNotices[currentNoticeIndex];
+      if (!n) return;
+
       const heroTitle = document.getElementById('notice-hero-title');
       const heroDesc = document.getElementById('notice-hero-desc');
       const noticeDate = document.getElementById('notice-date');
       const noticeBadge = document.getElementById('notice-badge');
 
+      const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
+      const branchLabel = isGlobal ? 'GLOBAL' : (n.targetBranch === 'Head Office' ? 'HEAD OFFICE ONLY' : n.targetBranch.toUpperCase());
+
       if (heroTitle) heroTitle.innerText = n.title;
       if (heroDesc) heroDesc.innerText = n.description;
-      if (noticeDate) noticeDate.innerText = new Date(n.postedDate).toISOString().split('T')[0];
-      if (noticeBadge) noticeBadge.innerText = `📢 NOTICE ${currentNoticeIndex + 1} OF ${noticeList.length}`;
+      if (noticeDate) noticeDate.innerText = `${new Date(n.postedDate).toISOString().split('T')[0]} • ${branchLabel}`;
+      if (noticeBadge) noticeBadge.innerText = `📢 NOTICE ${currentNoticeIndex + 1} OF ${visibleNotices.length} (${branchLabel})`;
     }
 
     window.nextNotice = function() {
-      if (noticeList.length === 0) return;
-      currentNoticeIndex = (currentNoticeIndex + 1) % noticeList.length;
-      updateNoticeSlider();
+      const visibleNotices = noticeList.filter(isNoticeVisibleToCurrentUser);
+      if (visibleNotices.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex + 1) % visibleNotices.length;
+      updateNoticeSlider(visibleNotices);
     };
 
     window.prevNotice = function() {
-      if (noticeList.length === 0) return;
-      currentNoticeIndex = (currentNoticeIndex - 1 + noticeList.length) % noticeList.length;
-      updateNoticeSlider();
+      const visibleNotices = noticeList.filter(isNoticeVisibleToCurrentUser);
+      if (visibleNotices.length === 0) return;
+      currentNoticeIndex = (currentNoticeIndex - 1 + visibleNotices.length) % visibleNotices.length;
+      updateNoticeSlider(visibleNotices);
     };
 
     window.saveNewNotice = async function(e) {
       e.preventDefault();
       const title = document.getElementById('notice-title').value;
       const desc = document.getElementById('notice-desc').value;
+      const targetBranch = document.getElementById('notice-target-branch') ? document.getElementById('notice-target-branch').value : 'ALL';
 
       await addDoc(collection(db, "notices"), {
         title: title,
         description: desc,
+        targetBranch: targetBranch || 'ALL',
+        postedBy: currentUserEmail || 'Admin',
         postedDate: new Date().toISOString()
       });
 
       document.getElementById('notice-form').reset();
       toggleModal('add-notice-modal', false);
       showToast('success', 'নতুন নোটিশ প্রকাশিত হয়েছে!');
+    };
+
+    window.deleteNoticeRecord = async function(id) {
+      if (confirm('এই নোটিশটি মুছে ফেলতে চান?')) {
+        try {
+          await deleteDoc(doc(db, "notices", id));
+          showToast('success', 'নোটিশ মুছে ফেলা হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
+      }
     };
 
     // Company Documents Realtime
@@ -3148,12 +3236,20 @@
 
       <form id="notice-form" onsubmit="saveNewNotice(event)" class="space-y-3">
         <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Target Audience / Branch (কার জন্য এই নোটিশ) *</label>
+          <select id="notice-target-branch" class="w-full p-2.5 border rounded-xl text-xs bg-white font-bold text-indigo-700 outline-none">
+            <option value="ALL">🌐 All Branches & Head Office (সবার জন্য)</option>
+            <option value="Head Office">🏢 Head Office Only (শুধুমাত্র হেড অফিস)</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">হেড অফিস সিলেক্ট করলে ব্রাঞ্চ ম্যানেজার বা অন্য ব্রাঞ্চের কর্মচারীরা এই নোটিশ দেখতে পাবে না।</p>
+        </div>
+        <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Notice Title *</label>
-          <input type="text" id="notice-title" required class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+          <input type="text" id="notice-title" required class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g. জরুরি মিটিং / অফিস নির্দেশিকা">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Notice Content *</label>
-          <textarea id="notice-desc" rows="3" required class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+          <textarea id="notice-desc" rows="3" required class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="নোটিশের বিস্তারিত লিখুন..."></textarea>
         </div>
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
           <button type="button" onclick="toggleModal('add-notice-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
@@ -3240,6 +3336,4 @@
 
 </body>
 </html>
-```
 
-উক্ত সম্পূর্ণ কোডটি আপনার লোকাল ফাইলে সেভ করা আছে: [index.html](file:///c:/Users/PC/Downloads/123452/index.html)।

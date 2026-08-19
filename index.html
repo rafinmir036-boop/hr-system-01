@@ -1,3 +1,6 @@
+নিচে আপনার সম্পূর্ণ ফিক্সড এবং আপডেটেড **`index.html`** কোডটি দেওয়া হলো:
+
+```html
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -868,9 +871,9 @@
             </td>
             <td class="px-6 py-4 text-right space-x-1.5">
               ${currentUserRole !== 'Employee' ? `
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Present')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Present</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Late')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-xs">Late</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Absent')" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Absent</button>
+                <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Present</button>
+                <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-xs">Late</button>
+                <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Absent</button>
               ` : '<span class="text-xs text-slate-400 font-semibold">Biometric Verified</span>'}
             </td>
           </tr>
@@ -887,26 +890,31 @@
       return 'bg-slate-100 text-slate-600';
     }
 
-    window.markAttendance = async function(empId, customEmpCode, branch, status) {
+    window.markAttendance = async function(empId, status) {
       const selectedDate = document.getElementById('att-date').value;
       if (!selectedDate) {
         showToast('warning', 'তারিখ নির্বাচন করুন');
         return;
       }
+
+      const emp = employeeList.find(e => e.id === empId);
+      const customEmpCode = emp ? (emp.customEmpCode || '') : '';
+      const branch = emp ? (emp.branch || 'Head Office') : 'Head Office';
+
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       try {
         await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
           employeeId: empId,
-          customEmpCode: customEmpCode || '',
-          branch: branch || 'Head Office',
+          customEmpCode: customEmpCode,
+          branch: branch,
           status: status,
           punchTime: status !== 'Absent' ? timeStr : '--:--',
           method: 'Manual Override',
           updatedAt: now.toISOString()
         });
-        showToast('success', 'উপস্থিতি আপডেট করা হয়েছে');
+        showToast('success', `${emp ? emp.name : 'কর্মচারী'} এর উপস্থিতি (${status}) আপডেট করা হয়েছে`);
       } catch (err) {
         showToast('error', err.message);
       }
@@ -3573,3 +3581,4 @@
 
 </body>
 </html>
+```

@@ -72,6 +72,7 @@
     let perfList = [];
     let docList = [];
     let advanceList = [];
+    let fineList = [];
     let userPermissions = {};
     let currentUserPermissions = {};
     let branchList = [];
@@ -196,6 +197,9 @@
         if(document.getElementById('adv-filter-month')) {
           document.getElementById('adv-filter-month').value = currentMonthStr;
         }
+        if(document.getElementById('fine-filter-month')) {
+          document.getElementById('fine-filter-month').value = currentMonthStr;
+        }
         if(document.getElementById('rep-month')) {
           document.getElementById('rep-month').value = currentMonthStr;
         }
@@ -210,6 +214,7 @@
         loadLeaveRequestsRealtime();
         loadPayrollRealtime();
         loadAdvancesRealtime();
+        loadFinesRealtime();
         loadCompanyDocsRealtime();
         loadPerformanceRealtime();
         loadNoticesRealtime();
@@ -321,6 +326,7 @@
       updateAttendanceDashboardMetrics();
       renderAttendanceTable();
       renderAdvanceTable();
+      renderFineTable();
       checkIncrementDues();
       generateReport();
       renderDashboardCharts();
@@ -393,6 +399,7 @@
       'can_attendance',
       'can_advance_apply',
       'can_advance_approve',
+      'can_fines',
       'can_leave_apply',
       'can_leave_approve',
       'can_payroll',
@@ -412,6 +419,7 @@
           can_attendance: true,
           can_advance_apply: true,
           can_advance_approve: true,
+          can_fines: true,
           can_leave_apply: true,
           can_leave_approve: true,
           can_payroll: true,
@@ -429,6 +437,7 @@
           can_attendance: true,
           can_advance_apply: true,
           can_advance_approve: true,
+          can_fines: true,
           can_leave_apply: true,
           can_leave_approve: true,
           can_payroll: true,
@@ -446,6 +455,7 @@
           can_attendance: true,
           can_advance_apply: true,
           can_advance_approve: true,
+          can_fines: true,
           can_leave_apply: true,
           can_leave_approve: true,
           can_payroll: false,
@@ -463,6 +473,7 @@
           can_attendance: true,
           can_advance_apply: true,
           can_advance_approve: false,
+          can_fines: true,
           can_leave_apply: true,
           can_leave_approve: false,
           can_payroll: false,
@@ -473,6 +484,24 @@
           can_reports: true,
           can_settings: false
         };
+      } else if (role === 'Fine Operator' || role === 'Fine Executive') {
+        return {
+          can_dashboard: true,
+          can_employees: false,
+          can_attendance: false,
+          can_advance_apply: false,
+          can_advance_approve: false,
+          can_fines: true,
+          can_leave_apply: false,
+          can_leave_approve: false,
+          can_payroll: false,
+          can_increment: false,
+          can_documents: false,
+          can_performance: false,
+          can_notices: false,
+          can_reports: false,
+          can_settings: false
+        };
       } else { // Employee
         return {
           can_dashboard: true,
@@ -480,6 +509,7 @@
           can_attendance: false,
           can_advance_apply: true,
           can_advance_approve: false,
+          can_fines: false,
           can_leave_apply: true,
           can_leave_approve: false,
           can_payroll: false,
@@ -667,6 +697,7 @@
         applyRoleAccessUI();
         renderNotices();
         renderAdvanceTable();
+        renderFineTable();
         renderLeaveTable();
       });
     }
@@ -676,6 +707,7 @@
       if (role === 'Operation' || role === 'Operations Manager') return 'bg-teal-50 text-teal-700 border-teal-200';
       if (role === 'Area Manager') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
       if (role === 'Manager' || role === 'Branch Manager') return 'bg-blue-50 text-blue-700 border-blue-200';
+      if (role === 'Fine Operator' || role === 'Fine Executive') return 'bg-rose-50 text-rose-700 border-rose-200';
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     }
 
@@ -685,6 +717,7 @@
         'employees': 'can_employees',
         'attendance': 'can_attendance',
         'advance': 'can_advance_apply',
+        'fine': 'can_fines',
         'leave': 'can_leave_apply',
         'payroll': 'can_payroll',
         'increment': 'can_increment',
@@ -706,6 +739,8 @@
           isVisible = true;
         } else if (navId === 'advance') {
           isVisible = hasPermission('can_advance_apply') || hasPermission('can_advance_approve');
+        } else if (navId === 'fine') {
+          isVisible = hasPermission('can_fines');
         } else if (navId === 'leave') {
           isVisible = hasPermission('can_leave_apply') || hasPermission('can_leave_approve');
         } else {
@@ -722,6 +757,7 @@
       const adminCharts = document.getElementById('dash-charts-container');
       const leaveEmpSelectBox = document.getElementById('leave-emp-select-box');
       const advAddBtn = document.getElementById('adv-add-btn');
+      const fineAddBtn = document.getElementById('fine-add-btn');
       const payAddBtn = document.getElementById('pay-add-btn');
       const docUploadBtn = document.getElementById('doc-upload-btn');
       const noticePostBtn = document.getElementById('notice-post-btn');
@@ -747,6 +783,11 @@
       if (advAddBtn) {
         if (hasPermission('can_advance_apply')) advAddBtn.classList.remove('hidden');
         else advAddBtn.classList.add('hidden');
+      }
+
+      if (fineAddBtn) {
+        if (hasPermission('can_fines')) fineAddBtn.classList.remove('hidden');
+        else fineAddBtn.classList.add('hidden');
       }
 
       if (empAddBtn) {
@@ -826,6 +867,7 @@
         const leaveSelect = document.getElementById('leave-emp-id');
         const payEmpSelect = document.getElementById('pay-emp-id');
         const advEmpSelect = document.getElementById('adv-emp-id');
+        const fineEmpSelect = document.getElementById('fine-emp-id');
         const perfEmpSelect = document.getElementById('perf-emp-id');
         const docEmpSelect = document.getElementById('doc-emp-id');
         const repEmpSelect = document.getElementById('rep-filter-emp');
@@ -834,6 +876,7 @@
         leaveSelect.innerHTML = '<option value="">Select Employee</option>';
         payEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         if(advEmpSelect) advEmpSelect.innerHTML = '<option value="">Select Employee</option>';
+        if(fineEmpSelect) fineEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         perfEmpSelect.innerHTML = '<option value="">Select Employee</option>';
         docEmpSelect.innerHTML = '<option value="General">General / All Employees</option>';
         if(repEmpSelect) repEmpSelect.innerHTML = '<option value="ALL">All Employees</option>';
@@ -854,6 +897,7 @@
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           if(advEmpSelect) advEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          if(fineEmpSelect) fineEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}]</option>`;
           perfEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           docEmpSelect.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
           if(repEmpSelect) repEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
@@ -898,6 +942,7 @@
         renderAttendanceTable();
         checkIncrementDues();
         renderAdvanceTable();
+        renderFineTable();
         generateReport();
         calculateMyPersonalSummary();
         renderDashboardCharts();
@@ -1630,6 +1675,205 @@
       }
     };
 
+    // ==========================================
+    // EMPLOYEE FINE & PENALTY SYSTEM
+    // ==========================================
+    window.saveFineRecord = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('fine-emp-id').value;
+      const month = document.getElementById('fine-month').value;
+      const date = document.getElementById('fine-date').value;
+      const amount = Number(document.getElementById('fine-amount').value) || 0;
+      const category = document.getElementById('fine-category').value;
+      const reason = document.getElementById('fine-reason').value.trim();
+
+      if (!empId || !amount || !month) {
+        showToast('warning', 'দয়া করে কর্মচারী, মাস ও জরিমানার পরিমাণ নির্ধারণ করুন');
+        return;
+      }
+
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "fines"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown Staff',
+          employeeEmail: emp ? (emp.email || '') : '',
+          designation: emp ? emp.designation : '',
+          customEmpCode: emp ? (emp.customEmpCode || '') : '',
+          branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
+          amount: amount,
+          month: month,
+          date: date || new Date().toISOString().split('T')[0],
+          category: category || 'General Fine',
+          reason: reason || 'N/A',
+          status: 'Pending',
+          recordedBy: currentUserEmail,
+          createdAt: new Date().toISOString()
+        });
+
+        document.getElementById('fine-form').reset();
+        toggleModal('add-fine-modal', false);
+        showToast('success', `কর্মচারী "${emp ? emp.name : 'Staff'}" এর জন্য ৳${amount.toLocaleString()} জরিমানা সফলভাবে এন্ট্রি হয়েছে!`);
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+      }
+    };
+
+    function loadFinesRealtime() {
+      onSnapshot(collection(db, "fines"), (snapshot) => {
+        fineList = [];
+        snapshot.forEach((docSnap) => {
+          fineList.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        renderFineTable();
+        calculateMyPersonalSummary();
+        generateReport();
+      });
+    }
+
+    window.renderFineTable = function() {
+      const tbody = document.getElementById('fine-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const filterMonth = document.getElementById('fine-filter-month') ? document.getElementById('fine-filter-month').value : '';
+      const filterStatus = document.getElementById('fine-filter-status') ? document.getElementById('fine-filter-status').value : 'ALL';
+      const searchTxt = document.getElementById('fine-search-input') ? document.getElementById('fine-search-input').value.toLowerCase().trim() : '';
+
+      let totalMonthFine = 0;
+      let totalPending = 0;
+      let totalDeducted = 0;
+
+      const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
+        ? fineList.filter(f => f.employeeId === myEmployeeProfile.id || (myEmployeeProfile.email && f.employeeEmail === myEmployeeProfile.email))
+        : fineList;
+
+      const canManage = currentUserRole === 'Admin' || hasPermission('can_fines') || hasPermission('can_payroll');
+
+      listToRender.forEach((fn) => {
+        if (!isItemInActiveBranch(fn.branch)) return;
+
+        if (filterMonth && fn.month !== filterMonth) return;
+        if (filterStatus !== 'ALL' && fn.status !== filterStatus) return;
+
+        if (searchTxt) {
+          const matchName = (fn.employeeName || '').toLowerCase().includes(searchTxt);
+          const matchCode = (fn.customEmpCode || '').toLowerCase().includes(searchTxt);
+          const matchCat = (fn.category || '').toLowerCase().includes(searchTxt);
+          if (!matchName && !matchCode && !matchCat) return;
+        }
+
+        const amt = Number(fn.amount) || 0;
+        totalMonthFine += amt;
+        if (fn.status === 'Deducted') {
+          totalDeducted += amt;
+        } else if (fn.status === 'Pending') {
+          totalPending += amt;
+        }
+
+        let statusBadge = '';
+        if (fn.status === 'Deducted') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-solid fa-check-double text-blue-500 mr-1"></i>Deducted in Payroll</span>';
+        } else if (fn.status === 'Waived' || fn.status === 'Cancelled') {
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200"><i class="fa-solid fa-ban text-slate-400 mr-1"></i>Waived / Cancelled</span>';
+        } else { // Pending
+          statusBadge = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-clock text-amber-500 mr-1"></i>Pending (অপেক্ষমাণ)</span>';
+        }
+
+        let actionButtons = '';
+        if (fn.status === 'Pending') {
+          if (canManage) {
+            actionButtons = `
+              <button onclick="updateFineStatus('${fn.id}', 'Deducted')" title="পেইড/ডিডাক্টেড মার্ক করুন" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition border border-blue-200 inline-flex items-center space-x-1">
+                <i class="fa-solid fa-check-double"></i> <span>Deduct</span>
+              </button>
+              <button onclick="updateFineStatus('${fn.id}', 'Waived')" title="মওকুফ/বাতিল করুন" class="p-1.5 ml-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-hand-holding-hand"></i></button>
+              <button onclick="deleteFineRecord('${fn.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+            `;
+          } else {
+            actionButtons = '<span class="text-xs font-bold text-amber-600">⏳ Pending Deduction</span>';
+          }
+        } else if (fn.status === 'Deducted') {
+          if (canManage) {
+            actionButtons = `
+              <button onclick="updateFineStatus('${fn.id}', 'Pending')" title="পুনরায় পেন্ডিং করুন" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition">
+                <i class="fa-solid fa-rotate-left"></i> Revert
+              </button>
+              <button onclick="deleteFineRecord('${fn.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+            `;
+          } else {
+            actionButtons = '<span class="text-xs font-bold text-blue-600">✓ Deducted</span>';
+          }
+        } else if (fn.status === 'Waived' || fn.status === 'Cancelled') {
+          if (canManage) {
+            actionButtons = `
+              <button onclick="updateFineStatus('${fn.id}', 'Pending')" title="পুনরায় সক্রিয় করুন" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold rounded-lg text-xs transition border border-amber-200">
+                <i class="fa-solid fa-rotate-left"></i> Restore
+              </button>
+              <button onclick="deleteFineRecord('${fn.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+            `;
+          } else {
+            actionButtons = '<span class="text-xs font-bold text-slate-500">Waived</span>';
+          }
+        }
+
+        const row = `
+          <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+            <td class="px-6 py-4">
+              <div class="font-bold text-slate-800">${fn.employeeName}</div>
+              <div class="text-[11px] text-slate-500 font-semibold">${fn.designation || ''} • <span class="text-indigo-600 font-bold">ID: ${fn.customEmpCode || 'N/A'}</span> <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${fn.branch || 'Head Office'}</span></div>
+            </td>
+            <td class="px-6 py-4 font-semibold text-slate-700">${fn.month}</td>
+            <td class="px-6 py-4 text-slate-500 font-medium">${fn.date || '-'}</td>
+            <td class="px-6 py-4 font-bold text-rose-600 text-sm">৳ ${amt.toLocaleString()}</td>
+            <td class="px-6 py-4">
+              <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold text-[10px] border border-rose-100">${fn.category || 'General'}</span>
+              <div class="text-slate-500 text-[11px] mt-0.5 italic max-w-xs truncate">${fn.reason || '-'}</div>
+            </td>
+            <td class="px-6 py-4 text-slate-500 text-[11px]">
+              <div class="font-medium text-slate-700">${fn.recordedBy || 'Admin'}</div>
+              <div class="text-[10px] text-slate-400">${fn.createdAt ? new Date(fn.createdAt).toLocaleDateString() : ''}</div>
+            </td>
+            <td class="px-6 py-4">${statusBadge}</td>
+            <td class="px-6 py-4 text-right">${actionButtons}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+
+      if (document.getElementById('fine-stat-total')) {
+        document.getElementById('fine-stat-total').innerText = `৳ ${totalMonthFine.toLocaleString()}`;
+        document.getElementById('fine-stat-pending').innerText = `৳ ${totalPending.toLocaleString()}`;
+        document.getElementById('fine-stat-deducted').innerText = `৳ ${totalDeducted.toLocaleString()}`;
+      }
+    };
+
+    window.updateFineStatus = async function(id, newStatus) {
+      try {
+        await updateDoc(doc(db, "fines", id), {
+          status: newStatus,
+          updatedBy: currentUserEmail,
+          updatedAt: new Date().toISOString(),
+          clearedAt: newStatus === 'Deducted' ? new Date().toISOString() : null
+        });
+        showToast('success', `জরিমানার স্ট্যাটাস: ${newStatus}`);
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.deleteFineRecord = async function(id) {
+      if (confirm('এই জরিমানার রেকর্ডটি মুছে ফেলতে চান?')) {
+        try {
+          await deleteDoc(doc(db, "fines", id));
+          showToast('success', 'জরিমানার রেকর্ড মুছে ফেলা হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
+      }
+    };
+
     // Leave Management Realtime
     function loadLeaveRequestsRealtime() {
       onSnapshot(collection(db, "leaves"), (snapshot) => {
@@ -1812,6 +2056,14 @@
           autoAdvance = pendingAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
         }
         document.getElementById('pay-advance').value = autoAdvance;
+
+        let autoFine = 0;
+        if (month) {
+          const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
+          autoFine = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        }
+        document.getElementById('pay-fine').value = autoFine;
+
         calculateNetSalary();
       }
     };
@@ -1862,9 +2114,20 @@
         }
       }
 
+      if (fine > 0 && month) {
+        const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
+        for (let fn of pendingFines) {
+          await updateDoc(doc(db, "fines", fn.id), {
+            status: 'Deducted',
+            clearedInPayrollMonth: month,
+            clearedAt: new Date().toISOString()
+          });
+        }
+      }
+
       document.getElementById('payroll-form').reset();
       toggleModal('add-payroll-modal', false);
-      showToast('success', 'বেতন স্লিপ সফলভাবে তৈরি হয়েছে এবং অগ্রিম বেতন স্বয়ংক্রিয়ভাবে ক্লিয়ার হয়েছে!');
+      showToast('success', 'বেতন স্লিপ সফলভাবে তৈরি হয়েছে এবং অগ্রিম ও জরিমানা স্বয়ংক্রিয়ভাবে সমন্বয় হয়েছে!');
     };
 
     window.generatePayslipPDF = function(payrollId) {
@@ -2961,6 +3224,41 @@
             </tr>
           `;
         });
+      } else if (type === 'fines') {
+        if (statsBox) statsBox.classList.add('hidden');
+
+        tableHead.innerHTML = `
+          <tr>
+            <th class="px-4 py-3.5">Employee Name & ID</th>
+            <th class="px-4 py-3.5">Branch</th>
+            <th class="px-4 py-3.5">Month</th>
+            <th class="px-4 py-3.5">Date</th>
+            <th class="px-4 py-3.5">Category & Reason</th>
+            <th class="px-4 py-3.5">Fine Amount</th>
+            <th class="px-4 py-3.5">Recorded By</th>
+            <th class="px-4 py-3.5">Status</th>
+          </tr>
+        `;
+        tableBody.innerHTML = '';
+        fineList.forEach(fn => {
+          if(month && fn.month !== month) return;
+          if (filterBranch !== 'ALL' && fn.branch !== filterBranch) return;
+          if (!isItemInActiveBranch(fn.branch)) return;
+          if (filterEmpId !== 'ALL' && fn.employeeId !== filterEmpId) return;
+
+          tableBody.innerHTML += `
+            <tr class="border-b text-xs">
+              <td class="px-4 py-3 font-bold">${fn.employeeName} <span class="text-indigo-600 font-normal">(${fn.customEmpCode || 'N/A'})</span></td>
+              <td class="px-4 py-3 font-semibold text-emerald-700">🏢 ${fn.branch || 'Head Office'}</td>
+              <td class="px-4 py-3">${fn.month}</td>
+              <td class="px-4 py-3">${fn.date || '-'}</td>
+              <td class="px-4 py-3"><b>${fn.category || 'General'}</b>: ${fn.reason || '-'}</td>
+              <td class="px-4 py-3 font-bold text-rose-600">৳ ${(Number(fn.amount) || 0).toLocaleString()}</td>
+              <td class="px-4 py-3 text-slate-500">${fn.recordedBy || 'Admin'}</td>
+              <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full font-bold ${fn.status === 'Deducted' ? 'bg-blue-50 text-blue-700' : (fn.status === 'Waived' ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700')}">${fn.status}</span></td>
+            </tr>
+          `;
+        });
       }
     };
 
@@ -3024,6 +3322,17 @@
           const advDate = document.getElementById('adv-date');
           if (advDate && !advDate.value) {
             advDate.value = new Date().toISOString().split('T')[0];
+          }
+        }
+        if (id === 'add-fine-modal') {
+          const fineMonth = document.getElementById('fine-month');
+          if (fineMonth && !fineMonth.value) {
+            const d = new Date();
+            fineMonth.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          }
+          const fineDate = document.getElementById('fine-date');
+          if (fineDate && !fineDate.value) {
+            fineDate.value = new Date().toISOString().split('T')[0];
           }
         }
         if (id === 'add-leave-modal') {
@@ -3138,6 +3447,9 @@
           </button>
           <button id="nav-advance" onclick="switchNav('advance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
             <i class="fa-solid fa-hand-holding-dollar text-emerald-400 w-4"></i><span>Advance Salary</span>
+          </button>
+          <button id="nav-fine" onclick="switchNav('fine')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+            <i class="fa-solid fa-gavel text-rose-400 w-4"></i><span>Fines / Penalties</span>
           </button>
           <button id="nav-leave" onclick="switchNav('leave')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
             <i class="fa-solid fa-calendar-check text-rose-400 w-4"></i><span>Leave Requests</span>
@@ -3502,6 +3814,91 @@
           </div>
         </section>
 
+        <!-- FINE & PENALTY SECTION -->
+        <section id="sec-fine" class="hidden space-y-5">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                <i class="fa-solid fa-gavel text-rose-500"></i>
+                <span>Employee Fine & Penalty Management (কর্মচারী জরিমানা ব্যবস্থাপনা)</span>
+              </h2>
+              <p class="text-xs text-slate-500">দেরি, অনুপস্থিতি বা নিয়মলঙ্ঘনের জরিমানা এন্ট্রি ও পে-রোল সমন্বয়</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                <label class="text-[11px] font-bold text-slate-600 pl-1"><i class="fa-solid fa-calendar-days mr-1 text-indigo-500"></i>Month:</label>
+                <input type="month" id="fine-filter-month" onchange="renderFineTable()" class="p-1 bg-white border border-slate-200 rounded-lg text-xs font-bold text-indigo-700 outline-none">
+              </div>
+
+              <select id="fine-filter-status" onchange="renderFineTable()" class="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none">
+                <option value="ALL">All Status (সকল অবস্থা)</option>
+                <option value="Pending">Pending (অপেক্ষমাণ)</option>
+                <option value="Deducted">Deducted in Payroll (কর্তনকৃত)</option>
+                <option value="Waived">Waived / Cancelled (মওকুফ)</option>
+              </select>
+
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="fine-search-input" oninput="renderFineTable()" placeholder="কর্মচারীর নাম/আইডি খুঁজুন..." class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:ring-1 focus:ring-rose-500 transition">
+              </div>
+
+              <button id="fine-add-btn" onclick="toggleModal('add-fine-modal', true)" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Add Fine Entry</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary widgets for fines -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Total Fine (This Month)</span>
+                <h4 id="fine-stat-total" class="text-xl font-black text-slate-800 mt-1">৳ 0</h4>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg"><i class="fa-solid fa-receipt"></i></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Pending Deductions</span>
+                <h4 id="fine-stat-pending" class="text-xl font-black text-amber-600 mt-1">৳ 0</h4>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg"><i class="fa-solid fa-hourglass-half"></i></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div>
+                <span class="text-xs font-bold text-slate-400 uppercase">Deducted in Payroll</span>
+                <h4 id="fine-stat-deducted" class="text-xl font-black text-blue-600 mt-1">৳ 0</h4>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg"><i class="fa-solid fa-check-double"></i></div>
+            </div>
+          </div>
+
+          <!-- Fine Table -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
+                  <tr>
+                    <th class="px-6 py-3.5">Employee Name & Biometric ID</th>
+                    <th class="px-6 py-3.5">Target Month</th>
+                    <th class="px-6 py-3.5">Fine Date</th>
+                    <th class="px-6 py-3.5">Fine Amount</th>
+                    <th class="px-6 py-3.5">Category & Reason</th>
+                    <th class="px-6 py-3.5">Recorded By</th>
+                    <th class="px-6 py-3.5">Status</th>
+                    <th class="px-6 py-3.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="fine-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- 5. LEAVE REQUESTS -->
         <section id="sec-leave" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex justify-between items-center">
@@ -3684,6 +4081,7 @@
                   <option value="attendance_daily">📅 Daily Attendance Log (দৈনিক লগ)</option>
                   <option value="payroll">💳 Payroll Summary (বেতন বিবরণী)</option>
                   <option value="advance">💰 Advance Salary Tracking (অগ্রিম বেতন)</option>
+                  <option value="fines">⚖️ Fine & Penalty Tracking (জরিমানা বিবরণী)</option>
                 </select>
               </div>
 
@@ -3820,6 +4218,7 @@
                       <option value="Operation">Operations Manager (অপারেশনস)</option>
                       <option value="Area Manager">Area Manager (এরিয়া ম্যানেজার)</option>
                       <option value="Manager">Branch Manager (ব্রাঞ্চ ম্যানেজার)</option>
+                      <option value="Fine Operator">Fine Entry Operator (শুধুমাত্র জরিমানা এন্ট্রি)</option>
                       <option value="Employee">Employee (কর্মচারী)</option>
                       <option value="Custom">Custom (কাস্টম টিক মার্ক)</option>
                     </select>
@@ -3875,6 +4274,11 @@
                     <label class="flex items-center space-x-2.5 p-2 rounded-lg bg-amber-50/80 border border-amber-200 hover:bg-amber-100/60 cursor-pointer transition">
                       <input type="checkbox" id="perm_can_advance_approve" checked class="perm-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
                       <span class="font-bold text-amber-900">💵 অগ্রিম অনুমোদন/বাতিল (Approve Advance)</span>
+                    </label>
+
+                    <label class="flex items-center space-x-2.5 p-2 rounded-lg bg-rose-50/60 border border-rose-100 hover:bg-rose-100/60 cursor-pointer transition">
+                      <input type="checkbox" id="perm_can_fines" checked class="perm-checkbox w-4 h-4 rounded text-rose-600 focus:ring-rose-500">
+                      <span class="font-bold text-rose-800">⚖️ জরিমানা এন্ট্রি ও পরিচালনা (Fine Entry)</span>
                     </label>
 
                     <label class="flex items-center space-x-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-slate-100 transition">
@@ -4193,6 +4597,68 @@
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
           <button type="button" onclick="toggleModal('add-adv-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
           <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition">Save Advance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADD FINE MODAL -->
+  <div id="add-fine-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+          <i class="fa-solid fa-gavel text-rose-600"></i>
+          <span>Add Employee Fine (জরিমানা এন্ট্রি)</span>
+        </h3>
+        <button onclick="toggleModal('add-fine-modal', false)" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="fine-form" onsubmit="saveFineRecord(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Select Employee (কর্মচারী নির্বাচন) *</label>
+          <select id="fine-emp-id" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-rose-500 outline-none"></select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Salary Month (বেতন মাস) *</label>
+            <input type="month" id="fine-month" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white font-bold text-indigo-700 focus:ring-2 focus:ring-rose-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Incident Date (তারিখ) *</label>
+            <input type="date" id="fine-date" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white font-medium outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Fine Amount (৳) *</label>
+            <input type="number" id="fine-amount" required min="1" placeholder="e.g. 500" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-black text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Category (ধরন) *</label>
+            <select id="fine-category" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs bg-white font-medium outline-none">
+              <option value="Late Attendance">Late Attendance (দেরিতে আসা)</option>
+              <option value="Uninformed Absence">Uninformed Absence (অনুপস্থিতি)</option>
+              <option value="Dress Code / ID Violation">Dress Code / ID Violation</option>
+              <option value="Work Error / Negligence">Work Error / Negligence (ভুল/অবহেলা)</option>
+              <option value="Misconduct / Disciplinary">Misconduct (শৃঙ্খলাভঙ্গ)</option>
+              <option value="Other Violation">Other Violation (অন্যান্য)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Reason / Note (জরিমানার কারণ ও বিবরণ)</label>
+          <textarea id="fine-reason" rows="2" placeholder="জরিমানা করার কারণ বিস্তারিত লিখুন..." class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 outline-none"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+          <button type="button" onclick="toggleModal('add-fine-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Save Fine Entry</span>
+          </button>
         </div>
       </form>
     </div>

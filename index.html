@@ -1,23 +1,3 @@
-আপনার চাহিদা অনুযায়ী **Employee Role**-এর অ্যাক্সেস সম্পূর্ণ সিকিউর ও প্রাইভেট করা হয়েছে।
-
-### Employee লগইন করলে যা যা ঘটবে:
-1. **শুধুমাত্র নিজের তথ্য দেখতে পাবে**:
-   * **Dashboard**: শুধু নিজের প্রোফাইল, মাসিক বেতন, নিজের বকেয়া অ্যাডভান্স এবং নিজের উপস্থিতি সারাংশ দেখতে পাবে।
-   * **Attendance**: শুধু নিজের দৈনিক উপস্থিতির স্ট্যাটাস দেখতে পাবে (অন্য কোনো কর্মচারীর নাম বা উপস্থিতি দেখতে পাবে না)।
-   * **Advance Salary**: শুধু নিজে কত টাকা অ্যাডভান্স নিয়েছে এবং তা ক্লিয়ার হয়েছে কিনা দেখতে পাবে।
-   * **Leave Requests**: শুধু নিজের ছুটির আবেদনের তালিকা দেখতে পারবে এবং নতুন আবেদন করতে পারবে।
-   * **Payroll / Payslips**: শুধু নিজের স্যালারি স্লিপ দেখতে ও প্রিন্ট করতে পারবে (নতুন স্লিপ তৈরি করতে পারবে না)।
-   * **Documents**: শুধু কোম্পানির সাধারণ নোটিশ বা স্পেসিফিক তার নামে আপলোড করা ফাইল দেখতে ও ডাউনলোড করতে পারবে।
-   * **Notice Board**: নোটিশ পড়তে পারবে কিন্তু কোনো নোটিশ তৈরি বা ডিলিট করতে পারবে না।
-   * **Settings**: শুধু নিজের পাসওয়ার্ড পরিবর্তন করতে পারবে (অন্য ইউজারদের রোল তৈরি বা অ্যাক্সেস দেখার বক্সটি তার জন্য সম্পূর্ণরূপে লুকানো থাকবে)।
-2. **লুকানো মেনুসমূহ (Hidden Menus)**:
-   * **Employees Directory, Increment Management, Performance Review, Reports & Analytics** — এই মেনুগুলো Employee লগইন করলে সাইডবারে দেখাবেই না।
-
----
-
-### সম্পূর্ণ আপডেট করা কোড (Copy & Paste):
-
-```html
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -99,6 +79,7 @@
     let currentUserRole = 'Employee';
     let currentUserEmail = '';
     let myEmployeeProfile = null;
+    let todayAttendanceData = {};
 
     let statusChartInstance = null;
     let deptChartInstance = null;
@@ -235,7 +216,6 @@
       return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     }
 
-    // Role Based Access Controller
     function applyRoleAccessUI() {
       const allNavs = ['dashboard', 'employees', 'attendance', 'advance', 'leave', 'payroll', 'increment', 'documents', 'performance', 'notice', 'reports', 'settings'];
       
@@ -245,7 +225,6 @@
       } else if (currentUserRole === 'Manager') {
         allowedNavs = ['dashboard', 'employees', 'attendance', 'advance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
       } else {
-        // Employee Allowed Tabs
         allowedNavs = ['dashboard', 'attendance', 'advance', 'leave', 'payroll', 'documents', 'notice', 'settings'];
       }
 
@@ -294,6 +273,27 @@
         const payHeading = document.getElementById('payroll-section-heading');
         if(payHeading) payHeading.innerText = 'Payroll & Salary Management';
       }
+    }
+
+    // Recalculates Dashboard Metrics accurately matching actual registered employees
+    function updateAttendanceDashboardMetrics() {
+      let presentCount = 0, absentCount = 0, leaveCount = 0;
+
+      employeeList.forEach(emp => {
+        const st = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        if (st === 'Present' || st === 'Late') {
+          presentCount++;
+        } else if (st === 'Absent') {
+          absentCount++;
+        } else if (st === 'On Leave') {
+          leaveCount++;
+        }
+      });
+
+      document.getElementById('dash-total-emp').innerText = employeeList.length;
+      document.getElementById('dash-present-today').innerText = presentCount;
+      document.getElementById('dash-absent-today').innerText = absentCount;
+      document.getElementById('dash-leave-today').innerText = leaveCount;
     }
 
     function loadEmployeesRealtime() {
@@ -356,8 +356,6 @@
           tbody.innerHTML += row;
         });
 
-        document.getElementById('dash-total-emp').innerText = employeeList.length;
-
         if (myEmployeeProfile) {
           document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
           document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
@@ -369,6 +367,7 @@
           if (leaveSelect) leaveSelect.value = myEmployeeProfile.id;
         }
 
+        updateAttendanceDashboardMetrics();
         renderAttendanceTable();
         checkIncrementDues();
         renderAdvanceTable();
@@ -379,7 +378,6 @@
     }
 
     // Attendance Realtime
-    let todayAttendanceData = {};
     window.loadAttendanceForDate = function() {
       listenTodayAttendance(document.getElementById('att-date').value);
     };
@@ -387,20 +385,17 @@
     function listenTodayAttendance(dateStr) {
       onSnapshot(collection(db, `attendance_${dateStr}`), (snapshot) => {
         todayAttendanceData = {};
-        let presentCount = 0, absentCount = 0, leaveCount = 0;
 
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          todayAttendanceData[docSnap.id] = data.status;
-          if (data.status === 'Present' || data.status === 'Late') presentCount++;
-          if (data.status === 'Absent') absentCount++;
-          if (data.status === 'On Leave') leaveCount++;
+          const targetKey = data.employeeId || docSnap.id;
+          todayAttendanceData[targetKey] = data.status;
+          if (data.customEmpCode) {
+            todayAttendanceData[data.customEmpCode] = data.status;
+          }
         });
 
-        document.getElementById('dash-present-today').innerText = presentCount;
-        document.getElementById('dash-absent-today').innerText = absentCount;
-        document.getElementById('dash-leave-today').innerText = leaveCount;
-
+        updateAttendanceDashboardMetrics();
         renderAttendanceTable();
       });
     }
@@ -410,11 +405,10 @@
       if (!tbody) return;
       tbody.innerHTML = '';
 
-      // If Employee, ONLY show their own row!
       let listToRender = (currentUserRole === 'Employee' && myEmployeeProfile) ? [myEmployeeProfile] : employeeList;
 
       listToRender.forEach((emp) => {
-        const currentStatus = todayAttendanceData[emp.id] || todayAttendanceData[emp.customEmpCode] || 'Not Marked';
+        const currentStatus = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null) || 'Not Marked';
 
         const row = `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
@@ -464,14 +458,6 @@
           status: status,
           updatedAt: new Date().toISOString()
         });
-        if (customEmpCode) {
-          await setDoc(doc(db, `attendance_${selectedDate}`, customEmpCode), {
-            employeeId: empId,
-            customEmpCode: customEmpCode,
-            status: status,
-            updatedAt: new Date().toISOString()
-          });
-        }
         showToast('success', 'উপস্থিতি সংরক্ষিত হয়েছে');
       } catch (err) {
         showToast('error', err.message);
@@ -538,7 +524,6 @@
 
       let filtered = advanceList;
 
-      // Filter ONLY Employee's own advance
       if (currentUserRole === 'Employee' && myEmployeeProfile) {
         filtered = filtered.filter(a => a.employeeId === myEmployeeProfile.id);
       }
@@ -642,7 +627,6 @@
           payrollList.push({ id, ...pay });
 
           if (tbody) {
-            // IF EMPLOYEE -> SHOW ONLY THEIR OWN PAYSLIP!
             if (currentUserRole === 'Employee' && myEmployeeProfile && pay.employeeId !== myEmployeeProfile.id) {
               return;
             }
@@ -761,7 +745,6 @@
           if (leave.status === 'Rejected') badgeColor = 'bg-rose-50 text-rose-700 border border-rose-200';
 
           if (tbody) {
-            // IF EMPLOYEE -> SHOW ONLY THEIR OWN LEAVES!
             if (currentUserRole === 'Employee' && myEmployeeProfile && leave.employeeId !== myEmployeeProfile.id) return;
 
             const row = `
@@ -832,7 +815,6 @@
           docList.push({ id, ...item });
 
           if (grid) {
-            // Employee only sees general or specifically assigned docs
             if (currentUserRole === 'Employee' && myEmployeeProfile && item.targetEmployee !== 'General' && item.targetEmployee !== myEmployeeProfile.name) return;
 
             const card = `
@@ -897,7 +879,6 @@
       }
     };
 
-    // Personal Summary calculation
     function calculateMyPersonalSummary() {
       if (!myEmployeeProfile) return;
 
@@ -1267,6 +1248,35 @@
         }
       });
       document.getElementById('dash-increment-due').innerText = dueList.length;
+
+      const incAlertBox = document.getElementById('dash-increment-alert');
+      if (incAlertBox) {
+        if (dueList.length > 0) {
+          incAlertBox.classList.remove('hidden');
+          incAlertBox.innerHTML = `
+            <div class="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-50 border border-amber-300/80 p-4 rounded-2xl flex items-center justify-between shadow-xs">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-sm flex-shrink-0">
+                  <i class="fa-solid fa-bell"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-amber-900 text-sm">Increment Alert (${dueList.length} জন অপেক্ষমাণ)</h4>
+                  <p class="text-xs text-amber-700">১ বছর পূর্ণ হওয়ায় নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়ার সময় হয়েছে:</p>
+                  <div class="flex flex-wrap gap-1.5 mt-2">
+                    ${dueList.map(e => `<span class="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">${e.name} (${e.designation})</span>`).join('')}
+                  </div>
+                </div>
+              </div>
+              <button onclick="showSection('increment')" class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs transition flex-shrink-0 shadow-sm ml-4">
+                Process Now
+              </button>
+            </div>
+          `;
+        } else {
+          incAlertBox.classList.add('hidden');
+        }
+      }
+
       renderIncrementTable(dueList);
     }
 
@@ -1562,6 +1572,7 @@
           </div>
         </div>
 
+        <!-- Increment Alert Banner -->
         <div id="dash-increment-alert" class="hidden"></div>
 
         <!-- Dashboard Section -->

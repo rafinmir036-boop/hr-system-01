@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HRMS Enterprise - Human Resource & Biometric Automation</title>
+  <title>HRMS Enterprise - Multi-Branch Management & Biometric Automation</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -73,11 +73,14 @@
     let docList = [];
     let advanceList = [];
     let userPermissions = {};
+    let branchList = ['Head Office', 'Gulshan Branch', 'Chattogram Branch', 'Sylhet Branch', 'Uttara Branch'];
 
     let currentNoticeIndex = 0;
     let noticeInterval = null;
     let currentUserRole = 'Employee';
     let currentUserEmail = '';
+    let currentUserBranch = 'ALL';
+    let selectedActiveBranch = 'ALL';
     let myEmployeeProfile = null;
     let todayAttendanceData = {};
 
@@ -160,6 +163,7 @@
           document.getElementById('adv-filter-month').value = currentMonthStr;
         }
 
+        loadBranchesRealtime();
         loadPermissionsRealtime(user.email);
         loadEmployeesRealtime();
         listenTodayAttendance(todayStr);
@@ -175,6 +179,141 @@
       }
     });
 
+    // ==========================================
+    // MULTI-BRANCH SYSTEM & FILTER HELPERS
+    // ==========================================
+    function loadBranchesRealtime() {
+      onSnapshot(collection(db, "branches"), (snapshot) => {
+        const storedBranches = [];
+        const tbody = document.getElementById('branch-table-body');
+        if (tbody) tbody.innerHTML = '';
+
+        snapshot.forEach(docSnap => {
+          const b = docSnap.data();
+          storedBranches.push(b.name);
+          if (tbody) {
+            tbody.innerHTML += `
+              <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+                <td class="px-4 py-3 font-bold text-slate-800">${b.name}</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${b.code || 'BR'}</span></td>
+                <td class="px-4 py-3 text-slate-600">${b.city || 'Bangladesh'}</td>
+                <td class="px-4 py-3 text-slate-600 font-medium">${b.managerEmail || 'Unassigned'}</td>
+                <td class="px-4 py-3 text-right">
+                  <button onclick="deleteBranchRecord('${docSnap.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+              </tr>
+            `;
+          }
+        });
+
+        if (storedBranches.length > 0) {
+          branchList = Array.from(new Set(['Head Office', ...storedBranches]));
+        }
+
+        populateBranchSelectDropdowns();
+      });
+    }
+
+    function populateBranchSelectDropdowns() {
+      const headerSelect = document.getElementById('header-branch-select');
+      const empBranchSelect = document.getElementById('emp-branch');
+      const permBranchSelect = document.getElementById('perm-branch');
+      const repBranchSelect = document.getElementById('rep-filter-branch');
+      const bulkBranchSelect = document.getElementById('bulk-default-branch');
+
+      if (headerSelect) {
+        let opts = `<option value="ALL">🏢 All Branches (Global)</option>`;
+        branchList.forEach(b => { opts += `<option value="${b}">📍 ${b}</option>`; });
+        headerSelect.innerHTML = opts;
+        headerSelect.value = selectedActiveBranch;
+      }
+
+      if (empBranchSelect) {
+        let opts = '';
+        branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
+        empBranchSelect.innerHTML = opts;
+      }
+
+      if (permBranchSelect) {
+        let opts = `<option value="ALL">All Branches (Head Office / Super Admin)</option>`;
+        branchList.forEach(b => { opts += `<option value="${b}">Only: ${b}</option>`; });
+        permBranchSelect.innerHTML = opts;
+      }
+
+      if (repBranchSelect) {
+        let opts = `<option value="ALL">All Branches</option>`;
+        branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
+        repBranchSelect.innerHTML = opts;
+      }
+
+      if (bulkBranchSelect) {
+        let opts = '';
+        branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
+        bulkBranchSelect.innerHTML = opts;
+      }
+    }
+
+    window.onHeaderBranchChange = function() {
+      const select = document.getElementById('header-branch-select');
+      selectedActiveBranch = select.value;
+      
+      updateAttendanceDashboardMetrics();
+      renderAttendanceTable();
+      renderAdvanceTable();
+      checkIncrementDues();
+      generateReport();
+      renderDashboardCharts();
+      loadEmployeesRealtime();
+      showToast('info', `ফিল্টার করা হয়েছে: ${selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch}`);
+    };
+
+    window.isItemInActiveBranch = function(itemBranch) {
+      const targetBranch = itemBranch || 'Head Office';
+      
+      // If user is a Branch Manager, they ONLY see their assigned branch
+      if (currentUserRole === 'Manager') {
+        return currentUserBranch === 'ALL' || targetBranch === currentUserBranch;
+      }
+
+      // If user is Admin, they see based on the top header branch dropdown
+      if (currentUserRole === 'Admin') {
+        if (selectedActiveBranch === 'ALL') return true;
+        return targetBranch === selectedActiveBranch;
+      }
+
+      return true;
+    };
+
+    window.saveNewBranch = async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('branch-new-name').value.trim();
+      const code = document.getElementById('branch-new-code').value.trim();
+      const city = document.getElementById('branch-new-city').value.trim();
+      const managerEmail = document.getElementById('branch-new-manager').value.trim().toLowerCase();
+
+      if (!name) return;
+
+      try {
+        await addDoc(collection(db, "branches"), {
+          name, code: code || 'BR', city: city || 'Bangladesh', managerEmail: managerEmail || '', createdAt: new Date().toISOString()
+        });
+        document.getElementById('branch-form').reset();
+        showToast('success', `নতুন ব্রাঞ্চ "${name}" যুক্ত হয়েছে!`);
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.deleteBranchRecord = async function(id) {
+      if (confirm("এই ব্রাঞ্চ মুছে ফেলতে চান?")) {
+        await deleteDoc(doc(db, "branches", id));
+        showToast('success', 'ব্রাঞ্চ মুছে ফেলা হয়েছে');
+      }
+    };
+
+    // ==========================================
+    // ROLE PERMISSIONS & BRANCH ISOLATION
+    // ==========================================
     function loadPermissionsRealtime(userEmail) {
       onSnapshot(collection(db, "user_roles"), (snapshot) => {
         const tbody = document.getElementById('perm-table-body');
@@ -184,13 +323,14 @@
         snapshot.forEach((docSnap) => {
           const p = docSnap.data();
           const id = docSnap.id;
-          userPermissions[p.email.toLowerCase()] = p.role;
+          userPermissions[p.email.toLowerCase()] = { role: p.role, branch: p.branch || 'ALL' };
 
           if (tbody) {
             tbody.innerHTML += `
               <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-xs">
                 <td class="px-4 py-3 font-semibold text-slate-700">${p.email}</td>
                 <td class="px-4 py-3"><span class="px-2.5 py-0.5 rounded-full font-bold ${getRoleBadge(p.role)}">${p.role}</span></td>
+                <td class="px-4 py-3 text-slate-600 font-bold"><span class="bg-slate-100 px-2 py-0.5 rounded text-indigo-700 font-semibold text-[11px]">${p.branch || 'ALL'}</span></td>
                 <td class="px-4 py-3 text-right">
                   <button onclick="deletePermissionRole('${id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition"><i class="fa-solid fa-trash-can"></i></button>
                 </td>
@@ -199,13 +339,33 @@
           }
         });
 
-        const assignedRole = userPermissions[userEmail.toLowerCase()];
-        currentUserRole = assignedRole || (userEmail.includes('admin') ? 'Admin' : 'Employee');
+        const assignedInfo = userPermissions[userEmail.toLowerCase()];
+        if (assignedInfo) {
+          currentUserRole = assignedInfo.role;
+          currentUserBranch = assignedInfo.branch || 'ALL';
+        } else {
+          currentUserRole = userEmail.includes('admin') ? 'Admin' : 'Employee';
+          currentUserBranch = 'ALL';
+        }
+
+        if (currentUserRole === 'Manager' && currentUserBranch !== 'ALL') {
+          selectedActiveBranch = currentUserBranch;
+        }
         
         const badgeElem = document.getElementById('user-role-badge');
         if(badgeElem) {
           badgeElem.className = `text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border ${getRoleBadge(currentUserRole)}`;
           badgeElem.innerText = currentUserRole;
+        }
+
+        const branchBadgeElem = document.getElementById('user-branch-badge');
+        if (branchBadgeElem) {
+          if (currentUserRole === 'Manager') {
+            branchBadgeElem.innerText = `🏢 ${currentUserBranch}`;
+            branchBadgeElem.classList.remove('hidden');
+          } else {
+            branchBadgeElem.classList.add('hidden');
+          }
         }
 
         applyRoleAccessUI();
@@ -225,7 +385,7 @@
       if (currentUserRole === 'Admin') {
         allowedNavs = allNavs;
       } else if (currentUserRole === 'Manager') {
-        allowedNavs = ['dashboard', 'employees', 'attendance', 'advance', 'leave', 'documents', 'performance', 'notice', 'reports', 'settings'];
+        allowedNavs = ['dashboard', 'employees', 'attendance', 'advance', 'leave', 'payroll', 'documents', 'performance', 'notice', 'reports', 'settings'];
       } else {
         allowedNavs = ['dashboard', 'attendance', 'advance', 'leave', 'payroll', 'documents', 'notice', 'settings'];
       }
@@ -238,6 +398,7 @@
         }
       });
 
+      const headerBranchContainer = document.getElementById('header-branch-switcher-box');
       const adminDash = document.getElementById('admin-dash-cards');
       const empDash = document.getElementById('emp-dash-profile');
       const adminCharts = document.getElementById('dash-charts-container');
@@ -247,7 +408,18 @@
       const docUploadBtn = document.getElementById('doc-upload-btn');
       const noticePostBtn = document.getElementById('notice-post-btn');
       const roleAccessSettings = document.getElementById('sec-settings-roles');
+      const branchAccessSettings = document.getElementById('sec-settings-branches');
       const empBulkBtn = document.getElementById('emp-bulk-btn');
+
+      if (currentUserRole === 'Admin') {
+        if (headerBranchContainer) headerBranchContainer.classList.remove('hidden');
+        if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
+        if (branchAccessSettings) branchAccessSettings.classList.remove('hidden');
+      } else {
+        if (headerBranchContainer) headerBranchContainer.classList.add('hidden');
+        if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
+        if (branchAccessSettings) branchAccessSettings.classList.add('hidden');
+      }
 
       if (currentUserRole === 'Employee') {
         if (adminDash) adminDash.classList.add('hidden');
@@ -258,7 +430,6 @@
         if (payAddBtn) payAddBtn.classList.add('hidden');
         if (docUploadBtn) docUploadBtn.classList.add('hidden');
         if (noticePostBtn) noticePostBtn.classList.add('hidden');
-        if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
         if (empBulkBtn) empBulkBtn.classList.add('hidden');
         
         const payHeading = document.getElementById('payroll-section-heading');
@@ -272,18 +443,20 @@
         if (payAddBtn) payAddBtn.classList.remove('hidden');
         if (docUploadBtn) docUploadBtn.classList.remove('hidden');
         if (noticePostBtn) noticePostBtn.classList.remove('hidden');
-        if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
         if (empBulkBtn) empBulkBtn.classList.remove('hidden');
 
         const payHeading = document.getElementById('payroll-section-heading');
-        if(payHeading) payHeading.innerText = 'Payroll & Salary Management';
+        if(payHeading) payHeading.innerText = currentUserRole === 'Manager' ? `Payroll Management (${currentUserBranch})` : 'Payroll & Salary Management';
       }
     }
 
     function updateAttendanceDashboardMetrics() {
-      let presentCount = 0, absentCount = 0, leaveCount = 0;
+      let presentCount = 0, absentCount = 0, leaveCount = 0, totalEmpInScope = 0;
 
       employeeList.forEach(emp => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+        totalEmpInScope++;
+
         const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
         const st = att ? (typeof att === 'object' ? att.status : att) : 'Absent';
         
@@ -296,7 +469,7 @@
         }
       });
 
-      document.getElementById('dash-total-emp').innerText = employeeList.length;
+      document.getElementById('dash-total-emp').innerText = totalEmpInScope;
       document.getElementById('dash-present-today').innerText = presentCount;
       document.getElementById('dash-absent-today').innerText = absentCount;
       document.getElementById('dash-leave-today').innerText = leaveCount;
@@ -331,6 +504,8 @@
             myEmployeeProfile = { id, ...emp };
           }
 
+          if (!isItemInActiveBranch(emp.branch)) return;
+
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
           if(advEmpSelect) advEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
@@ -350,6 +525,7 @@
               <td class="px-6 py-4 text-slate-600 font-medium">${emp.email}</td>
               <td class="px-6 py-4"><span class="bg-indigo-50/80 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-full text-[11px] font-bold">${emp.designation}</span></td>
               <td class="px-6 py-4 text-slate-600 font-medium">${emp.department}</td>
+              <td class="px-6 py-4"><span class="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold">🏢 ${emp.branch || 'Head Office'}</span></td>
               <td class="px-6 py-4 text-slate-600">${emp.joiningDate || 'N/A'}</td>
               <td class="px-6 py-4 font-bold text-slate-900">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
               <td class="px-6 py-4 text-right space-x-1">
@@ -365,7 +541,7 @@
         if (myEmployeeProfile) {
           document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
           document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
-          document.getElementById('emp-p-desig').innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department})`;
+          document.getElementById('emp-p-desig').innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department}) • 🏢 ${myEmployeeProfile.branch || 'Head Office'}`;
           document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
           document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
           document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
@@ -414,6 +590,8 @@
       let listToRender = (currentUserRole === 'Employee' && myEmployeeProfile) ? [myEmployeeProfile] : employeeList;
 
       listToRender.forEach((emp) => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+
         const attRecord = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
         
         let currentStatus = 'Absent';
@@ -436,7 +614,7 @@
               <img src="${emp.photoUrl}" alt="Photo" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
               <div>
                 <div class="font-bold text-slate-800">${emp.name}</div>
-                <div class="text-[11px] text-indigo-600 font-semibold">Machine ID: <span class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation}</div>
+                <div class="text-[11px] text-indigo-600 font-semibold">Machine ID: <span class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation} <span class="bg-slate-100 text-slate-600 font-bold px-1.5 rounded ml-1">🏢 ${emp.branch || 'Head Office'}</span></div>
               </div>
             </td>
             <td class="px-6 py-4">
@@ -453,9 +631,9 @@
             </td>
             <td class="px-6 py-4 text-right space-x-1.5">
               ${currentUserRole !== 'Employee' ? `
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Present')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition">Present</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Late')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition">Late</button>
-                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', 'Absent')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition">Absent</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Present')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition">Present</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Late')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition">Late</button>
+                <button onclick="markAttendance('${emp.id}', '${emp.customEmpCode}', '${emp.branch || 'Head Office'}', 'Absent')" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition">Absent</button>
               ` : '<span class="text-xs text-slate-400 font-semibold">Biometric Verified</span>'}
             </td>
           </tr>
@@ -472,7 +650,7 @@
       return 'bg-slate-100 text-slate-600';
     }
 
-    window.markAttendance = async function(empId, customEmpCode, status) {
+    window.markAttendance = async function(empId, customEmpCode, branch, status) {
       const selectedDate = document.getElementById('att-date').value;
       if (!selectedDate) {
         showToast('warning', 'তারিখ নির্বাচন করুন');
@@ -485,6 +663,7 @@
         await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
           employeeId: empId,
           customEmpCode: customEmpCode || '',
+          branch: branch || 'Head Office',
           status: status,
           punchTime: status !== 'Absent' ? timeStr : '--:--',
           method: 'Manual Override',
@@ -525,13 +704,14 @@
           const timeToken = tokens.find(t => t.includes(':')) || '10:00:00';
 
           const emp = employeeList.find(e => e.customEmpCode == candidateId || e.id == candidateId);
-          if (emp) {
+          if (emp && isItemInActiveBranch(emp.branch)) {
             const isLate = timeToken > '09:30:00';
             const status = isLate ? 'Late' : 'Present';
 
             await setDoc(doc(db, `attendance_${selectedDate}`, emp.id), {
               employeeId: emp.id,
               customEmpCode: emp.customEmpCode || candidateId,
+              branch: emp.branch || 'Head Office',
               status: status,
               punchTime: timeToken,
               method: 'ZKTeco Machine Punch',
@@ -547,16 +727,16 @@
     };
 
     // ==========================================
-    // BULK CSV EMPLOYEE IMPORT SYSTEM
+    // BULK CSV EMPLOYEE IMPORT SYSTEM (WITH BRANCH)
     // ==========================================
     window.downloadSampleEmployeeCSV = function() {
-      const sampleHeaders = "Machine_ID,Name,Email,Phone,Designation,Department,Joining_Date,Salary\n";
+      const sampleHeaders = "Machine_ID,Name,Email,Phone,Designation,Department,Branch,Joining_Date,Salary\n";
       const sampleRows = 
-        "1,Tanvir Islam Soaib,tanvir@example.com,01711111111,Software Engineer,IT,2024-01-01,45000\n" +
-        "6,Rafin Mir,rafin@gmail.com,01822222222,Accounts Manager,Accounts,2022-11-07,40000\n" +
-        "16,Ssnim Ahmed,ssnim@gmail.com,01933333333,Courier Senior Executive,Courier,2024-02-15,30000\n" +
-        "21,Ashikur Rahman,ashik@example.com,01644444444,Operations Officer,Operations,2023-05-10,35000\n" +
-        "47,Naim Khan,naim@example.com,01555555555,HR Executive,HR,2024-03-01,28000\n";
+        "1,Tanvir Islam Soaib,tanvir@example.com,01711111111,Software Engineer,IT,Head Office,2024-01-01,45000\n" +
+        "6,Rafin Mir,rafin@gmail.com,01822222222,Accounts Manager,Accounts,Gulshan Branch,2022-11-07,40000\n" +
+        "16,Ssnim Ahmed,ssnim@gmail.com,01933333333,Courier Senior Executive,Courier,Chattogram Branch,2024-02-15,30000\n" +
+        "21,Ashikur Rahman,ashik@example.com,01644444444,Operations Officer,Operations,Sylhet Branch,2023-05-10,35000\n" +
+        "47,Naim Khan,naim@example.com,01555555555,HR Executive,HR,Uttara Branch,2024-03-01,28000\n";
 
       const csvBlob = new Blob(["\uFEFF" + sampleHeaders + sampleRows], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
@@ -584,17 +764,21 @@
         return;
       }
 
+      const defaultBranchFallback = currentUserRole === 'Manager' && currentUserBranch !== 'ALL' 
+        ? currentUserBranch 
+        : (document.getElementById('bulk-default-branch') ? document.getElementById('bulk-default-branch').value : 'Head Office');
+
       parsedBulkEmployees = [];
       const headerLine = lines[0].toLowerCase();
       const headers = headerLine.split(/[,;\t]/).map(h => h.trim().replace(/^["']|["']$/g, ''));
 
-      // Find column indexes dynamically
       const idIdx = headers.findIndex(h => h.includes('id') || h.includes('pin') || h.includes('code') || h.includes('badge') || h.includes('machine'));
       const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('first'));
       const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
       const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('tel') || h.includes('contact'));
       const desigIdx = headers.findIndex(h => h.includes('desig') || h.includes('title') || h.includes('position') || h.includes('role'));
       const deptIdx = headers.findIndex(h => h.includes('dept') || h.includes('department'));
+      const branchIdx = headers.findIndex(h => h.includes('branch') || h.includes('location') || h.includes('office'));
       const joinIdx = headers.findIndex(h => h.includes('join') || h.includes('date') || h.includes('hire'));
       const salaryIdx = headers.findIndex(h => h.includes('salary') || h.includes('basic') || h.includes('pay') || h.includes('amount'));
 
@@ -608,6 +792,7 @@
         const phone = (phoneIdx !== -1 && row[phoneIdx]) ? row[phoneIdx] : '01700000000';
         const designation = (desigIdx !== -1 && row[desigIdx]) ? row[desigIdx] : 'Staff';
         const department = (deptIdx !== -1 && row[deptIdx]) ? row[deptIdx] : 'General';
+        const branch = (branchIdx !== -1 && row[branchIdx]) ? row[branchIdx] : defaultBranchFallback;
         const joiningDate = (joinIdx !== -1 && row[joinIdx]) ? row[joinIdx] : new Date().toISOString().split('T')[0];
         const salary = (salaryIdx !== -1 && row[salaryIdx]) ? (Number(row[salaryIdx].replace(/[^0-9.]/g, '')) || 25000) : 25000;
 
@@ -618,6 +803,7 @@
           phone,
           designation,
           department,
+          branch,
           joiningDate,
           salary,
           photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`,
@@ -654,7 +840,7 @@
             <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name}</td>
             <td class="px-4 py-2.5 text-slate-600">${emp.designation}</td>
             <td class="px-4 py-2.5 text-slate-600">${emp.department}</td>
-            <td class="px-4 py-2.5 text-slate-600">${emp.email}</td>
+            <td class="px-4 py-2.5 font-semibold text-emerald-700">🏢 ${emp.branch}</td>
             <td class="px-4 py-2.5 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right">
               <button onclick="removeBulkParsedItem(${index})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
@@ -697,6 +883,7 @@
               phone: emp.phone,
               designation: emp.designation,
               department: emp.department,
+              branch: emp.branch || 'Head Office',
               joiningDate: emp.joiningDate,
               salary: Number(emp.salary)
             });
@@ -710,6 +897,7 @@
               photoUrl: emp.photoUrl,
               designation: emp.designation,
               department: emp.department,
+              branch: emp.branch || 'Head Office',
               joiningDate: emp.joiningDate,
               lastIncrementDate: emp.joiningDate,
               salary: Number(emp.salary),
@@ -750,6 +938,7 @@
           employeeName: emp ? emp.name : 'Unknown',
           designation: emp ? emp.designation : '',
           customEmpCode: emp ? (emp.customEmpCode || '') : '',
+          branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
           amount: amount,
           month: month,
           date: date || new Date().toISOString().split('T')[0],
@@ -790,6 +979,8 @@
 
       if (currentUserRole === 'Employee' && myEmployeeProfile) {
         filtered = filtered.filter(a => a.employeeId === myEmployeeProfile.id);
+      } else {
+        filtered = filtered.filter(a => isItemInActiveBranch(a.branch));
       }
 
       if (filterMonth) {
@@ -812,7 +1003,7 @@
       if (document.getElementById('adv-metric-cleared')) document.getElementById('adv-metric-cleared').innerText = `৳ ${totalCleared.toLocaleString()}`;
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs">কোনো অগ্রিম বেতনের রেকর্ড পাওয়া যায়নি 🔍</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs">কোনো অগ্রিম বেতনের রেকর্ড পাওয়া যায়নি 🔍</td></tr>`;
         return;
       }
 
@@ -825,6 +1016,7 @@
         const row = `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${adv.employeeName} <span class="text-[11px] font-normal text-slate-500">(${adv.designation})</span></td>
+            <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">🏢 ${adv.branch || 'Head Office'}</span></td>
             <td class="px-6 py-4 font-semibold text-indigo-600">${adv.month}</td>
             <td class="px-6 py-4 text-slate-500">${adv.date || 'N/A'}</td>
             <td class="px-6 py-4 font-extrabold text-slate-900 text-sm">৳ ${(adv.amount || 0).toLocaleString()}</td>
@@ -894,10 +1086,14 @@
             if (currentUserRole === 'Employee' && myEmployeeProfile && pay.employeeId !== myEmployeeProfile.id) {
               return;
             }
+            if (currentUserRole !== 'Employee' && !isItemInActiveBranch(pay.branch)) {
+              return;
+            }
 
             const row = `
               <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
                 <td class="px-6 py-4 font-bold text-slate-800">${pay.employeeName} <span class="text-[11px] font-normal text-slate-500">(${pay.designation})</span></td>
+                <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">🏢 ${pay.branch || 'Head Office'}</span></td>
                 <td class="px-6 py-4 font-semibold text-indigo-600">${pay.month}</td>
                 <td class="px-6 py-4">৳ ${pay.basic.toLocaleString()}</td>
                 <td class="px-6 py-4 text-emerald-600 font-semibold">+৳ ${pay.bonus.toLocaleString()}</td>
@@ -906,7 +1102,7 @@
                 <td class="px-6 py-4 font-black text-slate-900 text-sm">৳ ${pay.net.toLocaleString()}</td>
                 <td class="px-6 py-4"><span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">${pay.status}</span></td>
                 <td class="px-6 py-4 text-right">
-                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-bold inline-flex items-center space-x-1.5 transition ml-auto">
+                  <button onclick="printPayslip('${pay.employeeName}', '${pay.designation}', '${pay.month}', '${pay.branch || 'Head Office'}', ${pay.basic}, ${pay.bonus}, ${pay.advance}, ${pay.fine}, ${pay.net})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg font-bold inline-flex items-center space-x-1.5 transition ml-auto">
                     <i class="fa-solid fa-print text-xs"></i><span>Print Payslip</span>
                   </button>
                 </td>
@@ -968,6 +1164,7 @@
           employeeId: empId,
           employeeName: emp ? emp.name : 'Unknown',
           designation: emp ? emp.designation : '',
+          branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
           month,
           basic,
           bonus,
@@ -1010,10 +1207,12 @@
 
           if (tbody) {
             if (currentUserRole === 'Employee' && myEmployeeProfile && leave.employeeId !== myEmployeeProfile.id) return;
+            if (currentUserRole !== 'Employee' && !isItemInActiveBranch(leave.branch)) return;
 
             const row = `
               <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
                 <td class="px-6 py-4 font-bold text-slate-800">${leave.employeeName}</td>
+                <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">🏢 ${leave.branch || 'Head Office'}</span></td>
                 <td class="px-6 py-4"><span class="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-semibold border">${leave.leaveType}</span></td>
                 <td class="px-6 py-4 text-slate-600">${leave.startDate} → ${leave.endDate}</td>
                 <td class="px-6 py-4 text-slate-600">${leave.reason}</td>
@@ -1047,7 +1246,15 @@
 
       try {
         await addDoc(collection(db, "leaves"), {
-          employeeId: empId, employeeName: emp ? emp.name : 'Unknown', leaveType: type, startDate, endDate, reason, status: 'Pending', appliedAt: new Date().toISOString()
+          employeeId: empId, 
+          employeeName: emp ? emp.name : 'Unknown', 
+          branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
+          leaveType: type, 
+          startDate, 
+          endDate, 
+          reason, 
+          status: 'Pending', 
+          appliedAt: new Date().toISOString()
         });
         document.getElementById('leave-form').reset();
         toggleModal('add-leave-modal', false);
@@ -1260,8 +1467,76 @@
       }
     };
 
+    // Performance Reviews
+    function loadPerformanceRealtime() {
+      onSnapshot(collection(db, "performance_reviews"), (snapshot) => {
+        const tbody = document.getElementById('perf-table-body');
+        perfList = [];
+        if (tbody) tbody.innerHTML = '';
+
+        snapshot.forEach((docSnap) => {
+          const perf = docSnap.data();
+          const id = docSnap.id;
+          perfList.push({ id, ...perf });
+
+          if (tbody) {
+            if (currentUserRole === 'Employee' && myEmployeeProfile && perf.employeeId !== myEmployeeProfile.id) return;
+            if (currentUserRole !== 'Employee' && !isItemInActiveBranch(perf.branch)) return;
+
+            const stars = '⭐'.repeat(Number(perf.rating) || 5);
+            const row = `
+              <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+                <td class="px-6 py-4 font-bold text-slate-800">${perf.employeeName} <span class="text-[10px] text-slate-400 font-normal">(${perf.branch || 'Head Office'})</span></td>
+                <td class="px-6 py-4 text-amber-500">${stars}</td>
+                <td class="px-6 py-4 font-extrabold text-indigo-600">${perf.kpiScore}%</td>
+                <td class="px-6 py-4 text-slate-600 max-w-xs truncate">${perf.feedback}</td>
+                <td class="px-6 py-4 text-slate-500">${perf.reviewDate}</td>
+                <td class="px-6 py-4 text-right">
+                  ${currentUserRole !== 'Employee' ? `<button onclick="deletePerformanceReview('${id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-slate-400 font-medium">Logged</span>'}
+                </td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          }
+        });
+      });
+    }
+
+    window.savePerformanceReview = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('perf-emp-id').value;
+      const rating = document.getElementById('perf-rating').value;
+      const kpiScore = document.getElementById('perf-kpi').value;
+      const feedback = document.getElementById('perf-feedback').value;
+      const emp = employeeList.find(e => e.id === empId);
+
+      try {
+        await addDoc(collection(db, "performance_reviews"), {
+          employeeId: empId,
+          employeeName: emp ? emp.name : 'Unknown',
+          branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
+          rating,
+          kpiScore,
+          feedback,
+          reviewDate: new Date().toISOString().split('T')[0]
+        });
+        document.getElementById('perf-form').reset();
+        toggleModal('add-perf-modal', false);
+        showToast('success', 'মূল্যায়ন সংরক্ষণ করা হয়েছে!');
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.deletePerformanceReview = async function(id) {
+      if(confirm("মূল্যায়ন রেকর্ড মুছে ফেলতে চান?")) {
+        await deleteDoc(doc(db, "performance_reviews", id));
+        showToast('success', 'রেকর্ড মুছে ফেলা হয়েছে');
+      }
+    };
+
     // Reports, Payslips, Password etc.
-    window.printPayslip = function(name, desig, month, basic, bonus, advance, fine, net) {
+    window.printPayslip = function(name, desig, month, branch, basic, bonus, advance, fine, net) {
       const win = window.open('', '', 'width=850,height=750');
       win.document.write(`
         <!DOCTYPE html>
@@ -1290,15 +1565,15 @@
             <div class="header">
               <div>
                 <div class="company">HRMS ENTERPRISE</div>
-                <div style="font-size:12px; color:#64748b; margin-top:2px;">Official Salary Disbursement Slip</div>
+                <div style="font-size:12px; color:#64748b; margin-top:2px;">Official Salary Disbursement Slip • Branch: ${branch}</div>
               </div>
               <span class="badge">${month}</span>
             </div>
             <div class="meta">
               <div><strong>Employee Name:</strong> ${name}</div>
               <div><strong>Designation:</strong> ${desig}</div>
+              <div><strong>Branch:</strong> ${branch}</div>
               <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
-              <div><strong>Status:</strong> Disbursed (Paid)</div>
             </div>
             <table>
               <tr><th>Earnings & Deductions</th><th style="text-align:right;">Amount (BDT)</th></tr>
@@ -1310,7 +1585,7 @@
             </table>
             <div class="signatures">
               <div class="sig-line">Employee Signature</div>
-              <div class="sig-line">Authorized Signature</div>
+              <div class="sig-line">Authorized Signature (${branch})</div>
             </div>
           </div>
           <script>window.print();<\/script>
@@ -1324,11 +1599,12 @@
       e.preventDefault();
       const email = document.getElementById('perm-email').value.trim().toLowerCase();
       const role = document.getElementById('perm-role').value;
+      const branch = document.getElementById('perm-branch').value;
       const userPass = document.getElementById('perm-user-pass').value;
 
       try {
         await addDoc(collection(db, "user_roles"), {
-          email, role, assignedPassword: userPass, createdAt: new Date().toISOString()
+          email, role, branch, assignedPassword: userPass, createdAt: new Date().toISOString()
         });
         try {
           await createUserWithEmailAndPassword(auth, email, userPass);
@@ -1412,6 +1688,7 @@
         const phone = document.getElementById('emp-phone').value;
         const designation = document.getElementById('emp-designation').value;
         const department = document.getElementById('emp-department').value;
+        const branch = (currentUserRole === 'Manager' && currentUserBranch !== 'ALL') ? currentUserBranch : document.getElementById('emp-branch').value;
         const joiningDate = document.getElementById('emp-joining').value;
         const salary = document.getElementById('emp-salary').value;
         const photoFile = document.getElementById('emp-photo-file').files[0];
@@ -1430,10 +1707,10 @@
         }
 
         if (empId) {
-          await updateDoc(doc(db, "employees", empId), { customEmpCode, name, email, phone, photoUrl, designation, department, joiningDate, salary: Number(salary), docUrl });
+          await updateDoc(doc(db, "employees", empId), { customEmpCode, name, email, phone, photoUrl, designation, department, branch, joiningDate, salary: Number(salary), docUrl });
           showToast('success', 'তথ্য আপডেট হয়েছে!');
         } else {
-          await addDoc(collection(db, "employees"), { customEmpCode, name, email, phone, photoUrl, designation, department, joiningDate, lastIncrementDate: joiningDate, salary: Number(salary), docUrl, createdAt: new Date().toISOString() });
+          await addDoc(collection(db, "employees"), { customEmpCode, name, email, phone, photoUrl, designation, department, branch, joiningDate, lastIncrementDate: joiningDate, salary: Number(salary), docUrl, createdAt: new Date().toISOString() });
           showToast('success', 'নতুন কর্মচারী যুক্ত হয়েছে!');
         }
         
@@ -1453,6 +1730,15 @@
       document.getElementById('emp-doc-id').value = '';
       document.getElementById('emp-modal-title').innerText = 'Add New Employee';
 
+      const branchField = document.getElementById('emp-branch');
+      if (currentUserRole === 'Manager' && currentUserBranch !== 'ALL') {
+        branchField.value = currentUserBranch;
+        branchField.disabled = true;
+      } else {
+        branchField.disabled = false;
+        branchField.value = selectedActiveBranch !== 'ALL' ? selectedActiveBranch : 'Head Office';
+      }
+
       if (id) {
         const emp = employeeList.find(e => e.id === id);
         if (emp) {
@@ -1464,6 +1750,7 @@
           document.getElementById('emp-phone').value = emp.phone || '';
           document.getElementById('emp-designation').value = emp.designation || '';
           document.getElementById('emp-department').value = emp.department || '';
+          document.getElementById('emp-branch').value = emp.branch || 'Head Office';
           document.getElementById('emp-joining').value = emp.joiningDate || '';
           document.getElementById('emp-salary').value = emp.salary || 0;
           document.getElementById('emp-existing-photo').value = emp.photoUrl || '';
@@ -1478,7 +1765,7 @@
       if (!emp) return;
       document.getElementById('view-emp-photo').src = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff`;
       document.getElementById('view-emp-name').innerText = emp.name || 'N/A';
-      document.getElementById('view-emp-desig').innerText = `Machine ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation || 'N/A'} (${emp.department || 'N/A'})`;
+      document.getElementById('view-emp-desig').innerText = `Machine ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation || 'N/A'} (${emp.department || 'N/A'}) • 🏢 ${emp.branch || 'Head Office'}`;
       document.getElementById('view-emp-email').innerText = emp.email || 'N/A';
       document.getElementById('view-emp-phone').innerText = emp.phone || 'N/A';
       document.getElementById('view-emp-joining').innerText = emp.joiningDate || 'N/A';
@@ -1504,6 +1791,8 @@
       const today = new Date();
       let dueList = [];
       employeeList.forEach(emp => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+
         const refDateStr = emp.lastIncrementDate || emp.joiningDate;
         if (refDateStr) {
           const refDate = new Date(refDateStr);
@@ -1524,10 +1813,10 @@
                   <i class="fa-solid fa-bell"></i>
                 </div>
                 <div>
-                  <h4 class="font-bold text-amber-900 text-sm">Increment Alert (${dueList.length} জন অপেক্ষমাণ)</h4>
+                  <h4 class="font-bold text-amber-900 text-sm">Increment Alert (${dueList.length} জন অপেক্ষমাণ - ${selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch})</h4>
                   <p class="text-xs text-amber-700">১ বছর পূর্ণ হওয়ায় নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়ার সময় হয়েছে:</p>
                   <div class="flex flex-wrap gap-1.5 mt-2">
-                    ${dueList.map(e => `<span class="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">${e.name} (${e.designation})</span>`).join('')}
+                    ${dueList.map(e => `<span class="bg-amber-100/90 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">${e.name} (${e.designation} • ${e.branch || 'Head Office'})</span>`).join('')}
                   </div>
                 </div>
               </div>
@@ -1550,7 +1839,7 @@
       tbody.innerHTML = '';
 
       if (dueList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-400 text-sm">কোনো ইনক্রিমেন্ট বাকি নেই 🎉</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 text-sm">কোনো ইনক্রিমেন্ট বাকি নেই 🎉</td></tr>`;
         return;
       }
 
@@ -1558,6 +1847,7 @@
         const row = `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${emp.name}</td>
+            <td class="px-6 py-4"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">🏢 ${emp.branch || 'Head Office'}</span></td>
             <td class="px-6 py-4 text-slate-600">${emp.designation} (${emp.department})</td>
             <td class="px-6 py-4 text-slate-600">${emp.lastIncrementDate || emp.joiningDate}</td>
             <td class="px-6 py-4 font-bold text-slate-900">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
@@ -1604,11 +1894,14 @@
       const statusCtx = document.getElementById('chart-emp-status');
       if (statusCtx) {
         if (statusChartInstance) statusChartInstance.destroy();
+        const activeCount = employeeList.filter(e => isItemInActiveBranch(e.branch)).length;
+        const leaveCount = leaveList.filter(l => isItemInActiveBranch(l.branch)).length;
+
         statusChartInstance = new Chart(statusCtx, {
           type: 'doughnut',
           data: {
             labels: ['Active Employees', 'On Leave'],
-            datasets: [{ data: [employeeList.length, leaveList.length], backgroundColor: ['#6366f1', '#f43f5e'], borderWidth: 0 }]
+            datasets: [{ data: [activeCount, leaveCount], backgroundColor: ['#6366f1', '#f43f5e'], borderWidth: 0 }]
           },
           options: { plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
         });
@@ -1618,7 +1911,7 @@
       if (deptCtx) {
         if (deptChartInstance) deptChartInstance.destroy();
         let deptMap = {};
-        employeeList.forEach(e => { deptMap[e.department || 'General'] = (deptMap[e.department || 'General'] || 0) + 1; });
+        employeeList.filter(e => isItemInActiveBranch(e.branch)).forEach(e => { deptMap[e.department || 'General'] = (deptMap[e.department || 'General'] || 0) + 1; });
         deptChartInstance = new Chart(deptCtx, {
           type: 'doughnut',
           data: {
@@ -1633,7 +1926,7 @@
       if (payrollCtx) {
         if (payrollChartInstance) payrollChartInstance.destroy();
         let monthPayrollMap = {};
-        payrollList.forEach(p => { monthPayrollMap[p.month] = (monthPayrollMap[p.month] || 0) + (p.net || 0); });
+        payrollList.filter(p => isItemInActiveBranch(p.branch)).forEach(p => { monthPayrollMap[p.month] = (monthPayrollMap[p.month] || 0) + (p.net || 0); });
         payrollChartInstance = new Chart(payrollCtx, {
           type: 'bar',
           data: {
@@ -1651,6 +1944,7 @@
       const type = document.getElementById('rep-type').value;
       const selectedEmp = document.getElementById('rep-filter-emp').value;
       const selectedMonth = document.getElementById('rep-filter-month').value;
+      const selectedRepBranch = document.getElementById('rep-filter-branch') ? document.getElementById('rep-filter-branch').value : 'ALL';
       const thead = document.getElementById('rep-table-head');
       const tbody = document.getElementById('rep-table-body');
       if (!thead || !tbody) return;
@@ -1658,36 +1952,43 @@
       thead.innerHTML = ''; tbody.innerHTML = '';
       currentReportTableData = { headers: [], rows: [] };
 
+      function matchesRepBranch(itemBranch) {
+        if (selectedRepBranch === 'ALL') return isItemInActiveBranch(itemBranch);
+        return itemBranch === selectedRepBranch;
+      }
+
       if (type === 'ADVANCE') {
-        currentReportTableData.headers = ["Employee", "Month", "Date", "Advance Amount", "Note", "Status"];
-        let filtered = advanceList;
+        currentReportTableData.headers = ["Employee", "Branch", "Month", "Date", "Advance Amount", "Note", "Status"];
+        let filtered = advanceList.filter(a => matchesRepBranch(a.branch));
         if (selectedEmp !== 'ALL') filtered = filtered.filter(a => a.employeeId === selectedEmp);
         if (selectedMonth) filtered = filtered.filter(a => a.month === selectedMonth);
         filtered.forEach(a => {
-          currentReportTableData.rows.push([a.employeeName, a.month, a.date || 'N/A', `৳ ${(a.amount || 0).toLocaleString()}`, a.note || '-', a.status]);
+          currentReportTableData.rows.push([a.employeeName, a.branch || 'Head Office', a.month, a.date || 'N/A', `৳ ${(a.amount || 0).toLocaleString()}`, a.note || '-', a.status]);
         });
       }
       else if (type === 'EMPLOYEE') {
-        currentReportTableData.headers = ["Machine ID", "Name", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
-        let filtered = (selectedEmp !== 'ALL') ? employeeList.filter(e => e.id === selectedEmp) : employeeList;
+        currentReportTableData.headers = ["Machine ID", "Name", "Branch", "Email", "Phone", "Designation", "Department", "Salary", "Joining Date"];
+        let filtered = employeeList.filter(e => matchesRepBranch(e.branch));
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(e => e.id === selectedEmp);
         filtered.forEach(e => {
-          currentReportTableData.rows.push([e.customEmpCode || 'N/A', e.name, e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A']);
+          currentReportTableData.rows.push([e.customEmpCode || 'N/A', e.name, e.branch || 'Head Office', e.email, e.phone || 'N/A', e.designation, e.department, `৳ ${e.salary ? e.salary.toLocaleString() : 0}`, e.joiningDate || 'N/A']);
         });
       } 
       else if (type === 'PAYROLL') {
-        currentReportTableData.headers = ["Employee Name", "Month", "Basic Salary", "Bonus", "Advance Cut", "Fine Cut", "Net Salary", "Status"];
-        let filtered = payrollList;
+        currentReportTableData.headers = ["Employee Name", "Branch", "Month", "Basic Salary", "Bonus", "Advance Cut", "Fine Cut", "Net Salary", "Status"];
+        let filtered = payrollList.filter(p => matchesRepBranch(p.branch));
         if (selectedEmp !== 'ALL') filtered = filtered.filter(p => p.employeeId === selectedEmp);
         if (selectedMonth) filtered = filtered.filter(p => p.month === selectedMonth);
         filtered.forEach(p => {
-          currentReportTableData.rows.push([p.employeeName, p.month, `৳ ${p.basic.toLocaleString()}`, `৳ ${p.bonus.toLocaleString()}`, `৳ ${p.advance.toLocaleString()}`, `৳ ${p.fine.toLocaleString()}`, `৳ ${p.net.toLocaleString()}`, p.status]);
+          currentReportTableData.rows.push([p.employeeName, p.branch || 'Head Office', p.month, `৳ ${p.basic.toLocaleString()}`, `৳ ${p.bonus.toLocaleString()}`, `৳ ${p.advance.toLocaleString()}`, `৳ ${p.fine.toLocaleString()}`, `৳ ${p.net.toLocaleString()}`, p.status]);
         });
       }
       else if (type === 'LEAVE') {
-        currentReportTableData.headers = ["Employee Name", "Leave Type", "Start Date", "End Date", "Reason", "Status"];
-        let filtered = (selectedEmp !== 'ALL') ? leaveList.filter(l => l.employeeId === selectedEmp) : leaveList;
+        currentReportTableData.headers = ["Employee Name", "Branch", "Leave Type", "Start Date", "End Date", "Reason", "Status"];
+        let filtered = leaveList.filter(l => matchesRepBranch(l.branch));
+        if (selectedEmp !== 'ALL') filtered = filtered.filter(l => l.employeeId === selectedEmp);
         filtered.forEach(l => {
-          currentReportTableData.rows.push([l.employeeName, l.leaveType, l.startDate, l.endDate, l.reason, l.status]);
+          currentReportTableData.rows.push([l.employeeName, l.branch || 'Head Office', l.leaveType, l.startDate, l.endDate, l.reason, l.status]);
         });
       }
 
@@ -1720,7 +2021,7 @@
       });
       const link = document.createElement("a");
       link.setAttribute("href", encodeURI(csvContent));
-      link.setAttribute("download", `HR_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `HR_MultiBranch_Report_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1739,7 +2040,7 @@
           <i class="fa-solid fa-shapes text-2xl"></i>
         </div>
         <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">HRMS Enterprise</h2>
-        <p class="text-xs text-slate-500 mt-1">কর্মচারী ব্যবস্থাপনা পোর্টালে সাইন-ইন করুন</p>
+        <p class="text-xs text-slate-500 mt-1">Multi-Branch & Employee Management Suite</p>
       </div>
 
       <div class="space-y-4">
@@ -1770,7 +2071,7 @@
           </div>
           <div>
             <span class="text-base font-extrabold tracking-tight text-white block">HRMS Pro</span>
-            <span class="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase">Management Suite</span>
+            <span class="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase">Enterprise Suite</span>
           </div>
         </div>
 
@@ -1800,15 +2101,32 @@
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col overflow-y-auto bg-slate-50/60">
       
-      <!-- Top Modern Header -->
+      <!-- Top Modern Header with Global Branch Switcher -->
       <header class="bg-white/90 backdrop-blur-md shadow-xs border-b border-slate-200/80 px-8 py-3.5 flex justify-between items-center sticky top-0 z-30">
         <div>
           <h1 id="page-title" class="text-lg font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
-          <p class="text-[11px] text-slate-400 font-medium">Enterprise HRMS & Biometric Integration</p>
+          <p class="text-[11px] text-slate-400 font-medium">Multi-Branch HR Management & Biometric Automation</p>
         </div>
 
         <div class="flex items-center space-x-4">
+          <!-- Super Admin Branch Switcher Dropdown -->
+          <div id="header-branch-switcher-box" class="hidden items-center space-x-2 bg-indigo-50/80 border border-indigo-200 px-3 py-1.5 rounded-xl">
+            <span class="text-xs font-bold text-indigo-900 flex items-center space-x-1.5">
+              <i class="fa-solid fa-building text-indigo-600"></i>
+              <span>Branch:</span>
+            </span>
+            <select id="header-branch-select" onchange="onHeaderBranchChange()" class="bg-white text-xs font-bold text-indigo-900 border border-indigo-200 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+              <option value="ALL">🏢 All Branches (Global)</option>
+            </select>
+          </div>
+
+          <!-- Manager Fixed Branch Indicator Badge -->
+          <span id="user-branch-badge" class="hidden text-[11px] font-extrabold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200"></span>
+
+          <!-- Role Badge -->
           <span id="user-role-badge" class="text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border">Role</span>
+
+          <!-- User Profile Avatar -->
           <div class="flex items-center space-x-2.5 pl-3 border-l border-slate-200">
             <div id="header-user-avatar" class="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center font-extrabold text-xs shadow-sm">U</div>
             <div class="text-left hidden sm:block">
@@ -1964,6 +2282,7 @@
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th class="px-6 py-3.5">Employee</th>
+                    <th class="px-6 py-3.5">Branch</th>
                     <th class="px-6 py-3.5">Month</th>
                     <th class="px-6 py-3.5">Date</th>
                     <th class="px-6 py-3.5">Amount</th>
@@ -1978,13 +2297,13 @@
           </div>
         </section>
 
-        <!-- Employees Section (Enhanced with Bulk Import) -->
+        <!-- Employees Section (Enhanced with Bulk Import & Branch) -->
         <section id="sec-employees" class="hidden">
           <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/40">
               <div>
                 <h2 class="text-base font-bold text-slate-800">Employee Directory</h2>
-                <p class="text-xs text-slate-500">সকল কর্মচারীদের তালিকা ও ZKTeco মেশিন আইডি</p>
+                <p class="text-xs text-slate-500">সকল কর্মচারীদের তালিকা, ব্রাঞ্চ ও ZKTeco মেশিন আইডি</p>
               </div>
               <div class="flex items-center space-x-2.5">
                 <button id="emp-bulk-btn" onclick="toggleModal('bulk-emp-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
@@ -2006,6 +2325,7 @@
                     <th class="px-6 py-3.5">Email</th>
                     <th class="px-6 py-3.5">Designation</th>
                     <th class="px-6 py-3.5">Department</th>
+                    <th class="px-6 py-3.5">Branch</th>
                     <th class="px-6 py-3.5">Joining Date</th>
                     <th class="px-6 py-3.5">Salary</th>
                     <th class="px-6 py-3.5 text-right">Action</th>
@@ -2080,6 +2400,7 @@
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th class="px-6 py-3.5">Employee</th>
+                    <th class="px-6 py-3.5">Branch</th>
                     <th class="px-6 py-3.5">Leave Type</th>
                     <th class="px-6 py-3.5">Duration</th>
                     <th class="px-6 py-3.5">Reason</th>
@@ -2111,6 +2432,7 @@
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th class="px-6 py-3.5">Employee</th>
+                    <th class="px-6 py-3.5">Branch</th>
                     <th class="px-6 py-3.5">Month</th>
                     <th class="px-6 py-3.5">Basic</th>
                     <th class="px-6 py-3.5">Bonus</th>
@@ -2127,7 +2449,7 @@
           </div>
         </section>
 
-        <!-- Increment Section (Admin Only) -->
+        <!-- Increment Section (Admin/Manager) -->
         <section id="sec-increment" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
             <h2 class="text-base font-bold text-slate-800">Salary Increment Management</h2>
@@ -2140,6 +2462,7 @@
                 <thead class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
                   <tr>
                     <th class="px-6 py-3.5">Employee Name</th>
+                    <th class="px-6 py-3.5">Branch</th>
                     <th class="px-6 py-3.5">Designation</th>
                     <th class="px-6 py-3.5">Last Increment</th>
                     <th class="px-6 py-3.5">Current Salary</th>
@@ -2212,12 +2535,12 @@
           <div id="notice-list" class="space-y-3"></div>
         </section>
 
-        <!-- Reports Section (Admin Only) -->
+        <!-- Reports Section -->
         <section id="sec-reports" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h2 class="text-base font-bold text-slate-800">Reports & Analytics Export</h2>
-              <p class="text-xs text-slate-500">এক্সেল ও প্রিন্ট এক্সপোর্ট</p>
+              <p class="text-xs text-slate-500">ব্রাঞ্চভিত্তিক এক্সেল ও প্রিন্ট এক্সপোর্ট</p>
             </div>
             <div class="flex items-center space-x-2">
               <button onclick="downloadReportExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition shadow-sm">
@@ -2229,7 +2552,7 @@
             </div>
           </div>
 
-          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Report Type</label>
               <select id="rep-type" onchange="generateReport()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
@@ -2237,6 +2560,12 @@
                 <option value="EMPLOYEE">👥 Employee Report</option>
                 <option value="PAYROLL">💵 Payroll Report</option>
                 <option value="LEAVE">📝 Leave Report</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Filter Branch</label>
+              <select id="rep-filter-branch" onchange="generateReport()" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
+                <option value="ALL">All Branches</option>
               </select>
             </div>
             <div>
@@ -2261,56 +2590,110 @@
           </div>
         </section>
 
-        <!-- Settings Section -->
+        <!-- Settings Section (Roles, Branches & Security) -->
         <section id="sec-settings" class="hidden space-y-5">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
-              <div>
-                <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Password Update</h3>
-                <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3 mt-3">
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">New Password</label>
-                    <input type="password" id="settings-new-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
-                    <input type="password" id="settings-confirm-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
-                  </div>
-                  <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">Update Password</button>
-                </form>
-              </div>
+            
+            <!-- Password Card -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Password Update</h3>
+              <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">New Password</label>
+                  <input type="password" id="settings-new-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
+                  <input type="password" id="settings-confirm-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">Update Password</button>
+              </form>
             </div>
 
-            <!-- Role Access Card (Only shown to Admin) -->
+            <!-- Role & Branch Manager Assignment Card (Admin Only) -->
             <div id="sec-settings-roles" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Role & User Access</h3>
+              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Manager & Role Access (ব্রাঞ্চ অ্যাসাইনমেন্ট)</h3>
               <form id="perm-form" onsubmit="saveUserRolePermission(event)" class="space-y-3">
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">User Email</label>
-                  <input type="email" id="perm-email" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="manager@hrms.com">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">User Email *</label>
+                  <input type="email" id="perm-email" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="manager.gulshan@hrms.com">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Role *</label>
+                    <select id="perm-role" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
+                      <option value="Manager">Branch Manager</option>
+                      <option value="Admin">Super Admin (All Branches)</option>
+                      <option value="Employee">Employee (Self Portal)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Assigned Branch *</label>
+                    <select id="perm-branch" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-bold text-indigo-700">
+                      <option value="ALL">All Branches</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">Role</label>
-                  <select id="perm-role" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
-                    <option value="Admin">Admin (Full Control)</option>
-                    <option value="Manager">Manager (Operations & Review)</option>
-                    <option value="Employee">Employee (Self Portal)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">Temporary Password</label>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Temporary Password *</label>
                   <input type="text" id="perm-user-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Save Role</button>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm">Save Role & Branch</button>
               </form>
 
               <div class="pt-3 border-t border-slate-100">
-                <h4 class="font-bold text-slate-700 text-xs mb-2">Assigned Roles</h4>
+                <h4 class="font-bold text-slate-700 text-xs mb-2">Assigned Roles & Branches</h4>
                 <div class="overflow-x-auto max-h-40 overflow-y-auto">
                   <table class="w-full text-left text-xs text-slate-600"><tbody id="perm-table-body"></tbody></table>
                 </div>
               </div>
             </div>
+
+            <!-- Branch Master Management Card (Admin Only) -->
+            <div id="sec-settings-branches" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4 md:col-span-2">
+              <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800">Branch Management (নতুন ব্রাঞ্চ তৈরি ও পরিচালনা)</h3>
+                  <p class="text-xs text-slate-500">আপনার প্রতিষ্ঠানের সকল শাখা ও অফিস লিস্ট</p>
+                </div>
+              </div>
+
+              <form id="branch-form" onsubmit="saveNewBranch(event)" class="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Branch Name *</label>
+                  <input type="text" id="branch-new-name" required placeholder="e.g. Dhanmondi Branch" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">Branch Code</label>
+                  <input type="text" id="branch-new-code" placeholder="e.g. DHN-01" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-700 mb-1">City / Location</label>
+                  <input type="text" id="branch-new-city" placeholder="e.g. Dhaka" class="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="flex items-end">
+                  <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg text-xs font-bold transition shadow-sm">
+                    <i class="fa-solid fa-plus mr-1"></i> Add Branch
+                  </button>
+                </div>
+              </form>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 font-bold uppercase text-slate-700 border-b">
+                    <tr>
+                      <th class="px-4 py-2.5">Branch Name</th>
+                      <th class="px-4 py-2.5">Code</th>
+                      <th class="px-4 py-2.5">Location</th>
+                      <th class="px-4 py-2.5">Manager</th>
+                      <th class="px-4 py-2.5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="branch-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+
           </div>
         </section>
 
@@ -2339,13 +2722,20 @@
               <i class="fa-solid fa-file-csv"></i>
             </div>
             <div>
-              <h4 class="font-bold text-indigo-950 text-xs">Standard CSV Format</h4>
-              <p class="text-[11px] text-indigo-700">স্যাম্পল ফাইল ডাউনলোড করে কর্মচারীদের আইডি ও নাম বসিয়ে নিন</p>
+              <h4 class="font-bold text-indigo-950 text-xs">Standard CSV Format (With Branch)</h4>
+              <p class="text-[11px] text-indigo-700">স্যাম্পল ফাইল ডাউনলোড করে কর্মচারীদের আইডি, নাম ও ব্রাঞ্চ বসিয়ে নিন</p>
             </div>
           </div>
           <button type="button" onclick="downloadSampleEmployeeCSV()" class="bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-300 px-3.5 py-1.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center space-x-1.5">
             <i class="fa-solid fa-download"></i><span>Download Template</span>
           </button>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Default Branch (যদি ফাইলে ব্রাঞ্চ না থাকে)</label>
+          <select id="bulk-default-branch" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <option value="Head Office">Head Office</option>
+          </select>
         </div>
 
         <!-- File Upload Area -->
@@ -2376,7 +2766,7 @@
                   <th class="px-4 py-2">Name</th>
                   <th class="px-4 py-2">Designation</th>
                   <th class="px-4 py-2">Department</th>
-                  <th class="px-4 py-2">Email</th>
+                  <th class="px-4 py-2">Branch</th>
                   <th class="px-4 py-2">Salary</th>
                   <th class="px-4 py-2 text-right">Remove</th>
                 </tr>
@@ -2488,7 +2878,7 @@
     </div>
   </div>
 
-  <!-- Add Employee Modal -->
+  <!-- Add Employee Modal (With Branch Selector) -->
   <div id="add-emp-modal" class="hidden fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden max-h-[90vh] flex flex-col">
       <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
@@ -2522,9 +2912,17 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Profile Photo</label>
-          <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border border-slate-200 rounded-xl text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Branch (শাখা) *</label>
+            <select id="emp-branch" required class="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+              <option value="Head Office">Head Office</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Profile Photo</label>
+            <input type="file" id="emp-photo-file" accept="image/*" class="w-full p-2 border border-slate-200 rounded-xl text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700">
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">

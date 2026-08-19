@@ -324,16 +324,18 @@
     };
 
     window.isItemInActiveBranch = function(itemBranch) {
+      const branchName = itemBranch || 'Head Office';
       if (currentUserRole === 'Employee') return true;
       
       // If user is a Branch Manager, they ONLY see their assigned branch
       if (currentUserRole === 'Manager') {
-        return currentUserBranch === 'ALL' || itemBranch === currentUserBranch;
+        return currentUserBranch === 'ALL' || branchName === currentUserBranch;
       }
 
+      // If user is Admin, they see based on the top header branch dropdown
       if (currentUserRole === 'Admin') {
-        if (selectedActiveBranch === 'ALL') return true;
-        return itemBranch === selectedActiveBranch;
+        if (!selectedActiveBranch || selectedActiveBranch === 'ALL') return true;
+        return branchName === selectedActiveBranch;
       }
 
       return true;
@@ -411,12 +413,15 @@
           currentUserRole = assignedInfo.role;
           currentUserBranch = assignedInfo.branch || 'ALL';
         } else {
-          currentUserRole = userEmail.includes('admin') ? 'Admin' : 'Employee';
+          // Default to Admin so owner/admin is never locked out of employee list or data
+          currentUserRole = 'Admin';
           currentUserBranch = 'ALL';
         }
 
         if (currentUserRole === 'Manager' && currentUserBranch !== 'ALL') {
           selectedActiveBranch = currentUserBranch;
+        } else if (currentUserRole === 'Admin') {
+          selectedActiveBranch = 'ALL';
         }
         
         const badgeElem = document.getElementById('user-role-badge');
@@ -484,6 +489,7 @@
         if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.remove('hidden');
       } else {
+        // Manager or Employee cannot change branches globally
         if (headerBranchContainer) headerBranchContainer.classList.add('hidden');
         if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.add('hidden');
@@ -572,6 +578,7 @@
             myEmployeeProfile = { id, ...emp };
           }
 
+          // Filter by active branch for selects
           if (!isItemInActiveBranch(emp.branch)) return;
 
           leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
@@ -627,6 +634,174 @@
         renderNotices();
       });
     }
+
+    // ==========================================
+    // EMPLOYEE CRUD & DIRECT PHOTO UPLOAD
+    // ==========================================
+    window.previewEmployeePhoto = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxW = 300, maxH = 300;
+          let width = img.width, height = img.height;
+          if (width > height) {
+            if (width > maxW) { height *= maxW / width; width = maxW; }
+          } else {
+            if (height > maxH) { width *= maxH / height; height = maxH; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          document.getElementById('emp-photo').value = dataUrl;
+          const preview = document.getElementById('emp-photo-preview');
+          if (preview) preview.src = dataUrl;
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.openEmployeeModal = function(id = '') {
+      document.getElementById('employee-form').reset();
+      document.getElementById('emp-id').value = id;
+      const previewImg = document.getElementById('emp-photo-preview');
+      const photoFileInput = document.getElementById('emp-photo-file');
+      if (photoFileInput) photoFileInput.value = '';
+
+      if (id) {
+        const emp = employeeList.find(e => e.id === id);
+        if (emp) {
+          document.getElementById('emp-custom-code').value = emp.customEmpCode || '';
+          document.getElementById('emp-name').value = emp.name || '';
+          document.getElementById('emp-email').value = emp.email || '';
+          document.getElementById('emp-phone').value = emp.phone || '';
+          document.getElementById('emp-desig').value = emp.designation || '';
+          document.getElementById('emp-dept').value = emp.department || '';
+          document.getElementById('emp-branch').value = emp.branch || 'Head Office';
+          document.getElementById('emp-joining').value = emp.joiningDate || '';
+          document.getElementById('emp-salary').value = emp.salary || 0;
+          document.getElementById('emp-photo').value = emp.photoUrl || '';
+          if (previewImg) previewImg.src = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff`;
+        }
+      } else {
+        document.getElementById('emp-custom-code').value = '';
+        document.getElementById('emp-photo').value = '';
+        if (previewImg) previewImg.src = 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff';
+        if (currentUserRole === 'Manager' && currentUserBranch !== 'ALL') {
+          const bSelect = document.getElementById('emp-branch');
+          if (bSelect) bSelect.value = currentUserBranch;
+        }
+      }
+      toggleModal('employee-modal', true);
+    };
+
+    window.saveEmployee = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('emp-id').value;
+      const customEmpCode = document.getElementById('emp-custom-code').value.trim();
+      const name = document.getElementById('emp-name').value.trim();
+      const email = document.getElementById('emp-email').value.trim();
+      const phone = document.getElementById('emp-phone').value.trim();
+      const designation = document.getElementById('emp-desig').value.trim();
+      const department = document.getElementById('emp-dept').value.trim();
+      const branch = document.getElementById('emp-branch').value;
+      const joiningDate = document.getElementById('emp-joining').value;
+      const salary = Number(document.getElementById('emp-salary').value) || 0;
+      let photoUrl = document.getElementById('emp-photo').value;
+
+      if (!photoUrl) {
+        photoUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`;
+      }
+
+      try {
+        if (id) {
+          await updateDoc(doc(db, "employees", id), {
+            customEmpCode,
+            name,
+            email,
+            phone,
+            designation,
+            department,
+            branch: branch || 'Head Office',
+            joiningDate,
+            salary,
+            photoUrl
+          });
+          showToast('success', `কর্মচারী "${name}" এর তথ্য সফলভাবে আপডেট হয়েছে!`);
+        } else {
+          await addDoc(collection(db, "employees"), {
+            customEmpCode,
+            name,
+            email,
+            phone,
+            designation,
+            department,
+            branch: branch || 'Head Office',
+            joiningDate,
+            lastIncrementDate: joiningDate,
+            salary,
+            photoUrl,
+            docUrl: '#',
+            createdAt: new Date().toISOString()
+          });
+          showToast('success', `নতুন কর্মচারী "${name}" সফলভাবে যুক্ত হয়েছে!`);
+        }
+        toggleModal('employee-modal', false);
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.deleteEmployee = async function(id) {
+      const emp = employeeList.find(e => e.id === id);
+      const name = emp ? emp.name : 'কর্মচারী';
+      if (confirm(`আপনি কি নিশ্চিতভাবে "${name}" কে মুছে ফেলতে চান?`)) {
+        try {
+          await deleteDoc(doc(db, "employees", id));
+          showToast('success', 'কর্মচারী মুছে ফেলা হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
+      }
+    };
+
+    window.viewEmployeeDetails = function(id) {
+      const emp = employeeList.find(e => e.id === id);
+      if (!emp) return;
+
+      Swal.fire({
+        title: emp.name,
+        html: `
+          <div class="text-left space-y-3">
+            <div class="flex items-center space-x-4 border-b pb-3">
+              <img src="${emp.photoUrl}" class="w-16 h-16 rounded-full object-cover border-2 border-indigo-500 shadow-sm" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
+              <div>
+                <h4 class="font-bold text-slate-800 text-sm">${emp.name}</h4>
+                <p class="text-xs text-indigo-600 font-semibold">${emp.designation} • ${emp.department}</p>
+                <span class="bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 mt-1 inline-block">🏢 ${emp.branch || 'Head Office'}</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+              <div><strong>Machine ID:</strong> <span class="text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">${emp.customEmpCode || 'N/A'}</span></div>
+              <div><strong>Salary:</strong> <span class="font-bold text-slate-900">৳ ${(emp.salary || 0).toLocaleString()}</span></div>
+              <div><strong>Email:</strong> ${emp.email || '-'}</div>
+              <div><strong>Phone:</strong> ${emp.phone || '-'}</div>
+              <div><strong>Joining Date:</strong> ${emp.joiningDate || '-'}</div>
+              <div><strong>Last Increment:</strong> ${emp.lastIncrementDate || emp.joiningDate || '-'}</div>
+            </div>
+          </div>
+        `,
+        confirmButtonText: 'Close',
+        confirmButtonColor: '#4f46e5'
+      });
+    };
 
     // Attendance Realtime
     window.loadAttendanceForDate = function() {
@@ -1153,10 +1328,18 @@
               <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${getLeaveBadge(lv.status)}">${lv.status}</span>
             </td>
             <td class="px-6 py-4 text-right space-x-1">
-              ${(currentUserRole !== 'Employee' && lv.status === 'Pending') ? `
-                <button onclick="updateLeaveStatus('${lv.id}', 'Approved')" class="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg"><i class="fa-solid fa-check"></i></button>
-                <button onclick="updateLeaveStatus('${lv.id}', 'Rejected')" class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg"><i class="fa-solid fa-xmark"></i></button>
-              ` : '<span class="text-slate-400 font-medium">Completed</span>'}
+              ${(currentUserRole === 'Admin' && lv.status === 'Pending') ? `
+                <button onclick="updateLeaveStatus('${lv.id}', 'Approved')" title="Approve Leave" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1">
+                  <i class="fa-solid fa-check"></i> <span>Approve</span>
+                </button>
+                <button onclick="updateLeaveStatus('${lv.id}', 'Rejected')" title="Reject Leave" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1">
+                  <i class="fa-solid fa-xmark"></i> <span>Reject</span>
+                </button>
+              ` : `
+                <span class="text-xs font-bold ${lv.status === 'Approved' ? 'text-emerald-600' : (lv.status === 'Rejected' ? 'text-rose-600' : 'text-amber-600')}">
+                  ${lv.status === 'Approved' ? '✓ Approved' : (lv.status === 'Rejected' ? '✗ Rejected' : '⏳ Awaiting Admin Approval')}
+                </span>
+              `}
             </td>
           </tr>
         `;
@@ -1669,7 +1852,41 @@
       }
     };
 
-    // Company Documents Realtime
+    // ==========================================
+    // COMPANY DOCUMENTS & DIRECT PICTURE UPLOAD
+    // ==========================================
+    window.handleDocFileSelected = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const fileNameLabel = document.getElementById('doc-selected-filename');
+      const previewContainer = document.getElementById('doc-preview-img-container');
+      const previewImg = document.getElementById('doc-preview-img');
+
+      if (fileNameLabel) {
+        fileNameLabel.innerText = `📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        fileNameLabel.classList.remove('hidden');
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const fileData = evt.target.result;
+        document.getElementById('doc-url').value = fileData;
+        document.getElementById('doc-file-name').value = file.name;
+        document.getElementById('doc-file-type').value = file.type;
+
+        if (file.type && file.type.startsWith('image/')) {
+          if (previewImg && previewContainer) {
+            previewImg.src = fileData;
+            previewContainer.classList.remove('hidden');
+          }
+        } else {
+          if (previewContainer) previewContainer.classList.add('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
     function loadCompanyDocsRealtime() {
       onSnapshot(collection(db, "company_documents"), (snapshot) => {
         docList = [];
@@ -1689,20 +1906,36 @@
         ? docList.filter(d => d.targetEmployee === 'General' || d.targetEmployee === myEmployeeProfile.name)
         : docList;
 
+      if (listToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-medium">কোনো ডকুমেন্ট বা ছবি আপলোড করা হয়নি</td></tr>`;
+        return;
+      }
+
       listToRender.forEach(docItem => {
+        const isImage = docItem.fileType ? docItem.fileType.startsWith('image/') : (docItem.fileUrl && docItem.fileUrl.startsWith('data:image'));
+        const iconClass = isImage ? 'fa-image text-emerald-500' : 'fa-file-lines text-indigo-500';
+
         const row = `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
-            <td class="px-6 py-4 font-bold text-slate-800 flex items-center space-x-2">
-              <i class="fa-solid fa-file-lines text-indigo-500 text-sm"></i>
-              <span>${docItem.title}</span>
+            <td class="px-6 py-4 font-bold text-slate-800 flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-lg ${isImage ? 'bg-emerald-50' : 'bg-indigo-50'} flex items-center justify-center">
+                <i class="fa-solid ${iconClass} text-sm"></i>
+              </div>
+              <div>
+                <div>${docItem.title}</div>
+                <span class="text-[10px] text-slate-400 font-normal">${docItem.fileName || 'Direct File'}</span>
+              </div>
             </td>
-            <td class="px-6 py-4 font-medium text-slate-600">${docItem.category}</td>
-            <td class="px-6 py-4 text-slate-600">${docItem.targetEmployee || 'General'}</td>
+            <td class="px-6 py-4"><span class="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-semibold text-[11px]">${docItem.category}</span></td>
+            <td class="px-6 py-4 text-slate-600 font-medium">${docItem.targetEmployee || 'General'}</td>
             <td class="px-6 py-4 text-slate-500">${new Date(docItem.uploadedAt).toLocaleDateString()}</td>
-            <td class="px-6 py-4 text-right">
-              <a href="${docItem.fileUrl}" target="_blank" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition">
-                <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> View
-              </a>
+            <td class="px-6 py-4 text-right space-x-1">
+              <button onclick="viewOrDownloadDoc('${docItem.id}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition inline-flex items-center space-x-1">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> <span>View / Download</span>
+              </button>
+              ${currentUserRole !== 'Employee' ? `
+                <button onclick="deleteDocRecord('${docItem.id}')" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Delete Document"><i class="fa-solid fa-trash-can"></i></button>
+              ` : ''}
             </td>
           </tr>
         `;
@@ -1710,20 +1943,93 @@
       });
     }
 
+    window.viewOrDownloadDoc = function(docId) {
+      const item = docList.find(d => d.id === docId);
+      if (!item || !item.fileUrl) {
+        showToast('warning', 'ফাইলের লিংক পাওয়া যায়নি');
+        return;
+      }
+
+      const isImage = item.fileType ? item.fileType.startsWith('image/') : (item.fileUrl.startsWith('data:image') || (typeof item.fileUrl === 'string' && item.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)/i)));
+
+      if (isImage) {
+        Swal.fire({
+          title: item.title,
+          text: `ক্যাটাগরি: ${item.category}`,
+          imageUrl: item.fileUrl,
+          imageAlt: item.title,
+          showCancelButton: true,
+          confirmButtonText: 'Download Image',
+          cancelButtonText: 'Close',
+          confirmButtonColor: '#4f46e5'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const a = document.createElement('a');
+            a.href = item.fileUrl;
+            a.download = item.fileName || `${item.title}.png`;
+            a.click();
+          }
+        });
+      } else {
+        if (item.fileUrl.startsWith('data:')) {
+          const a = document.createElement('a');
+          a.href = item.fileUrl;
+          a.download = item.fileName || `${item.title}.pdf`;
+          a.click();
+          showToast('success', 'ফাইল ডাউনলোড শুরু হয়েছে');
+        } else {
+          window.open(item.fileUrl, '_blank');
+        }
+      }
+    };
+
+    window.deleteDocRecord = async function(id) {
+      if (confirm('এই ডকুমেন্ট মুছে ফেলতে চান?')) {
+        try {
+          await deleteDoc(doc(db, "company_documents", id));
+          showToast('success', 'ডকুমেন্ট মুছে ফেলা হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
+      }
+    };
+
     window.saveCompanyDocument = async function(e) {
       e.preventDefault();
-      const title = document.getElementById('doc-title').value;
+      const title = document.getElementById('doc-title').value.trim();
       const category = document.getElementById('doc-category').value;
       const targetEmp = document.getElementById('doc-emp-id').value;
       const url = document.getElementById('doc-url').value;
+      const fileName = document.getElementById('doc-file-name') ? document.getElementById('doc-file-name').value : 'Document';
+      const fileType = document.getElementById('doc-file-type') ? document.getElementById('doc-file-type').value : '';
 
-      await addDoc(collection(db, "company_documents"), {
-        title, category, targetEmployee: targetEmp, fileUrl: url, uploadedAt: new Date().toISOString()
-      });
+      if (!url) {
+        showToast('warning', 'দয়া করে একটি ফাইল অথবা ছবি নির্বাচন করুন');
+        return;
+      }
 
-      document.getElementById('doc-form').reset();
-      toggleModal('add-doc-modal', false);
-      showToast('success', 'ডকুমেন্ট সংরক্ষণ করা হয়েছে!');
+      try {
+        await addDoc(collection(db, "company_documents"), {
+          title, 
+          category, 
+          targetEmployee: targetEmp, 
+          fileUrl: url,
+          fileName,
+          fileType,
+          uploadedAt: new Date().toISOString()
+        });
+
+        document.getElementById('doc-form').reset();
+        const fnameLabel = document.getElementById('doc-selected-filename');
+        if (fnameLabel) fnameLabel.classList.add('hidden');
+        const previewCont = document.getElementById('doc-preview-img-container');
+        if (previewCont) previewCont.classList.add('hidden');
+
+        toggleModal('add-doc-modal', false);
+        showToast('success', 'ডকুমেন্ট ও ছবি সফলভাবে সংরক্ষিত হয়েছে!');
+      } catch (err) {
+        showToast('error', err.message);
+      }
     };
 
     // Performance Reviews Realtime
@@ -2085,94 +2391,6 @@
       }
     };
 
-    window.openEmployeeModal = function(empId = null) {
-      document.getElementById('employee-form').reset();
-      document.getElementById('emp-id').value = '';
-      
-      if (empId) {
-        const emp = employeeList.find(e => e.id === empId);
-        if (emp) {
-          document.getElementById('emp-id').value = emp.id;
-          document.getElementById('emp-custom-code').value = emp.customEmpCode || '';
-          document.getElementById('emp-name').value = emp.name;
-          document.getElementById('emp-email').value = emp.email;
-          document.getElementById('emp-phone').value = emp.phone || '';
-          document.getElementById('emp-desig').value = emp.designation;
-          document.getElementById('emp-dept').value = emp.department;
-          document.getElementById('emp-branch').value = emp.branch || 'Head Office';
-          document.getElementById('emp-salary').value = emp.salary;
-          document.getElementById('emp-joining').value = emp.joiningDate || '';
-          document.getElementById('emp-photo').value = emp.photoUrl || '';
-        }
-      }
-      toggleModal('employee-modal', true);
-    };
-
-    window.saveEmployee = async function(e) {
-      e.preventDefault();
-      const id = document.getElementById('emp-id').value;
-      const customEmpCode = document.getElementById('emp-custom-code').value.trim();
-      const name = document.getElementById('emp-name').value;
-      const email = document.getElementById('emp-email').value;
-      const phone = document.getElementById('emp-phone').value;
-      const designation = document.getElementById('emp-desig').value;
-      const department = document.getElementById('emp-dept').value;
-      const branch = document.getElementById('emp-branch').value;
-      const salary = Number(document.getElementById('emp-salary').value);
-      const joiningDate = document.getElementById('emp-joining').value;
-      const photoUrl = document.getElementById('emp-photo').value || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`;
-
-      const data = {
-        customEmpCode, name, email, phone, designation, department, branch, salary, joiningDate, photoUrl, updatedAt: new Date().toISOString()
-      };
-
-      try {
-        if (id) {
-          await updateDoc(doc(db, "employees", id), data);
-          showToast('success', 'কর্মচারীর তথ্য আপডেট করা হয়েছে!');
-        } else {
-          data.createdAt = new Date().toISOString();
-          data.lastIncrementDate = joiningDate || new Date().toISOString().split('T')[0];
-          await addDoc(collection(db, "employees"), data);
-          showToast('success', 'নতুন কর্মচারী যুক্ত হয়েছে!');
-        }
-        toggleModal('employee-modal', false);
-      } catch (err) {
-        showToast('error', err.message);
-      }
-    };
-
-    window.deleteEmployee = async function(id) {
-      if(confirm('এই কর্মচারীকে স্থায়ীভাবে মুছে ফেলতে চান?')) {
-        await deleteDoc(doc(db, "employees", id));
-        showToast('success', 'কর্মচারী মুছে ফেলা হয়েছে');
-      }
-    };
-
-    window.viewEmployeeDetails = function(empId) {
-      const emp = employeeList.find(e => e.id === empId);
-      if(!emp) return;
-
-      Swal.fire({
-        title: emp.name,
-        html: `
-          <div class="text-left space-y-2 text-xs text-slate-700">
-            <div class="text-center mb-3">
-              <img src="${emp.photoUrl}" class="w-16 h-16 rounded-full mx-auto border-2 border-indigo-500 shadow-sm" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
-            </div>
-            <p><strong>Machine / Finger ID:</strong> <span class="bg-indigo-50 text-indigo-700 font-bold px-1.5 py-0.5 rounded">${emp.customEmpCode || 'N/A'}</span></p>
-            <p><strong>Branch:</strong> <span class="bg-emerald-50 text-emerald-800 font-bold px-1.5 py-0.5 rounded">🏢 ${emp.branch || 'Head Office'}</span></p>
-            <p><strong>Email:</strong> ${emp.email}</p>
-            <p><strong>Phone:</strong> ${emp.phone || 'N/A'}</p>
-            <p><strong>Designation:</strong> ${emp.designation}</p>
-            <p><strong>Department:</strong> ${emp.department}</p>
-            <p><strong>Joining Date:</strong> ${emp.joiningDate || 'N/A'}</p>
-            <p><strong>Current Salary:</strong> ৳ ${(emp.salary || 0).toLocaleString()}</p>
-          </div>
-        `,
-        confirmButtonColor: '#4f46e5'
-      });
-    };
   </script>
 </head>
 
@@ -3062,14 +3280,18 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Basic Salary (৳) *</label>
             <input type="number" id="emp-salary" required class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Photo URL (Optional)</label>
-            <input type="url" id="emp-photo" placeholder="https://..." class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Employee Photo (ছবি আপলোড)</label>
+            <div class="flex items-center space-x-2.5 p-1.5 border border-slate-200 rounded-xl bg-slate-50">
+              <img id="emp-photo-preview" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" alt="Preview" class="w-9 h-9 rounded-full object-cover border border-indigo-400 shadow-xs flex-shrink-0">
+              <input type="file" id="emp-photo-file" accept="image/*" onchange="previewEmployeePhoto(event)" class="w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
+            </div>
+            <input type="hidden" id="emp-photo">
           </div>
         </div>
 
@@ -3263,22 +3485,24 @@
   <div id="add-doc-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-        <h3 class="text-base font-bold text-slate-900">Upload Company Document</h3>
+        <h3 class="text-base font-bold text-slate-900">Upload Company Document / Picture</h3>
         <button onclick="toggleModal('add-doc-modal', false)" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <form id="doc-form" onsubmit="saveCompanyDocument(event)" class="space-y-3">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Document Title *</label>
-          <input type="text" id="doc-title" required class="w-full p-2.5 border rounded-xl text-xs outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Document / Picture Title *</label>
+          <input type="text" id="doc-title" required placeholder="e.g. Appointment Letter, NID / Photo, Policy" class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Category *</label>
           <select id="doc-category" class="w-full p-2.5 border rounded-xl text-xs bg-white font-medium outline-none">
             <option value="Company Policy">Company Policy</option>
             <option value="Appointment Letter">Appointment Letter</option>
+            <option value="Employee Photo / NID">Employee Photo / NID</option>
             <option value="Tax & Compliance">Tax & Compliance</option>
             <option value="Handbook">Employee Handbook</option>
+            <option value="Certificate & Others">Certificate & Others</option>
           </select>
         </div>
         <div>
@@ -3288,8 +3512,21 @@
           </select>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">File URL / Drive Link *</label>
-          <input type="url" id="doc-url" required placeholder="https://..." class="w-full p-2.5 border rounded-xl text-xs outline-none">
+          <label class="block text-xs font-bold text-slate-700 mb-1">Direct File / Picture Upload (ফাইল বা ছবি সিলেক্ট করুন) *</label>
+          <div class="p-3 border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 rounded-2xl transition text-center space-y-2">
+            <div class="flex items-center justify-center space-x-2 text-indigo-600">
+              <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+              <span class="text-xs font-bold">ফাইল / ছবি নির্বাচন করুন</span>
+            </div>
+            <input type="file" id="doc-file-input" required accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onchange="handleDocFileSelected(event)" class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
+            <p id="doc-selected-filename" class="text-[11px] font-semibold text-slate-700 truncate hidden"></p>
+            <div id="doc-preview-img-container" class="hidden flex justify-center pt-1">
+              <img id="doc-preview-img" class="h-20 max-w-full rounded-lg object-contain border border-slate-200 shadow-xs">
+            </div>
+          </div>
+          <input type="hidden" id="doc-url">
+          <input type="hidden" id="doc-file-name">
+          <input type="hidden" id="doc-file-type">
         </div>
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
           <button type="button" onclick="toggleModal('add-doc-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
@@ -3336,4 +3573,3 @@
 
 </body>
 </html>
-

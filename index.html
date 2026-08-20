@@ -1075,6 +1075,20 @@
       const dayOffElem = document.getElementById('dash-dayoff-today');
       if (dayOffElem) dayOffElem.innerText = dayOffCount;
 
+      const totalCount = totalEmpInScope || 1;
+      const attRate = ((presentCount / totalCount) * 100).toFixed(1);
+      const rateElem = document.getElementById('dash-attendance-rate');
+      if (rateElem) rateElem.innerText = `${attRate}% Live Present Rate`;
+
+      const barPres = document.getElementById('dash-bar-present');
+      if (barPres) barPres.style.width = `${(presentCount / totalCount) * 100}%`;
+      const barLeave = document.getElementById('dash-bar-leave');
+      if (barLeave) barLeave.style.width = `${(leaveCount / totalCount) * 100}%`;
+      const barDayOff = document.getElementById('dash-bar-dayoff');
+      if (barDayOff) barDayOff.style.width = `${(dayOffCount / totalCount) * 100}%`;
+      const barAbsent = document.getElementById('dash-bar-absent');
+      if (barAbsent) barAbsent.style.width = `${(absentCount / totalCount) * 100}%`;
+
       const statusModal = document.getElementById('dash-status-modal');
       if (statusModal && !statusModal.classList.contains('hidden')) {
         renderDashboardStatusModalList();
@@ -3806,7 +3820,7 @@ ${messageText}
       if (dashIncDue) dashIncDue.innerText = dueCount;
       if (incAlertCount) incAlertCount.innerText = dueCount;
       if (incAlertBox) {
-        if (dueCount > 0) incAlertBox.classList.remove('hidden');
+        if (dueCount > 0 && currentUserRole !== 'Employee') incAlertBox.classList.remove('hidden');
         else incAlertBox.classList.add('hidden');
       }
     }
@@ -3903,6 +3917,7 @@ ${messageText}
     }
 
     function renderNotices() {
+      const topBanner = document.getElementById('top-notice-banner');
       const heroTitle = document.getElementById('notice-hero-title');
       const heroDesc = document.getElementById('notice-hero-desc');
       const noticeDate = document.getElementById('notice-date');
@@ -3912,6 +3927,7 @@ ${messageText}
       const visibleNotices = noticeList.filter(isNoticeVisibleToCurrentUser);
 
       if (visibleNotices.length === 0) {
+        if (topBanner) topBanner.classList.add('hidden');
         if (heroTitle) heroTitle.innerText = 'কোনো নোটিশ নেই';
         if (heroDesc) heroDesc.innerText = 'আপনার ব্রাঞ্চের জন্য বর্তমানে প্রদর্শনের কোনো সক্রিয় নোটিশ নেই।';
         if (noticeDate) noticeDate.innerText = '--';
@@ -3920,6 +3936,7 @@ ${messageText}
         return;
       }
 
+      if (topBanner) topBanner.classList.remove('hidden');
       if (currentNoticeIndex >= visibleNotices.length) currentNoticeIndex = 0;
       updateNoticeSlider(visibleNotices);
 
@@ -4391,45 +4408,81 @@ ${messageText}
     };
 
     // Charts Engine
+    // Charts Engine
     function renderDashboardCharts() {
       if(currentUserRole === 'Employee') return;
 
       const activeEmployees = employeeList.filter(e => isItemInActiveBranch(e.branch));
 
-      // 1. Department Distribution Chart
+      // 1. Department Distribution Chart (Normalized names)
       const deptCounts = {};
       activeEmployees.forEach(e => {
-        const d = e.department || 'General';
-        deptCounts[d] = (deptCounts[d] || 0) + 1;
+        let raw = (e.department || 'General').trim();
+        // Capitalize words cleanly
+        let clean = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+        if (clean.toLowerCase().includes('sale')) clean = 'Sales';
+        if (clean.toLowerCase().includes('manag')) clean = 'Management';
+        if (clean.toLowerCase().includes('store') || clean.toLowerCase().includes('show')) clean = 'Store & Showroom';
+        if (clean.toLowerCase().includes('clean')) clean = 'Operations & Support';
+        deptCounts[clean] = (deptCounts[clean] || 0) + 1;
       });
 
       const deptCtx = document.getElementById('deptChart');
       if(deptCtx) {
         if(deptChartInstance) deptChartInstance.destroy();
+        const colors = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e'];
         deptChartInstance = new Chart(deptCtx, {
           type: 'doughnut',
           data: {
             labels: Object.keys(deptCounts),
             datasets: [{
               data: Object.values(deptCounts),
-              backgroundColor: ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+              backgroundColor: colors.slice(0, Object.keys(deptCounts).length),
+              borderWidth: 2,
+              borderColor: '#ffffff'
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+            cutout: '68%',
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  boxWidth: 12,
+                  padding: 14,
+                  font: { size: 11, weight: 'bold' }
+                }
+              }
+            }
           }
         });
       }
 
-      // 2. Attendance Status Breakdown
-      let present = 0, absent = 0, late = 0;
+      // 2. Attendance Status Breakdown (Full 5 Statuses)
+      let present = 0, late = 0, onLeave = 0, dayOff = 0, absent = 0;
+      const todayStr = new Date().toISOString().split('T')[0];
+
       activeEmployees.forEach(emp => {
         const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const st = att ? (typeof att === 'object' ? att.status : att) : 'Absent';
-        if(st === 'Present') present++;
-        else if(st === 'Late') late++;
+        let st = att ? (typeof att === 'object' ? att.status : att) : null;
+        
+        if (!st) {
+          const activeLeave = leaveList.find(l => 
+            (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) && 
+            l.status === 'Approved' && 
+            todayStr >= l.startDate && 
+            todayStr <= l.endDate
+          );
+          if (activeLeave) st = 'On Leave';
+          else st = 'Absent';
+        }
+
+        if (st === 'Present') present++;
+        else if (st === 'Late') late++;
+        else if (st === 'On Leave') onLeave++;
+        else if (st === 'Day Off') dayOff++;
         else absent++;
       });
 
@@ -4437,18 +4490,30 @@ ${messageText}
       if(statusCtx) {
         if(statusChartInstance) statusChartInstance.destroy();
         statusChartInstance = new Chart(statusCtx, {
-          type: 'pie',
+          type: 'doughnut',
           data: {
-            labels: ['Present', 'Late', 'Absent'],
+            labels: ['উপস্থিত (Present)', 'দেরিতে (Late)', 'ছুটিতে (On Leave)', 'ডে অফ (Day Off)', 'অনুপস্থিত (Absent)'],
             datasets: [{
-              data: [present, late, absent],
-              backgroundColor: ['#10b981', '#f59e0b', '#f43f5e']
+              data: [present, late, onLeave, dayOff, absent],
+              backgroundColor: ['#10b981', '#f59e0b', '#a855f7', '#0ea5e9', '#f43f5e'],
+              borderWidth: 2,
+              borderColor: '#ffffff'
             }]
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+            cutout: '68%',
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  boxWidth: 12,
+                  padding: 14,
+                  font: { size: 11, weight: 'bold' }
+                }
+              }
+            }
           }
         });
       }
@@ -5143,109 +5208,192 @@ ${messageText}
       </header>
 
       <!-- View Containers -->
-      <div class="p-6 space-y-6 flex-1">
+      <div class="p-4 sm:p-6 space-y-5 flex-1">
 
-        <!-- Top Notice Slider Banner (Original Dark Indigo Gradient Look) -->
-        <div class="relative bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl overflow-hidden shadow-xl border border-indigo-900/40">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center space-x-2">
-              <span id="notice-badge" class="bg-indigo-500/30 text-indigo-300 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full tracking-wider border border-indigo-400/30">📢 NOTICE 1 OF 1</span>
+        <!-- Top Notice Slider Banner (Sleek Glassmorphic Announcement Bar) -->
+        <div id="top-notice-banner" class="hidden relative bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-2xl overflow-hidden shadow-md border border-indigo-500/20">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-center space-x-3 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center text-sm shrink-0">
+                <i class="fa-solid fa-bullhorn"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center space-x-2">
+                  <span id="notice-badge" class="bg-indigo-500/30 text-indigo-200 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-indigo-400/30">📢 NOTICE</span>
+                  <span id="notice-date" class="text-[11px] text-indigo-300 font-medium">---</span>
+                </div>
+                <h3 id="notice-hero-title" class="text-xs sm:text-sm font-bold text-white tracking-wide truncate mt-0.5">---</h3>
+                <p id="notice-hero-desc" class="text-[11px] text-slate-300 truncate max-w-2xl">---</p>
+              </div>
             </div>
-            <span id="notice-date" class="text-xs text-indigo-300 font-semibold">2026-08-11</span>
-          </div>
-          <div id="notice-slide-area" class="space-y-1">
-            <h3 id="notice-hero-title" class="text-lg font-bold text-white tracking-wide">Lunch</h3>
-            <p id="notice-hero-desc" class="text-xs text-slate-300">Ajke hote sokol er lunch time ak 2:00PM</p>
-          </div>
-          <div class="flex items-center justify-between mt-4">
-            <div class="flex space-x-1.5" id="notice-dots">
-              <span class="w-6 h-1.5 bg-white rounded-full"></span>
-            </div>
-            <div class="flex space-x-2">
-              <button onclick="prevNotice()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-left"></i></button>
-              <button onclick="nextNotice()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs transition"><i class="fa-solid fa-chevron-right"></i></button>
+            <div class="flex items-center space-x-2 shrink-0 self-end md:self-center">
+              <button onclick="prevNotice()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-left"></i></button>
+              <button onclick="nextNotice()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-right"></i></button>
+              <button onclick="switchNav('notice')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1">
+                <span>সকল নোটিশ</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Increment Alert Banner (Original Yellow/Amber Look) -->
-        <div id="increment-alert-box" class="hidden bg-amber-50/90 border-l-4 border-amber-500 p-5 rounded-2xl shadow-xs space-y-2">
+        <!-- Increment Alert Banner (Sleek Compact Executive Banner) -->
+        <div id="increment-alert-box" class="hidden bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-50/50 border border-amber-200/80 p-3.5 sm:p-4 rounded-2xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div class="flex items-center space-x-3">
-            <div class="text-amber-600 text-lg"><i class="fa-solid fa-bell"></i></div>
+            <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-base shadow-xs shrink-0">
+              <i class="fa-solid fa-bell animate-bounce"></i>
+            </div>
             <div>
-              <h4 class="font-bold text-amber-900 text-sm">Increment Alert (<span id="inc-alert-count">0</span> জন অপেক্ষমাণ)</h4>
-              <p class="text-xs text-amber-700">১ বছর পূর্ণ হওয়ায় নিচের কর্মচারীদের ইনক্রিমেন্ট দেওয়ার সময় হয়েছে:</p>
+              <h4 class="font-bold text-amber-950 text-xs sm:text-sm flex items-center space-x-2">
+                <span>Increment Alert</span>
+                <span class="bg-amber-500 text-white text-[10px] font-mono font-bold px-2 py-0.2 rounded-full"><span id="inc-alert-count">0</span> জন অপেক্ষমাণ</span>
+              </h4>
+              <p class="text-[11px] text-amber-800 font-medium">১ বছর বা তার বেশি সময় পূর্ণ হওয়ায় কর্মচারীদের বেতন বৃদ্ধি / ইনক্রিমেন্ট দেওয়ার সময় হয়েছে।</p>
             </div>
           </div>
-          <div id="inc-alert-list" class="flex flex-wrap gap-2 pt-1"></div>
+          <div class="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+            <button onclick="openDashboardStatusModal('Increment Due')" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs">
+              <i class="fa-solid fa-list-check"></i>
+              <span>তালিকা ও প্রসেস দেখুন</span>
+            </button>
+          </div>
         </div>
 
         <!-- 1. DASHBOARD VIEW -->
-        <section id="sec-dashboard" class="space-y-6">
+        <section id="sec-dashboard" class="space-y-5">
 
-          <!-- Admin Metric Cards (6 Interactive Clickable Cards) -->
-          <div id="admin-dash-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <!-- 6 Interactive Clickable Metric Cards -->
+          <div id="admin-dash-cards" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
             
             <!-- 1. Total Workforce -->
-            <div onclick="openDashboardStatusModal('ALL')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
-              <div>
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TOTAL WORKFORCE</p>
-                <h3 id="dash-total-emp" class="text-2xl font-black text-slate-900 mt-0.5">0</h3>
-                <span class="text-[10px] text-indigo-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-list-check mr-1"></i>তালিকা দেখুন <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('ALL')" class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-indigo-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider">TOTAL STAFF</span>
+                <div class="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-users"></i></div>
               </div>
-              <div class="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-users"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-total-emp" class="text-2xl font-black text-slate-900 tracking-tight">0</h3>
+                <span class="text-[10px] text-indigo-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-list-check mr-1"></i>কর্মচারী তালিকা</span>
+              </div>
             </div>
 
             <!-- 2. Present Today -->
-            <div onclick="openDashboardStatusModal('Present')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
-              <div>
-                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">PRESENT TODAY</p>
-                <h3 id="dash-present-today" class="text-2xl font-black text-emerald-600 mt-0.5">0</h3>
-                <span class="text-[10px] text-emerald-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-user-check mr-1"></i>উপস্থিত তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('Present')" class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-emerald-600 uppercase tracking-wider">PRESENT</span>
+                <div class="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-user-check"></i></div>
               </div>
-              <div class="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-user-check"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-present-today" class="text-2xl font-black text-emerald-600 tracking-tight">0</h3>
+                <span class="text-[10px] text-emerald-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-chart-line mr-1"></i>উপস্থিত তালিকা</span>
+              </div>
             </div>
 
             <!-- 3. Absent Today -->
-            <div onclick="openDashboardStatusModal('Absent')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-rose-100 hover:ring-rose-300">
-              <div>
-                <p class="text-[11px] font-bold text-rose-500 uppercase tracking-wider">ABSENT TODAY</p>
-                <h3 id="dash-absent-today" class="text-2xl font-black text-rose-600 mt-0.5">0</h3>
-                <span class="text-[10px] text-rose-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-user-xmark mr-1"></i>অনুপস্থিত তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('Absent')" class="bg-white p-4 rounded-2xl border border-rose-100 shadow-xs hover:shadow-md hover:border-rose-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden ring-1 ring-rose-50">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-rose-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-rose-500 uppercase tracking-wider">ABSENT</span>
+                <div class="w-8 h-8 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-user-xmark"></i></div>
               </div>
-              <div class="w-11 h-11 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-user-xmark"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-absent-today" class="text-2xl font-black text-rose-600 tracking-tight">0</h3>
+                <span class="text-[10px] text-rose-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-circle-exclamation mr-1"></i>অনুপস্থিত তালিকা</span>
+              </div>
             </div>
 
             <!-- 4. On Leave -->
-            <div onclick="openDashboardStatusModal('On Leave')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-amber-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-amber-100 hover:ring-amber-300">
-              <div>
-                <p class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">ON LEAVE</p>
-                <h3 id="dash-leave-today" class="text-2xl font-black text-amber-600 mt-0.5">0</h3>
-                <span class="text-[10px] text-amber-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-umbrella-beach mr-1"></i>ছুটির তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('On Leave')" class="bg-white p-4 rounded-2xl border border-amber-100 shadow-xs hover:shadow-md hover:border-amber-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden ring-1 ring-amber-50">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-amber-600 uppercase tracking-wider">ON LEAVE</span>
+                <div class="w-8 h-8 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-umbrella-beach"></i></div>
               </div>
-              <div class="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-umbrella-beach"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-leave-today" class="text-2xl font-black text-amber-600 tracking-tight">0</h3>
+                <span class="text-[10px] text-amber-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-calendar-day mr-1"></i>ছুটির তালিকা</span>
+              </div>
             </div>
 
             <!-- 5. Day Off Today -->
-            <div onclick="openDashboardStatusModal('Day Off')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-sky-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-sky-100 hover:ring-sky-300">
-              <div>
-                <p class="text-[11px] font-bold text-sky-600 uppercase tracking-wider">DAY OFF</p>
-                <h3 id="dash-dayoff-today" class="text-2xl font-black text-sky-600 mt-0.5">0</h3>
-                <span class="text-[10px] text-sky-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-mug-hot mr-1"></i>অফ-ডে তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('Day Off')" class="bg-white p-4 rounded-2xl border border-sky-100 shadow-xs hover:shadow-md hover:border-sky-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden ring-1 ring-sky-50">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-sky-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-sky-600 uppercase tracking-wider">DAY OFF</span>
+                <div class="w-8 h-8 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-mug-hot"></i></div>
               </div>
-              <div class="w-11 h-11 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-mug-hot"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-dayoff-today" class="text-2xl font-black text-sky-600 tracking-tight">0</h3>
+                <span class="text-[10px] text-sky-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-coffee mr-1"></i>অফ-ডে তালিকা</span>
+              </div>
             </div>
 
             <!-- 6. Increment Due -->
-            <div onclick="openDashboardStatusModal('Increment Due')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-purple-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
-              <div>
-                <p class="text-[11px] font-bold text-purple-600 uppercase tracking-wider">INCREMENT DUE</p>
-                <h3 id="dash-inc-due" class="text-2xl font-black text-purple-600 mt-0.5">0</h3>
-                <span class="text-[10px] text-purple-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-award mr-1"></i>ডিউ তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+            <div onclick="openDashboardStatusModal('Increment Due')" class="bg-white p-4 rounded-2xl border border-purple-100 shadow-xs hover:shadow-md hover:border-purple-300 transition duration-200 cursor-pointer group flex flex-col justify-between transform hover:-translate-y-0.5 relative overflow-hidden">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-purple-500"></div>
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black text-purple-600 uppercase tracking-wider">INCREMENT</span>
+                <div class="w-8 h-8 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xs group-hover:scale-110 transition"><i class="fa-solid fa-award"></i></div>
               </div>
-              <div class="w-11 h-11 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-award"></i></div>
+              <div class="mt-2">
+                <h3 id="dash-inc-due" class="text-2xl font-black text-purple-600 tracking-tight">0</h3>
+                <span class="text-[10px] text-purple-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-arrow-trend-up mr-1"></i>ডিউ তালিকা</span>
+              </div>
             </div>
 
+          </div>
+
+          <!-- Executive Live Ratio Bar & Action Shortcuts -->
+          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            
+            <!-- Attendance Rate & Live Ratio Bar -->
+            <div class="space-y-1.5 w-full lg:w-96">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-slate-700 flex items-center space-x-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span>আজকের হাজিরা রেশিও (Live Attendance)</span>
+                </span>
+                <span id="dash-attendance-rate" class="font-black text-emerald-600 font-mono">0% Live Present Rate</span>
+              </div>
+              <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex shadow-inner">
+                <div id="dash-bar-present" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%" title="Present"></div>
+                <div id="dash-bar-leave" class="bg-amber-400 h-full transition-all duration-500" style="width: 0%" title="On Leave"></div>
+                <div id="dash-bar-dayoff" class="bg-sky-400 h-full transition-all duration-500" style="width: 0%" title="Day Off"></div>
+                <div id="dash-bar-absent" class="bg-rose-500 h-full transition-all duration-500" style="width: 0%" title="Absent"></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-bold">
+                <span class="text-emerald-700">🟢 উপস্থিত</span>
+                <span class="text-amber-700">🟡 ছুটি</span>
+                <span class="text-sky-700">🔵 ডে অফ</span>
+                <span class="text-rose-700">🔴 অনুপস্থিত</span>
+              </div>
+            </div>
+
+            <!-- Quick Action Shortcuts -->
+            <div class="flex flex-wrap gap-2 items-center w-full lg:w-auto justify-start lg:justify-end">
+              <button onclick="switchNav('attendance')" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs">
+                <i class="fa-solid fa-clipboard-user text-indigo-600"></i>
+                <span>হাজিরা দিন / ভিউ</span>
+              </button>
+              <button onclick="toggleModal('add-leave-modal', true)" class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs">
+                <i class="fa-solid fa-calendar-plus text-amber-600"></i>
+                <span>ছুটির আবেদন</span>
+              </button>
+              <button onclick="switchNav('payroll')" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs">
+                <i class="fa-solid fa-file-invoice-dollar text-emerald-600"></i>
+                <span>বেতন প্রসেস</span>
+              </button>
+              <button onclick="toggleModal('add-adv-modal', true)" class="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs">
+                <i class="fa-solid fa-hand-holding-dollar text-sky-600"></i>
+                <span>অগ্রিম বেতন</span>
+              </button>
+              <button onclick="toggleModal('add-fine-modal', true)" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs">
+                <i class="fa-solid fa-gavel text-rose-600"></i>
+                <span>জরিমানা এন্ট্রি</span>
+              </button>
+            </div>
           </div>
 
           <!-- Employee Self Profile (Shown when Role = Employee) -->
@@ -5315,17 +5463,29 @@ ${messageText}
             </div>
           </div>
 
-          <!-- Charts -->
-          <div id="dash-charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Charts Section (Executive Analytics) -->
+          <div id="dash-charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <h3 class="font-bold text-sm text-slate-800 mb-4">Department Distribution</h3>
+              <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div class="flex items-center space-x-2">
+                  <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs"><i class="fa-solid fa-chart-pie"></i></div>
+                  <h3 class="font-bold text-xs sm:text-sm text-slate-800">Department Distribution (বিভাগীয় কর্মী বণ্টন)</h3>
+                </div>
+                <span class="text-[10px] text-slate-400 font-bold uppercase">Workforce Share</span>
+              </div>
               <div class="h-64">
                 <canvas id="deptChart"></canvas>
               </div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <h3 class="font-bold text-sm text-slate-800 mb-4">Today Attendance Breakdown</h3>
+              <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div class="flex items-center space-x-2">
+                  <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs"><i class="fa-solid fa-chart-donut"></i></div>
+                  <h3 class="font-bold text-xs sm:text-sm text-slate-800">Today Attendance Breakdown (আজকের হাজিরা অ্যানালাইসিস)</h3>
+                </div>
+                <span class="text-[10px] text-emerald-600 font-bold uppercase">Live Snapshot</span>
+              </div>
               <div class="h-64">
                 <canvas id="statusChart"></canvas>
               </div>

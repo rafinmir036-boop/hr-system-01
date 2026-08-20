@@ -1030,13 +1030,28 @@
 
     function updateAttendanceDashboardMetrics() {
       let presentCount = 0, absentCount = 0, leaveCount = 0, dayOffCount = 0, totalEmpInScope = 0;
+      const todayStr = new Date().toISOString().split('T')[0];
 
       employeeList.forEach(emp => {
         if (!isItemInActiveBranch(emp.branch)) return;
         totalEmpInScope++;
 
         const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const st = att ? (typeof att === 'object' ? att.status : att) : 'Absent';
+        let st = att ? (typeof att === 'object' ? att.status : att) : null;
+        
+        if (!st) {
+          const activeLeave = leaveList.find(l => 
+            (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) && 
+            l.status === 'Approved' && 
+            todayStr >= l.startDate && 
+            todayStr <= l.endDate
+          );
+          if (activeLeave) {
+            st = 'On Leave';
+          } else {
+            st = 'Absent';
+          }
+        }
         
         if (st === 'Present' || st === 'Late') {
           presentCount++;
@@ -1049,11 +1064,367 @@
         }
       });
 
-      document.getElementById('dash-total-emp').innerText = totalEmpInScope;
-      document.getElementById('dash-present-today').innerText = presentCount;
-      document.getElementById('dash-absent-today').innerText = absentCount;
-      document.getElementById('dash-leave-today').innerText = leaveCount;
+      const totalElem = document.getElementById('dash-total-emp');
+      if (totalElem) totalElem.innerText = totalEmpInScope;
+      const presElem = document.getElementById('dash-present-today');
+      if (presElem) presElem.innerText = presentCount;
+      const absElem = document.getElementById('dash-absent-today');
+      if (absElem) absElem.innerText = absentCount;
+      const lveElem = document.getElementById('dash-leave-today');
+      if (lveElem) lveElem.innerText = leaveCount;
+      const dayOffElem = document.getElementById('dash-dayoff-today');
+      if (dayOffElem) dayOffElem.innerText = dayOffCount;
+
+      const statusModal = document.getElementById('dash-status-modal');
+      if (statusModal && !statusModal.classList.contains('hidden')) {
+        renderDashboardStatusModalList();
+      }
     }
+
+    // ==========================================
+    // DASHBOARD INTERACTIVE STATUS DRILLDOWN
+    // ==========================================
+    let currentDashModalCategory = 'Absent';
+
+    window.openDashboardStatusModal = function(category = 'Absent') {
+      currentDashModalCategory = category;
+      const searchInput = document.getElementById('dash-status-search-input');
+      if (searchInput) searchInput.value = '';
+      updateDashModalTabStyles();
+      renderDashboardStatusModalList();
+      toggleModal('dash-status-modal', true);
+    };
+
+    window.switchDashModalTab = function(category) {
+      currentDashModalCategory = category;
+      updateDashModalTabStyles();
+      renderDashboardStatusModalList();
+    };
+
+    window.filterDashModalList = function() {
+      renderDashboardStatusModalList();
+    };
+
+    function updateDashModalTabStyles() {
+      const categories = ['Absent', 'On Leave', 'Day Off', 'Present', 'Increment Due', 'ALL'];
+      const activeColorMap = {
+        'Absent': 'bg-rose-600 text-white shadow-sm',
+        'On Leave': 'bg-amber-500 text-white shadow-sm',
+        'Day Off': 'bg-sky-600 text-white shadow-sm',
+        'Present': 'bg-emerald-600 text-white shadow-sm',
+        'Increment Due': 'bg-purple-600 text-white shadow-sm',
+        'ALL': 'bg-indigo-600 text-white shadow-sm'
+      };
+
+      categories.forEach(cat => {
+        const btn = document.getElementById(`dash-tab-${cat}`);
+        if (!btn) return;
+        if (cat === currentDashModalCategory) {
+          btn.className = `px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 ${activeColorMap[cat] || 'bg-indigo-600 text-white'}`;
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100';
+        }
+      });
+
+      const headingElem = document.getElementById('dash-status-modal-heading');
+      const iconElem = document.getElementById('dash-status-modal-icon');
+      const subElem = document.getElementById('dash-status-modal-sub');
+
+      const titles = {
+        'Absent': { title: 'আজকের অনুপস্থিত কর্মচারী তালিকা (Absent Today)', icon: '<i class="fa-solid fa-user-xmark"></i>', bg: 'bg-rose-50 text-rose-600' },
+        'On Leave': { title: 'আজকের ছুটিতে থাকা কর্মচারী তালিকা (On Leave Today)', icon: '<i class="fa-solid fa-umbrella-beach"></i>', bg: 'bg-amber-50 text-amber-600' },
+        'Day Off': { title: 'আজকের ডে অফ কর্মচারী তালিকা (Day Off Today)', icon: '<i class="fa-solid fa-mug-hot"></i>', bg: 'bg-sky-50 text-sky-600' },
+        'Present': { title: 'আজকের উপস্থিত কর্মচারী তালিকা (Present Today)', icon: '<i class="fa-solid fa-user-check"></i>', bg: 'bg-emerald-50 text-emerald-600' },
+        'Increment Due': { title: 'ইনক্রিমেন্ট ডিউ কর্মচারী তালিকা (1 Year+ Eligible)', icon: '<i class="fa-solid fa-award"></i>', bg: 'bg-purple-50 text-purple-600' },
+        'ALL': { title: 'প্রতিষ্ঠানের সকল সক্রিয় কর্মচারী তালিকা (All Active Workforce)', icon: '<i class="fa-solid fa-users"></i>', bg: 'bg-indigo-50 text-indigo-600' }
+      };
+
+      const info = titles[currentDashModalCategory] || titles['ALL'];
+      if (headingElem) headingElem.innerText = info.title;
+      if (iconElem) {
+        iconElem.innerHTML = info.icon;
+        iconElem.className = `w-8 h-8 rounded-xl flex items-center justify-center text-sm ${info.bg}`;
+      }
+      if (subElem) {
+        const branchTxt = selectedActiveBranch === 'ALL' ? '🏢 সকল ব্রাঞ্চ (Global)' : `🏢 ব্রাঞ্চ: ${selectedActiveBranch}`;
+        const dateTxt = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+        subElem.innerText = `${dateTxt} • ${branchTxt}`;
+      }
+    }
+
+    window.renderDashboardStatusModalList = function() {
+      const tbody = document.getElementById('dash-status-modal-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const searchTxt = document.getElementById('dash-status-search-input') 
+        ? document.getElementById('dash-status-search-input').value.toLowerCase().trim() 
+        : '';
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const today = new Date();
+
+      let absentList = [];
+      let leaveListMatch = [];
+      let dayOffList = [];
+      let presentList = [];
+      let incDueList = [];
+      let allScopeList = [];
+
+      employeeList.forEach(emp => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+
+        allScopeList.push(emp);
+
+        // Check Attendance
+        const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        let st = att ? (typeof att === 'object' ? att.status : att) : null;
+        let punchTime = (att && typeof att === 'object') ? (att.punchTime || att.time || '') : '';
+        let method = (att && typeof att === 'object') ? (att.method || '') : '';
+
+        // Check active approved leave
+        const activeLeave = leaveList.find(l => 
+          (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) &&
+          l.status === 'Approved' &&
+          todayStr >= l.startDate &&
+          todayStr <= l.endDate
+        );
+
+        if (!st) {
+          if (activeLeave) {
+            st = 'On Leave';
+          } else {
+            st = 'Absent';
+          }
+        }
+
+        // Check Increment
+        const joinDate = new Date(emp.joiningDate || emp.createdAt || new Date());
+        const lastIncDate = emp.lastIncrementDate ? new Date(emp.lastIncrementDate) : joinDate;
+        const diffMonths = (today.getFullYear() - lastIncDate.getFullYear()) * 12 + (today.getMonth() - lastIncDate.getMonth());
+        const isIncDue = diffMonths >= 12;
+
+        const record = {
+          emp,
+          status: st,
+          punchTime,
+          method,
+          activeLeave,
+          isIncDue,
+          diffMonths,
+          lastIncDate
+        };
+
+        if (st === 'Present' || st === 'Late') presentList.push(record);
+        else if (st === 'On Leave') leaveListMatch.push(record);
+        else if (st === 'Day Off') dayOffList.push(record);
+        else absentList.push(record);
+
+        if (isIncDue) incDueList.push(record);
+      });
+
+      // Update Tab Badges
+      const bAbsent = document.getElementById('dash-tab-badge-Absent');
+      if (bAbsent) bAbsent.innerText = absentList.length;
+      const bLeave = document.getElementById('dash-tab-badge-On Leave');
+      if (bLeave) bLeave.innerText = leaveListMatch.length;
+      const bDayOff = document.getElementById('dash-tab-badge-Day Off');
+      if (bDayOff) bDayOff.innerText = dayOffList.length;
+      const bPres = document.getElementById('dash-tab-badge-Present');
+      if (bPres) bPres.innerText = presentList.length;
+      const bInc = document.getElementById('dash-tab-badge-Increment Due');
+      if (bInc) bInc.innerText = incDueList.length;
+      const bAll = document.getElementById('dash-tab-badge-ALL');
+      if (bAll) bAll.innerText = allScopeList.length;
+
+      // Select target dataset
+      let targetRecords = [];
+      if (currentDashModalCategory === 'Absent') targetRecords = absentList;
+      else if (currentDashModalCategory === 'On Leave') targetRecords = leaveListMatch;
+      else if (currentDashModalCategory === 'Day Off') targetRecords = dayOffList;
+      else if (currentDashModalCategory === 'Present') targetRecords = presentList;
+      else if (currentDashModalCategory === 'Increment Due') targetRecords = incDueList;
+      else {
+        targetRecords = allScopeList.map(emp => {
+          const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+          let st = att ? (typeof att === 'object' ? att.status : att) : null;
+          const activeLeave = leaveList.find(l => 
+            (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) &&
+            l.status === 'Approved' &&
+            todayStr >= l.startDate &&
+            todayStr <= l.endDate
+          );
+          if (!st) st = activeLeave ? 'On Leave' : 'Absent';
+          return { emp, status: st, activeLeave };
+        });
+      }
+
+      // Filter by search text
+      let filtered = targetRecords.filter(r => {
+        if (!searchTxt) return true;
+        const e = r.emp;
+        const name = (e.name || '').toLowerCase();
+        const code = (e.customEmpCode || '').toLowerCase();
+        const desig = (e.designation || '').toLowerCase();
+        const dept = (e.department || '').toLowerCase();
+        const branch = (e.branch || '').toLowerCase();
+        const phone = (e.phone || '').toLowerCase();
+        return name.includes(searchTxt) || code.includes(searchTxt) || desig.includes(searchTxt) || dept.includes(searchTxt) || branch.includes(searchTxt) || phone.includes(searchTxt);
+      });
+
+      const summaryElem = document.getElementById('dash-status-modal-summary');
+      if (summaryElem) {
+        summaryElem.innerText = `মোট ${filtered.length} জন কর্মচারী প্রদর্শিত হচ্ছে (সর্বমোট ${targetRecords.length} জন)`;
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center text-slate-400">
+              <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-2 text-slate-400 text-lg">
+                <i class="fa-solid fa-users-slash"></i>
+              </div>
+              <p class="font-bold text-slate-600">কোনো কর্মচারীর রেকর্ড পাওয়া যায়নি</p>
+              <p class="text-xs text-slate-400 mt-0.5">${searchTxt ? 'অনুসন্ধানের সাথে কোনো তথ্য মেলেনি' : 'এই ক্যাটাগরিতে বর্তমানে কোনো কর্মচারী নেই'}</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtered.forEach((r) => {
+        const emp = r.emp;
+        const status = r.status;
+        const photo = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff`;
+        const phoneClean = formatWhatsAppPhone(emp.phone);
+
+        // Status Badge
+        let badgeHtml = '';
+        if (status === 'Present') badgeHtml = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center"><i class="fa-solid fa-circle-check mr-1 text-emerald-500"></i>উপস্থিত</span>';
+        else if (status === 'Late') badgeHtml = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center"><i class="fa-solid fa-clock mr-1 text-amber-500"></i>দেরিতে উপস্থিত</span>';
+        else if (status === 'On Leave') badgeHtml = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 inline-flex items-center"><i class="fa-solid fa-umbrella-beach mr-1 text-purple-500"></i>ছুটিতে (Leave)</span>';
+        else if (status === 'Day Off') badgeHtml = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 inline-flex items-center"><i class="fa-solid fa-mug-hot mr-1 text-sky-500"></i>ডে অফ (Off-day)</span>';
+        else badgeHtml = '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center"><i class="fa-solid fa-circle-xmark mr-1 text-rose-500"></i>অনুপস্থিত (Absent)</span>';
+
+        // Detail Column
+        let detailHtml = '';
+        if (currentDashModalCategory === 'Increment Due' || r.isIncDue) {
+          detailHtml = `
+            <div class="space-y-0.5">
+              <div class="font-bold text-purple-900 text-xs">⭐ ইনক্রিমেন্ট দেওয়ার সময় হয়েছে</div>
+              <div class="text-[11px] text-slate-500">যোগদান: ${emp.joiningDate || 'N/A'} • মূল বেতন: <b class="text-slate-800">৳ ${(emp.salary || 0).toLocaleString()}</b></div>
+            </div>
+          `;
+        } else if (status === 'On Leave') {
+          const lv = r.activeLeave;
+          if (lv) {
+            detailHtml = `
+              <div class="space-y-0.5">
+                <div class="font-bold text-purple-900 text-xs">🌴 ${lv.leaveType} (${lv.startDate} হতে ${lv.endDate})</div>
+                <div class="text-[11px] text-slate-500 italic max-w-xs truncate">${lv.reason ? `কারণ: ${lv.reason}` : 'অনুমোদিত ছুটি'}</div>
+              </div>
+            `;
+          } else {
+            detailHtml = '<span class="text-xs text-purple-700 font-medium">আজকের দিনে অনুমোদিত ছুটি রয়েছে</span>';
+          }
+        } else if (status === 'Day Off') {
+          detailHtml = '<span class="text-xs text-sky-700 font-medium">সাপ্তাহিক বা নির্ধারিত ছুটির দিন (Day Off)</span>';
+        } else if (status === 'Present' || status === 'Late') {
+          detailHtml = `
+            <div class="space-y-0.5">
+              <div class="font-bold text-emerald-800 text-xs">⏰ ইন-টাইম: ${r.punchTime || 'সকাল ৯:০০'}</div>
+              <div class="text-[11px] text-slate-500">${r.method ? `মেথড: ${r.method}` : 'বায়োমেট্রিক পাঞ্চ ভেরিফায়েড'}</div>
+            </div>
+          `;
+        } else {
+          detailHtml = `
+            <div class="space-y-0.5">
+              <div class="font-bold text-rose-700 text-xs">❌ হাজিরা বা ছুটির রেকর্ড নেই</div>
+              <div class="text-[11px] text-slate-500">অননুমোদিত অনুপস্থিতি</div>
+            </div>
+          `;
+        }
+
+        // WhatsApp / Call Actions
+        let contactAction = '';
+        if (phoneClean) {
+          const defaultMsg = encodeURIComponent(`সম্মানিত ${emp.name}, HRMS সিস্টেম থেকে জানানো হচ্ছে যে আজকে আপনার হাজিরা স্ট্যাটাস: ${status}। কোনো সহায়তার প্রয়োজন হলে যোগাযোগ করুন।`);
+          contactAction = `
+            <div class="flex items-center justify-end space-x-1.5">
+              <a href="https://api.whatsapp.com/send?phone=${phoneClean}&text=${defaultMsg}" target="_blank" title="WhatsApp এ মেসেজ দিন" class="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs transition border border-emerald-200">
+                <i class="fa-brands fa-whatsapp text-sm"></i>
+              </a>
+              <a href="tel:${emp.phone}" title="কল করুন" class="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs transition border border-indigo-200">
+                <i class="fa-solid fa-phone text-xs"></i>
+              </a>
+              <span class="text-[11px] font-mono text-slate-600 font-bold hidden sm:inline">${emp.phone}</span>
+            </div>
+          `;
+        } else {
+          contactAction = '<span class="text-[11px] text-slate-400 italic">নম্বর নেই</span>';
+        }
+
+        const row = `
+          <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-xs">
+            <td class="px-4 py-3 flex items-center space-x-3">
+              <img src="${photo}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
+              <div class="min-w-0">
+                <div class="font-bold text-slate-900 truncate">${emp.name}</div>
+                <div class="text-[11px] text-indigo-600 font-semibold">ID: <span class="bg-indigo-50 text-indigo-700 px-1 py-0.2 rounded font-bold">${emp.customEmpCode || 'N/A'}</span></div>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="font-semibold text-slate-800">${emp.designation}</div>
+              <div class="text-[11px] text-slate-500">${emp.department || 'General'} • <span class="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-bold">🏢 ${emp.branch || 'Head Office'}</span></div>
+            </td>
+            <td class="px-4 py-3">${badgeHtml}</td>
+            <td class="px-4 py-3">${detailHtml}</td>
+            <td class="px-4 py-3 text-right">${contactAction}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    };
+
+    window.printDashModalList = function() {
+      const modalContent = document.getElementById('dash-status-modal-tbody');
+      const title = document.getElementById('dash-status-modal-heading').innerText;
+      const subtitle = document.getElementById('dash-status-modal-sub').innerText;
+      if (!modalContent) return;
+
+      const printWin = window.open('', '_blank');
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; }
+            h2 { margin-bottom: 4px; }
+            p { margin-top: 0; color: #64748b; font-size: 13px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+            th { background: #f1f5f9; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h2>${title}</h2>
+          <p>${subtitle}</p>
+          <table>
+            <thead>
+              <tr><th>Employee</th><th>Branch & Role</th><th>Status</th><th>Details</th><th>Contact</th></tr>
+            </thead>
+            <tbody>
+              ${modalContent.innerHTML}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 500);
+    };
 
     function loadEmployeesRealtime() {
       onSnapshot(collection(db, "employees"), (snapshot) => {
@@ -2729,6 +3100,7 @@ ${messageText}
         });
         renderLeaveTable();
         calculateMyPersonalSummary();
+        updateAttendanceDashboardMetrics();
       });
     }
 
@@ -4811,52 +5183,69 @@ ${messageText}
         <!-- 1. DASHBOARD VIEW -->
         <section id="sec-dashboard" class="space-y-6">
 
-          <!-- Admin Metric Cards (5 Original Cards) -->
-          <div id="admin-dash-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <!-- Admin Metric Cards (6 Interactive Clickable Cards) -->
+          <div id="admin-dash-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            
+            <!-- 1. Total Workforce -->
+            <div onclick="openDashboardStatusModal('ALL')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-indigo-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL WORKFORCE</p>
-                <h3 id="dash-total-emp" class="text-2xl font-black text-slate-900 mt-1">0</h3>
-                <span class="text-[11px] text-emerald-600 font-bold flex items-center mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Active registered members</span>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TOTAL WORKFORCE</p>
+                <h3 id="dash-total-emp" class="text-2xl font-black text-slate-900 mt-0.5">0</h3>
+                <span class="text-[10px] text-indigo-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-list-check mr-1"></i>তালিকা দেখুন <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
               </div>
-              <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-users"></i></div>
+              <div class="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-users"></i></div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <!-- 2. Present Today -->
+            <div onclick="openDashboardStatusModal('Present')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">PRESENT TODAY</p>
-                <h3 id="dash-present-today" class="text-2xl font-black text-emerald-600 mt-1">0</h3>
-                <span class="text-[11px] text-emerald-600 font-bold flex items-center mt-1"><i class="fa-solid fa-chart-line mr-1"></i>Live daily check-ins</span>
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">PRESENT TODAY</p>
+                <h3 id="dash-present-today" class="text-2xl font-black text-emerald-600 mt-0.5">0</h3>
+                <span class="text-[10px] text-emerald-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-user-check mr-1"></i>উপস্থিত তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
               </div>
-              <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-user-check"></i></div>
+              <div class="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-user-check"></i></div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <!-- 3. Absent Today -->
+            <div onclick="openDashboardStatusModal('Absent')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-rose-100 hover:ring-rose-300">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">ABSENT TODAY</p>
-                <h3 id="dash-absent-today" class="text-2xl font-black text-rose-600 mt-1">0</h3>
-                <span class="text-[11px] text-rose-500 font-bold flex items-center mt-1">Noted unexcused logs</span>
+                <p class="text-[11px] font-bold text-rose-500 uppercase tracking-wider">ABSENT TODAY</p>
+                <h3 id="dash-absent-today" class="text-2xl font-black text-rose-600 mt-0.5">0</h3>
+                <span class="text-[10px] text-rose-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-user-xmark mr-1"></i>অনুপস্থিত তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
               </div>
-              <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-user-xmark"></i></div>
+              <div class="w-11 h-11 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-user-xmark"></i></div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <!-- 4. On Leave -->
+            <div onclick="openDashboardStatusModal('On Leave')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-amber-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-amber-100 hover:ring-amber-300">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">ON LEAVE</p>
-                <h3 id="dash-leave-today" class="text-2xl font-black text-amber-600 mt-1">0</h3>
-                <span class="text-[11px] text-amber-600 font-bold flex items-center mt-1">Approved leaves today</span>
+                <p class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">ON LEAVE</p>
+                <h3 id="dash-leave-today" class="text-2xl font-black text-amber-600 mt-0.5">0</h3>
+                <span class="text-[10px] text-amber-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-umbrella-beach mr-1"></i>ছুটির তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
               </div>
-              <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-calendar-day"></i></div>
+              <div class="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-umbrella-beach"></i></div>
             </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <!-- 5. Day Off Today -->
+            <div onclick="openDashboardStatusModal('Day Off')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-sky-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5 ring-1 ring-sky-100 hover:ring-sky-300">
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">INCREMENT DUE</p>
-                <h3 id="dash-inc-due" class="text-2xl font-black text-purple-600 mt-1">0</h3>
-                <span class="text-[11px] text-purple-600 font-bold flex items-center mt-1">1 Year+ eligible count</span>
+                <p class="text-[11px] font-bold text-sky-600 uppercase tracking-wider">DAY OFF</p>
+                <h3 id="dash-dayoff-today" class="text-2xl font-black text-sky-600 mt-0.5">0</h3>
+                <span class="text-[10px] text-sky-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-mug-hot mr-1"></i>অফ-ডে তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
               </div>
-              <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-lg"><i class="fa-solid fa-award"></i></div>
+              <div class="w-11 h-11 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-mug-hot"></i></div>
             </div>
+
+            <!-- 6. Increment Due -->
+            <div onclick="openDashboardStatusModal('Increment Due')" class="bg-white p-4.5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-purple-300 transition duration-200 cursor-pointer group flex items-center justify-between transform hover:-translate-y-0.5">
+              <div>
+                <p class="text-[11px] font-bold text-purple-600 uppercase tracking-wider">INCREMENT DUE</p>
+                <h3 id="dash-inc-due" class="text-2xl font-black text-purple-600 mt-0.5">0</h3>
+                <span class="text-[10px] text-purple-600 font-bold flex items-center mt-1 group-hover:underline"><i class="fa-solid fa-award mr-1"></i>ডিউ তালিকা <i class="fa-solid fa-arrow-right ml-1 opacity-0 group-hover:opacity-100 transition"></i></span>
+              </div>
+              <div class="w-11 h-11 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-base shrink-0 group-hover:scale-110 transition"><i class="fa-solid fa-award"></i></div>
+            </div>
+
           </div>
 
           <!-- Employee Self Profile (Shown when Role = Employee) -->
@@ -6563,6 +6952,102 @@ ${messageText}
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 10. DASHBOARD DETAILED STATUS MODAL (Interactive Drilldown for Absent/Leave/DayOff/Present/Increment) -->
+  <div id="dash-status-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+    <div class="bg-white rounded-3xl max-w-5xl w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header -->
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="space-y-0.5">
+          <h3 class="text-base font-black text-slate-900 flex items-center space-x-2.5">
+            <span id="dash-status-modal-icon" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-sm"><i class="fa-solid fa-user-xmark"></i></span>
+            <span id="dash-status-modal-heading">আজকের অনুপস্থিত কর্মচারী তালিকা (Absent Today)</span>
+          </h3>
+          <p id="dash-status-modal-sub" class="text-xs text-slate-500 font-medium">রিয়েলটাইম হাজিরা ও ছুটির বিবরণী • 🏢 সকল ব্রাঞ্চ</p>
+        </div>
+        <button onclick="toggleModal('dash-status-modal', false)" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center text-sm transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Filter Tabs & Realtime Search Bar -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 shrink-0 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+        <!-- Category Tab Buttons -->
+        <div class="flex flex-wrap gap-1.5" id="dash-modal-tab-container">
+          <button onclick="switchDashModalTab('Absent')" id="dash-tab-Absent" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-rose-600 text-white shadow-xs">
+            <i class="fa-solid fa-user-xmark"></i>
+            <span>অনুপস্থিত (Absent)</span>
+            <span id="dash-tab-badge-Absent" class="bg-rose-700/80 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+          <button onclick="switchDashModalTab('On Leave')" id="dash-tab-On Leave" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-umbrella-beach text-amber-500"></i>
+            <span>ছুটিতে (On Leave)</span>
+            <span id="dash-tab-badge-On Leave" class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+          <button onclick="switchDashModalTab('Day Off')" id="dash-tab-Day Off" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-mug-hot text-sky-500"></i>
+            <span>ডে অফ (Day Off)</span>
+            <span id="dash-tab-badge-Day Off" class="bg-sky-100 text-sky-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+          <button onclick="switchDashModalTab('Present')" id="dash-tab-Present" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-user-check text-emerald-500"></i>
+            <span>উপস্থিত (Present)</span>
+            <span id="dash-tab-badge-Present" class="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+          <button onclick="switchDashModalTab('Increment Due')" id="dash-tab-Increment Due" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-award text-purple-500"></i>
+            <span>ইনক্রিমেন্ট (Increment)</span>
+            <span id="dash-tab-badge-Increment Due" class="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+          <button onclick="switchDashModalTab('ALL')" id="dash-tab-ALL" class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-100">
+            <i class="fa-solid fa-users text-indigo-500"></i>
+            <span>সকল (ALL)</span>
+            <span id="dash-tab-badge-ALL" class="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative min-w-[200px] sm:w-64 shrink-0">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="dash-status-search-input" onkeyup="filterDashModalList()" placeholder="নাম, পদবি বা আইডি খুঁজুন..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+      </div>
+
+      <!-- Employee List Table -->
+      <div class="flex-1 overflow-y-auto min-h-[300px] rounded-2xl border border-slate-200/80 bg-white">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-slate-100/90 text-slate-700 font-bold sticky top-0 border-b border-slate-200 z-10">
+            <tr>
+              <th class="px-4 py-3">কর্মচারী (Employee)</th>
+              <th class="px-4 py-3">শাখা ও পদবি</th>
+              <th class="px-4 py-3">স্ট্যাটাস (Status)</th>
+              <th class="px-4 py-3">বিবরণ / কারণ (Details)</th>
+              <th class="px-4 py-3 text-right">যোগাযোগ (Contact)</th>
+            </tr>
+          </thead>
+          <tbody id="dash-status-modal-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-between items-center pt-2 border-t border-slate-100 text-xs text-slate-500 shrink-0">
+        <div>
+          <span id="dash-status-modal-summary" class="font-bold text-slate-700">মোট ০ জন কর্মচারী প্রদর্শিত হচ্ছে</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="printDashModalList()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center space-x-1.5 text-xs">
+            <i class="fa-solid fa-print"></i>
+            <span>Print List</span>
+          </button>
+          <button onclick="toggleModal('dash-status-modal', false)" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-xs text-xs">
+            বন্ধ করুন (Close)
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 

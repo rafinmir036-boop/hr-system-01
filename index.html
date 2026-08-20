@@ -954,6 +954,7 @@
       const noticePostBtn = document.getElementById('notice-post-btn');
       const roleAccessSettings = document.getElementById('sec-settings-roles');
       const branchAccessSettings = document.getElementById('sec-settings-branches');
+      const waSettings = document.getElementById('sec-settings-whatsapp');
       const empBulkBtn = document.getElementById('emp-bulk-btn');
       const empAddBtn = document.getElementById('emp-add-btn');
 
@@ -963,12 +964,14 @@
         if (headerBranchContainer) headerBranchContainer.classList.add('hidden');
       }
 
-      if (currentUserRole === 'Admin' || hasPermission('can_settings')) {
+      if (currentUserRole === 'Admin' || (currentUserRole !== 'Employee' && hasPermission('can_settings'))) {
         if (roleAccessSettings) roleAccessSettings.classList.remove('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.remove('hidden');
+        if (waSettings) waSettings.classList.remove('hidden');
       } else {
         if (roleAccessSettings) roleAccessSettings.classList.add('hidden');
         if (branchAccessSettings) branchAccessSettings.classList.add('hidden');
+        if (waSettings) waSettings.classList.add('hidden');
       }
 
       if (advAddBtn) {
@@ -2827,8 +2830,27 @@ ${messageText}
 
         // Trigger WhatsApp notification to Employee if enabled
         if (whatsappConfig.notifyOnLeaveDecision !== false && lv) {
-          const emp = employeeList.find(e => e.id === lv.employeeId || e.name === lv.employeeName);
-          const empPhone = (emp && emp.phone) ? emp.phone : (lv.employeePhone || '');
+          // Robustly resolve employee profile from memory or Firestore
+          let emp = employeeList.find(e => 
+            e.id === lv.employeeId || 
+            (lv.appliedBy && e.email && e.email.toLowerCase() === lv.appliedBy.toLowerCase()) ||
+            (lv.employeeName && e.name && e.name.toLowerCase() === lv.employeeName.toLowerCase())
+          );
+          
+          let empPhone = (emp && emp.phone) ? emp.phone : (lv.employeePhone || '');
+
+          // If still no phone, try fetching directly from Firestore employees collection
+          if (!empPhone && lv.employeeId) {
+            try {
+              const empSnap = await getDoc(doc(db, "employees", lv.employeeId));
+              if (empSnap.exists()) {
+                const ed = empSnap.data();
+                if (ed.phone) empPhone = ed.phone;
+                if (!emp) emp = { id: empSnap.id, ...ed };
+              }
+            } catch (e) {}
+          }
+
           const empName = lv.employeeName || (emp ? emp.name : 'Staff');
           const empCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (lv.customEmpCode || 'N/A');
           const empBranch = lv.branch || (emp ? emp.branch : 'Head Office') || 'Head Office';
@@ -2870,12 +2892,22 @@ ${messageText}
                   `🏢 *HRMS Enterprise Management*`;
           }
 
-          triggerWhatsAppNotification(
-            empPhone,
-            msg,
-            status === 'Approved' ? '✨ ছুটি অনুমোদনের বার্তা পাঠান' : '⚠️ ছুটির সিদ্ধান্ত পাঠান',
-            `"${empName}" এর ছুটির আবেদন ${status === 'Approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} হয়েছে। সুন্দর ফরম্যাটের বার্তা প্রস্তুত:`
-          );
+          const cleanPhone = formatWhatsAppPhone(empPhone);
+          if (cleanPhone) {
+            triggerWhatsAppNotification(
+              cleanPhone,
+              msg,
+              status === 'Approved' ? '✨ ছুটি অনুমোদনের বার্তা পাঠান' : '⚠️ ছুটির সিদ্ধান্ত পাঠান',
+              `কর্মচারী "${empName}" এর হোয়াটসঅ্যাপ নম্বরে (${cleanPhone}) বার্তা পাঠানো হচ্ছে:`
+            );
+          } else {
+            Swal.fire({
+              icon: 'warning',
+              title: 'কর্মচারীর মোবাইল নম্বর পাওয়া যায়নি!',
+              html: `কর্মচারী <b>"${empName}"</b> এর প্রোফাইলে কোনো মোবাইল নম্বর নেই। ফলে সরাসরি WhatsApp এ বার্তা পাঠানো যায়নি।<br><br><span class="text-xs text-slate-500">অনুগ্রহ করে কর্মচারী ব্যবস্থাপনা বা সেটিংস থেকে তার প্রোফাইলে মোবাইল নম্বর আপডেট করুন।</span>`,
+              confirmButtonColor: '#4f46e5'
+            });
+          }
         }
       } catch (err) {
         showToast('error', err.message);
@@ -2944,10 +2976,10 @@ ${messageText}
       }
 
       const emp = employeeList.find(e => e.id === empId);
-      const empPhone = emp ? (emp.phone || '') : '';
-      const empName = emp ? emp.name : 'Unknown Staff';
-      const empBranch = emp ? (emp.branch || 'Head Office') : 'Head Office';
-      const empCode = emp ? (emp.customEmpCode || '') : '';
+      const empPhone = emp ? (emp.phone || '') : (myEmployeeProfile ? (myEmployeeProfile.phone || '') : '');
+      const empName = emp ? emp.name : (myEmployeeProfile ? myEmployeeProfile.name : 'Unknown Staff');
+      const empBranch = emp ? (emp.branch || 'Head Office') : (myEmployeeProfile ? (myEmployeeProfile.branch || 'Head Office') : 'Head Office');
+      const empCode = emp ? (emp.customEmpCode || '') : (myEmployeeProfile ? (myEmployeeProfile.customEmpCode || '') : '');
 
       await addDoc(collection(db, "leaves"), {
         employeeId: empId,
@@ -2985,6 +3017,7 @@ ${messageText}
                     `সম্মানিত অ্যাডমিন, একজন কর্মচারী ছুটির আবেদন জমা দিয়েছেন।\n\n` +
                     `👤 *কর্মচারীর তথ্য:*\n` +
                     `▫️ *নাম:* ${empName}\n` +
+                    `▫️ *মোবাইল:* ${empPhone || 'প্রোফাইলে নম্বর নেই'}\n` +
                     `▫️ *আইডি (Emp Code):* ${empCode || 'N/A'}\n` +
                     `▫️ *শাখা:* 🏢 ${empBranch}\n\n` +
                     `📋 *ছুটির বিবরণ:*\n` +

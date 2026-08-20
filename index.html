@@ -73,6 +73,7 @@
     let docList = [];
     let advanceList = [];
     let fineList = [];
+    let activityLogList = [];
     let userPermissions = {};
     let currentUserPermissions = {};
     let branchList = [];
@@ -218,6 +219,7 @@
         loadCompanyDocsRealtime();
         loadPerformanceRealtime();
         loadNoticesRealtime();
+        loadActivityLogsRealtime();
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
@@ -376,6 +378,14 @@
           managerEmail: managerEmail || '', 
           createdAt: new Date().toISOString()
         });
+
+        await logSystemActivity(
+          'CREATE',
+          'Settings',
+          `${currentUserEmail} added new branch: "${name}" (${code || 'BR'}, City: ${city || 'Bangladesh'})`,
+          { branchName: name, branchCode: code, city }
+        );
+
         document.getElementById('branch-form').reset();
         showToast('success', `নতুন ব্রাঞ্চ "${name}" যুক্ত হয়েছে!`);
       } catch (err) {
@@ -385,8 +395,18 @@
 
     window.deleteBranchRecord = async function(id) {
       if (confirm("এই ব্রাঞ্চ মুছে ফেলতে চান?")) {
-        await deleteDoc(doc(db, "branches", id));
-        showToast('success', 'ব্রাঞ্চ মুছে ফেলা হয়েছে');
+        try {
+          await deleteDoc(doc(db, "branches", id));
+          await logSystemActivity(
+            'DELETE',
+            'Settings',
+            `${currentUserEmail} deleted branch record (${id})`,
+            { branchId: id }
+          );
+          showToast('success', 'ব্রাঞ্চ মুছে ফেলা হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
       }
     };
 
@@ -408,7 +428,8 @@
       'can_performance',
       'can_notices',
       'can_reports',
-      'can_settings'
+      'can_settings',
+      'can_activity'
     ];
 
     function getDefaultPermissionsForRole(role) {
@@ -428,7 +449,8 @@
           can_performance: true,
           can_notices: true,
           can_reports: true,
-          can_settings: true
+          can_settings: true,
+          can_activity: true
         };
       } else if (role === 'Operation' || role === 'Operations Manager') {
         return {
@@ -446,7 +468,8 @@
           can_performance: true,
           can_notices: true,
           can_reports: true,
-          can_settings: false
+          can_settings: false,
+          can_activity: true
         };
       } else if (role === 'Area Manager') {
         return {
@@ -464,7 +487,8 @@
           can_performance: true,
           can_notices: true,
           can_reports: true,
-          can_settings: false
+          can_settings: false,
+          can_activity: true
         };
       } else if (role === 'Manager' || role === 'Branch Manager') {
         return {
@@ -482,7 +506,8 @@
           can_performance: false,
           can_notices: true,
           can_reports: true,
-          can_settings: false
+          can_settings: false,
+          can_activity: false
         };
       } else if (role === 'Fine Operator' || role === 'Fine Executive') {
         return {
@@ -500,7 +525,8 @@
           can_performance: false,
           can_notices: false,
           can_reports: false,
-          can_settings: false
+          can_settings: false,
+          can_activity: false
         };
       } else { // Employee
         return {
@@ -518,7 +544,8 @@
           can_performance: false,
           can_notices: true,
           can_reports: false,
-          can_settings: false
+          can_settings: false,
+          can_activity: false
         };
       }
     }
@@ -649,15 +676,33 @@
       try {
         if (docId) {
           await updateDoc(doc(db, "user_roles", docId), payload);
+          await logSystemActivity(
+            'UPDATE',
+            'Settings',
+            `${currentUserEmail} updated role & permissions for user "${email}" (Role: ${role}, Branch: ${branch || 'ALL'})`,
+            { email, role, branch }
+          );
           showToast('success', `ইউজার "${email}" এর পারমিশন সফলভাবে আপডেট হয়েছে!`);
         } else {
           const existingUser = Object.values(userPermissions).find(u => u.email && u.email.toLowerCase() === email);
           if (existingUser && existingUser.id) {
             await updateDoc(doc(db, "user_roles", existingUser.id), payload);
+            await logSystemActivity(
+              'UPDATE',
+              'Settings',
+              `${currentUserEmail} updated role & permissions for user "${email}" (Role: ${role}, Branch: ${branch || 'ALL'})`,
+              { email, role, branch }
+            );
             showToast('success', `ইউজার "${email}" এর পারমিশন সফলভাবে আপডেট হয়েছে!`);
           } else {
             payload.createdAt = new Date().toISOString();
             await addDoc(collection(db, "user_roles"), payload);
+            await logSystemActivity(
+              'CREATE',
+              'Settings',
+              `${currentUserEmail} created new system user role "${email}" (Role: ${role}, Branch: ${branch || 'ALL'})`,
+              { email, role, branch }
+            );
             showToast('success', `নতুন ইউজার "${email}" সফলভাবে তৈরি ও রোল প্রদান করা হয়েছে!`);
           }
         }
@@ -671,6 +716,12 @@
       if (confirm("এই ইউজারের রোল ও পারমিশন মুছে ফেলতে চান?")) {
         try {
           await deleteDoc(doc(db, "user_roles", id));
+          await logSystemActivity(
+            'DELETE',
+            'Settings',
+            `${currentUserEmail} deleted user role assignment (${id})`,
+            { roleId: id }
+          );
           showToast('success', 'ইউজার পারমিশন মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -861,7 +912,8 @@
         'performance': 'can_performance',
         'notice': 'can_notices',
         'reports': 'can_reports',
-        'settings': 'can_settings'
+        'settings': 'can_settings',
+        'activity': 'can_activity'
       };
 
       Object.keys(navMapping).forEach(navId => {
@@ -1255,6 +1307,7 @@
             salary,
             photoUrl
           });
+          await logSystemActivity('UPDATE', 'Employee', `${currentUserEmail} updated employee "${name}" (ID: ${customEmpCode}, Branch: ${branch || 'Head Office'})`, { employeeId: id, employeeName: name, customEmpCode });
           showToast('success', `কর্মচারী "${name}" এর তথ্য সফলভাবে আপডেট হয়েছে!`);
         } else {
           await addDoc(collection(db, "employees"), {
@@ -1272,6 +1325,7 @@
             docUrl: '#',
             createdAt: new Date().toISOString()
           });
+          await logSystemActivity('CREATE', 'Employee', `${currentUserEmail} created new employee "${name}" (ID: ${customEmpCode}, Branch: ${branch || 'Head Office'})`, { employeeName: name, customEmpCode });
           showToast('success', `নতুন কর্মচারী "${name}" সফলভাবে যুক্ত হয়েছে!`);
         }
         toggleModal('employee-modal', false);
@@ -1286,6 +1340,7 @@
       if (confirm(`আপনি কি নিশ্চিতভাবে "${name}" কে মুছে ফেলতে চান?`)) {
         try {
           await deleteDoc(doc(db, "employees", id));
+          await logSystemActivity('DELETE', 'Employee', `${currentUserEmail} deleted employee "${name}" (ID: ${emp ? emp.customEmpCode : 'N/A'})`, { employeeId: id, employeeName: name });
           showToast('success', 'কর্মচারী মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -1434,6 +1489,14 @@
           method: 'Manual Override',
           updatedAt: now.toISOString()
         });
+
+        await logSystemActivity(
+          'UPDATE',
+          'Attendance',
+          `${currentUserEmail} manually marked "${emp ? emp.name : 'Staff'}" as ${status} on ${selectedDate}`,
+          { employeeName: emp ? emp.name : '', status, date: selectedDate }
+        );
+
         showToast('success', `${emp ? emp.name : 'কর্মচারী'} এর উপস্থিতি (${status}) আপডেট করা হয়েছে`);
       } catch (err) {
         showToast('error', err.message);
@@ -1810,6 +1873,13 @@
           createdAt: new Date().toISOString()
         });
 
+        await logSystemActivity(
+          'CREATE',
+          'Advance',
+          `${currentUserEmail} added advance salary ৳${amount.toLocaleString()} for "${emp ? emp.name : 'Staff'}" (${month})`,
+          { employeeName: emp ? emp.name : '', amount, month }
+        );
+
         document.getElementById('adv-form').reset();
         toggleModal('add-adv-modal', false);
         showToast('success', 'অগ্রিম বেতনের আবেদন যুক্ত হয়েছে! (Pending Approval)');
@@ -1951,12 +2021,21 @@
 
     window.updateAdvanceStatus = async function(id, newStatus) {
       try {
+        const adv = advanceList.find(a => a.id === id);
         await updateDoc(doc(db, "advances", id), {
           status: newStatus,
           approvedBy: currentUserEmail,
           updatedAt: new Date().toISOString(),
           clearedAt: newStatus === 'Cleared' ? new Date().toISOString() : null
         });
+
+        await logSystemActivity(
+          newStatus === 'Approved' ? 'APPROVE' : (newStatus === 'Rejected' ? 'REJECT' : 'UPDATE'),
+          'Advance',
+          `${currentUserEmail} updated advance salary status to "${newStatus}" for "${adv ? adv.employeeName : 'Staff'}" (৳${adv ? adv.amount : 0})`,
+          { advanceId: id, status: newStatus, employeeName: adv ? adv.employeeName : '' }
+        );
+
         showToast('success', `অগ্রিম বেতনের স্ট্যাটাস: ${newStatus}`);
       } catch (err) {
         showToast('error', err.message);
@@ -1964,9 +2043,17 @@
     };
 
     window.deleteAdvanceRecord = async function(id) {
-      if (confirm('এই অগ্রিম বেতনের এন্ট্রি মুছে ফেলতে চান?')) {
+      const adv = advanceList.find(a => a.id === id);
+      const name = adv ? adv.employeeName : 'Staff';
+      if (confirm(`এই অগ্রিম বেতনের এন্ট্রি (৳${adv ? adv.amount : 0}) মুছে ফেলতে চান?`)) {
         try {
           await deleteDoc(doc(db, "advances", id));
+          await logSystemActivity(
+            'DELETE',
+            'Advance',
+            `${currentUserEmail} deleted advance salary record of "${name}" (৳${adv ? adv.amount : 0}, Month: ${adv ? adv.month : ''})`,
+            { advanceId: id, employeeName: name }
+          );
           showToast('success', 'অগ্রিম বেতনের রেকর্ড মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -2010,6 +2097,13 @@
           recordedBy: currentUserEmail,
           createdAt: new Date().toISOString()
         });
+
+        await logSystemActivity(
+          'CREATE',
+          'Fine',
+          `${currentUserEmail} added fine penalty ৳${amount.toLocaleString()} for "${emp ? emp.name : 'Staff'}" (${category})`,
+          { employeeName: emp ? emp.name : '', amount, category, month }
+        );
 
         document.getElementById('fine-form').reset();
         toggleModal('add-fine-modal', false);
@@ -2150,12 +2244,21 @@
 
     window.updateFineStatus = async function(id, newStatus) {
       try {
+        const fn = fineList.find(f => f.id === id);
         await updateDoc(doc(db, "fines", id), {
           status: newStatus,
           updatedBy: currentUserEmail,
           updatedAt: new Date().toISOString(),
           clearedAt: newStatus === 'Deducted' ? new Date().toISOString() : null
         });
+
+        await logSystemActivity(
+          newStatus === 'Deducted' ? 'APPROVE' : (newStatus === 'Waived' ? 'UPDATE' : 'UPDATE'),
+          'Fine',
+          `${currentUserEmail} updated fine status to "${newStatus}" for "${fn ? fn.employeeName : 'Staff'}" (৳${fn ? fn.amount : 0})`,
+          { fineId: id, status: newStatus, employeeName: fn ? fn.employeeName : '' }
+        );
+
         showToast('success', `জরিমানার স্ট্যাটাস: ${newStatus}`);
       } catch (err) {
         showToast('error', err.message);
@@ -2163,9 +2266,17 @@
     };
 
     window.deleteFineRecord = async function(id) {
-      if (confirm('এই জরিমানার রেকর্ডটি মুছে ফেলতে চান?')) {
+      const fn = fineList.find(f => f.id === id);
+      const name = fn ? fn.employeeName : 'Staff';
+      if (confirm(`এই জরিমানার রেকর্ডটি (৳${fn ? fn.amount : 0}) মুছে ফেলতে চান?`)) {
         try {
           await deleteDoc(doc(db, "fines", id));
+          await logSystemActivity(
+            'DELETE',
+            'Fine',
+            `${currentUserEmail} deleted fine record of "${name}" (৳${fn ? fn.amount : 0}, Category: ${fn ? fn.category : ''})`,
+            { fineId: id, employeeName: name }
+          );
           showToast('success', 'জরিমানার রেকর্ড মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -2195,6 +2306,7 @@
         : leaveList;
 
       const canApprove = hasPermission('can_leave_approve');
+      const canManage = currentUserRole === 'Admin' || hasPermission('can_leave_approve');
 
       listToRender.forEach((lv) => {
         if (!isItemInActiveBranch(lv.branch)) return;
@@ -2225,6 +2337,14 @@
           }
         }
 
+        if (canManage) {
+          actionButtons += `
+            <button onclick="deleteLeaveRequest('${lv.id}')" title="ছুটির আবেদন ডিলিট করুন" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition inline-flex items-center">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          `;
+        }
+
         const row = `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${lv.employeeName || 'Staff'} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${lv.branch || 'Head Office'}</span></td>
@@ -2249,14 +2369,56 @@
 
     window.updateLeaveStatus = async function(id, status) {
       try {
+        const lv = leaveList.find(l => l.id === id);
         await updateDoc(doc(db, "leaves", id), {
           status: status,
           approvedBy: currentUserEmail,
           updatedAt: new Date().toISOString()
         });
+
+        await logSystemActivity(
+          status === 'Approved' ? 'APPROVE' : 'REJECT',
+          'Leave',
+          `${currentUserEmail} ${status === 'Approved' ? 'approved' : 'rejected'} leave request (${lv ? lv.leaveType : ''}) of "${lv ? lv.employeeName : 'Staff'}"`,
+          { leaveId: id, employeeName: lv ? lv.employeeName : '', status }
+        );
+
         showToast('success', `ছুটি ${status === 'Approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} হয়েছে`);
       } catch (err) {
         showToast('error', err.message);
+      }
+    };
+
+    window.deleteLeaveRequest = async function(id) {
+      const lv = leaveList.find(l => l.id === id);
+      const empName = lv ? lv.employeeName : 'কর্মচারী';
+      
+      const result = await Swal.fire({
+        title: 'ছুটির আবেদন ডিলিট করবেন?',
+        html: `আপনি কি নিশ্চিতভাবে <b>${empName}</b> এর (${lv ? lv.leaveType : 'ছুটি'}) আবেদনটি মুছে ফেলতে চান?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'হ্যাঁ, ডিলিট করুন',
+        cancelButtonText: 'বাতিল'
+      });
+
+      if (result.isConfirmed) {
+        try {
+          await deleteDoc(doc(db, "leaves", id));
+
+          await logSystemActivity(
+            'DELETE',
+            'Leave',
+            `${currentUserEmail} deleted leave request (${lv ? lv.leaveType : ''}, ${lv ? lv.startDate : ''} to ${lv ? lv.endDate : ''}) of "${empName}"`,
+            { leaveId: id, employeeName: empName }
+          );
+
+          showToast('success', 'ছুটির আবেদন সফলভাবে ডিলিট হয়েছে');
+        } catch (err) {
+          showToast('error', err.message);
+        }
       }
     };
 
@@ -2287,12 +2449,143 @@
         endDate: end,
         reason: reason,
         status: 'Pending',
+        appliedBy: currentUserEmail,
         appliedAt: new Date().toISOString()
       });
+
+      await logSystemActivity(
+        'CREATE',
+        'Leave',
+        `${currentUserEmail} applied for ${type} (${start} to ${end}) for employee "${emp ? emp.name : 'Staff'}"`,
+        { employeeName: emp ? emp.name : '', leaveType: type, startDate: start, endDate: end }
+      );
 
       document.getElementById('leave-form').reset();
       toggleModal('add-leave-modal', false);
       showToast('success', 'ছুটির আবেদন জমা দেওয়া হয়েছে!');
+    };
+
+    // ==========================================
+    // ENTERPRISE ACTIVITY AUDIT TRAIL ENGINE
+    // ==========================================
+    window.logSystemActivity = async function(action, module, description, metadata = {}) {
+      try {
+        await addDoc(collection(db, "activity_logs"), {
+          action: action, // CREATE, UPDATE, APPROVE, REJECT, DELETE, INCREMENT
+          module: module, // Leave, Employee, Advance, Fine, Payroll, Document, Notice, Increment, Settings
+          description: description,
+          userEmail: currentUserEmail || 'Admin',
+          userRole: currentUserRole || 'Admin',
+          branch: selectedActiveBranch || currentUserBranch || 'ALL',
+          timestamp: new Date().toISOString(),
+          metadata: metadata
+        });
+      } catch (err) {
+        console.warn("Activity audit log save note:", err);
+      }
+    };
+
+    function loadActivityLogsRealtime() {
+      onSnapshot(collection(db, "activity_logs"), (snapshot) => {
+        activityLogList = [];
+        snapshot.forEach((docSnap) => {
+          activityLogList.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        activityLogList.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        renderActivityLogsTable();
+      });
+    }
+
+    window.renderActivityLogsTable = function() {
+      const tbody = document.getElementById('activity-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const filterModule = document.getElementById('activity-filter-module') ? document.getElementById('activity-filter-module').value : 'ALL';
+      const filterAction = document.getElementById('activity-filter-action') ? document.getElementById('activity-filter-action').value : 'ALL';
+      const filterDate = document.getElementById('activity-filter-date') ? document.getElementById('activity-filter-date').value : '';
+      const searchTxt = document.getElementById('activity-search-input') ? document.getElementById('activity-search-input').value.toLowerCase().trim() : '';
+
+      let totalLogs = 0;
+      let totalCreates = 0;
+      let totalDeletes = 0;
+      let totalApprovals = 0;
+
+      activityLogList.forEach((log) => {
+        if (!isItemInActiveBranch(log.branch)) return;
+
+        const logDateStr = log.timestamp ? log.timestamp.split('T')[0] : '';
+
+        if (filterModule !== 'ALL' && log.module !== filterModule) return;
+        if (filterAction !== 'ALL' && log.action !== filterAction) return;
+        if (filterDate && logDateStr !== filterDate) return;
+
+        if (searchTxt) {
+          const descMatch = (log.description || '').toLowerCase().includes(searchTxt);
+          const emailMatch = (log.userEmail || '').toLowerCase().includes(searchTxt);
+          const moduleMatch = (log.module || '').toLowerCase().includes(searchTxt);
+          if (!descMatch && !emailMatch && !moduleMatch) return;
+        }
+
+        totalLogs++;
+        if (log.action === 'CREATE' || log.action === 'INCREMENT') totalCreates++;
+        if (log.action === 'DELETE') totalDeletes++;
+        if (log.action === 'APPROVE') totalApprovals++;
+
+        let actionBadge = '';
+        if (log.action === 'CREATE') {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-plus mr-1"></i>Created</span>';
+        } else if (log.action === 'DELETE') {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200"><i class="fa-solid fa-trash-can mr-1"></i>Deleted</span>';
+        } else if (log.action === 'APPROVE') {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200"><i class="fa-solid fa-circle-check mr-1"></i>Approved</span>';
+        } else if (log.action === 'REJECT') {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><i class="fa-solid fa-circle-xmark mr-1"></i>Rejected</span>';
+        } else if (log.action === 'INCREMENT') {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200"><i class="fa-solid fa-arrow-trend-up mr-1"></i>Increment</span>';
+        } else {
+          actionBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200"><i class="fa-solid fa-pen-to-square mr-1"></i>Updated</span>';
+        }
+
+        let moduleBadge = '';
+        const m = log.module || 'General';
+        if (m === 'Leave') moduleBadge = '<span class="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200 text-[11px]"><i class="fa-solid fa-calendar-check mr-1"></i>Leave</span>';
+        else if (m === 'Employee') moduleBadge = '<span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200 text-[11px]"><i class="fa-solid fa-user-group mr-1"></i>Employee</span>';
+        else if (m === 'Advance') moduleBadge = '<span class="font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 text-[11px]"><i class="fa-solid fa-money-bill-transfer mr-1"></i>Advance</span>';
+        else if (m === 'Fine') moduleBadge = '<span class="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200 text-[11px]"><i class="fa-solid fa-gavel mr-1"></i>Fine</span>';
+        else if (m === 'Payroll') moduleBadge = '<span class="font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200 text-[11px]"><i class="fa-solid fa-receipt mr-1"></i>Payroll</span>';
+        else if (m === 'Notice') moduleBadge = '<span class="font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200 text-[11px]"><i class="fa-solid fa-bullhorn mr-1"></i>Notice</span>';
+        else if (m === 'Document') moduleBadge = '<span class="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 text-[11px]"><i class="fa-solid fa-folder-closed mr-1"></i>Document</span>';
+        else moduleBadge = `<span class="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 text-[11px]">${m}</span>`;
+
+        const timeFormatted = log.timestamp ? new Date(log.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A';
+
+        const row = `
+          <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+            <td class="px-5 py-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap">
+              <div class="font-bold text-slate-700">${timeFormatted}</div>
+            </td>
+            <td class="px-5 py-3.5">
+              <div class="font-bold text-slate-800 flex items-center space-x-1.5">
+                <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold uppercase">${(log.userEmail || 'U').charAt(0)}</span>
+                <span>${log.userEmail || 'Admin'}</span>
+              </div>
+              <div class="text-[10px] text-slate-400 font-semibold pl-7">${log.userRole || 'Admin'} • <span class="text-indigo-600">🏢 ${log.branch || 'ALL'}</span></div>
+            </td>
+            <td class="px-5 py-3.5">${moduleBadge}</td>
+            <td class="px-5 py-3.5">${actionBadge}</td>
+            <td class="px-5 py-3.5 text-slate-700 font-medium leading-snug">
+              ${log.description}
+            </td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+
+      if (document.getElementById('act-stat-total')) document.getElementById('act-stat-total').innerText = totalLogs;
+      if (document.getElementById('act-stat-creates')) document.getElementById('act-stat-creates').innerText = totalCreates;
+      if (document.getElementById('act-stat-approvals')) document.getElementById('act-stat-approvals').innerText = totalApprovals;
+      if (document.getElementById('act-stat-deletes')) document.getElementById('act-stat-deletes').innerText = totalDeletes;
     };
 
     // Payroll Realtime
@@ -2401,6 +2694,13 @@
         status: 'Paid',
         createdDate: new Date().toISOString()
       });
+
+      await logSystemActivity(
+        'CREATE',
+        'Payroll',
+        `${currentUserEmail} generated payroll for "${emp ? emp.name : 'Staff'}" (Month: ${month}, Net Salary: ৳${net.toLocaleString()})`,
+        { employeeName: emp ? emp.name : '', month, basicSalary: basic, netSalary: net }
+      );
 
       if (advance > 0 && month) {
         const pendingAdvances = advanceList.filter(a => a.employeeId === empId && a.month === month && (a.status === 'Pending' || a.status === 'Approved'));
@@ -2566,10 +2866,17 @@
     }
 
     window.promptIncrementModal = async function(empId, currentSalary) {
+      const emp = employeeList.find(e => e.id === empId);
+      const empName = emp ? emp.name : 'কর্মচারী';
+
       const { value: formValues } = await Swal.fire({
         title: 'বেতন ইনক্রিমেন্ট প্রসেস',
         html: `
           <div class="space-y-3 text-left">
+            <div>
+              <label class="text-xs font-bold text-slate-700">কর্মচারী</label>
+              <div class="p-2 border rounded-lg text-xs font-bold bg-slate-50 text-slate-800">${empName} (${emp ? emp.designation : ''})</div>
+            </div>
             <div>
               <label class="text-xs font-bold text-slate-700">বর্তমান বেতন (৳)</label>
               <input id="swal-curr-salary" class="w-full p-2 border rounded-lg text-sm bg-slate-100" value="${currentSalary}" readonly>
@@ -2602,6 +2909,13 @@
           salary: newTotalSalary,
           lastIncrementDate: todayStr
         });
+
+        await logSystemActivity(
+          'INCREMENT',
+          'Employee',
+          `${currentUserEmail} processed salary increment +৳${formValues.toLocaleString()} for "${empName}" (New Basic: ৳${newTotalSalary.toLocaleString()})`,
+          { employeeId: empId, employeeName: empName, incrementAmount: formValues, newTotalSalary }
+        );
 
         Swal.fire('অভিনন্দন!', `ইনক্রিমেন্ট সম্পন্ন হয়েছে। নতুন বেতন: ৳ ${newTotalSalary.toLocaleString()}`, 'success');
       }
@@ -2754,15 +3068,30 @@
         postedDate: new Date().toISOString()
       });
 
+      await logSystemActivity(
+        'CREATE',
+        'Notice',
+        `${currentUserEmail} published new notice: "${title}" (Target: ${targetBranch || 'ALL'})`,
+        { title, targetBranch }
+      );
+
       document.getElementById('notice-form').reset();
       toggleModal('add-notice-modal', false);
       showToast('success', 'নতুন নোটিশ প্রকাশিত হয়েছে!');
     };
 
     window.deleteNoticeRecord = async function(id) {
-      if (confirm('এই নোটিশটি মুছে ফেলতে চান?')) {
+      const n = noticeList.find(x => x.id === id);
+      const title = n ? n.title : 'নোটিশ';
+      if (confirm(`এই নোটিশটি "${title}" মুছে ফেলতে চান?`)) {
         try {
           await deleteDoc(doc(db, "notices", id));
+          await logSystemActivity(
+            'DELETE',
+            'Notice',
+            `${currentUserEmail} deleted notice: "${title}"`,
+            { noticeId: id, title }
+          );
           showToast('success', 'নোটিশ মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -2902,9 +3231,17 @@
     };
 
     window.deleteDocRecord = async function(id) {
-      if (confirm('এই ডকুমেন্ট মুছে ফেলতে চান?')) {
+      const d = docList.find(x => x.id === id);
+      const title = d ? d.title : 'ডকুমেন্ট';
+      if (confirm(`এই ডকুমেন্ট "${title}" মুছে ফেলতে চান?`)) {
         try {
           await deleteDoc(doc(db, "company_documents", id));
+          await logSystemActivity(
+            'DELETE',
+            'Document',
+            `${currentUserEmail} deleted company document: "${title}"`,
+            { docId: id, title }
+          );
           showToast('success', 'ডকুমেন্ট মুছে ফেলা হয়েছে');
         } catch (err) {
           showToast('error', err.message);
@@ -2934,8 +3271,16 @@
           fileUrl: url,
           fileName,
           fileType,
+          uploadedBy: currentUserEmail,
           uploadedAt: new Date().toISOString()
         });
+
+        await logSystemActivity(
+          'CREATE',
+          'Document',
+          `${currentUserEmail} uploaded company document: "${title}" (Category: ${category}, For: ${targetEmp || 'General'})`,
+          { title, category, targetEmployee: targetEmp }
+        );
 
         document.getElementById('doc-form').reset();
         const fnameLabel = document.getElementById('doc-selected-filename');
@@ -3770,6 +4115,9 @@
           </button>
           <button id="nav-reports" onclick="switchNav('reports')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
             <i class="fa-solid fa-file-invoice text-blue-400 w-4"></i><span>Reports & Analytics</span>
+          </button>
+          <button id="nav-activity" onclick="switchNav('activity')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+            <i class="fa-solid fa-clock-rotate-left text-cyan-400 w-4"></i><span>Activity Logs (অডিট রেকর্ড)</span>
           </button>
           <button id="nav-settings" onclick="switchNav('settings')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
             <i class="fa-solid fa-gear text-slate-400 w-4"></i><span>Settings</span>
@@ -4757,6 +5105,141 @@
               </div>
             </div>
 
+          </div>
+        </section>
+
+        <!-- 13. ACTIVITY LOGS & AUDIT TRAIL SECTION -->
+        <section id="sec-activity" class="space-y-6 hidden">
+          <!-- KPI Stats -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Activities</p>
+                <h3 id="act-stat-total" class="text-2xl font-black text-slate-800 mt-1">0</h3>
+                <span class="text-[11px] text-indigo-600 font-medium">Real-time system events</span>
+              </div>
+              <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-list-check"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Deletions (মুছে ফেলা)</p>
+                <h3 id="act-stat-deletions" class="text-2xl font-black text-rose-600 mt-1">0</h3>
+                <span class="text-[11px] text-rose-500 font-medium">Critical delete records</span>
+              </div>
+              <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-trash-can"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Approvals (অনুমোদন)</p>
+                <h3 id="act-stat-approvals" class="text-2xl font-black text-emerald-600 mt-1">0</h3>
+                <span class="text-[11px] text-emerald-600 font-medium">Leaves, advances & payroll</span>
+              </div>
+              <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-check-double"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div>
+                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Creations & Updates</p>
+                <h3 id="act-stat-creations" class="text-2xl font-black text-sky-600 mt-1">0</h3>
+                <span class="text-[11px] text-sky-600 font-medium">New entries & edits</span>
+              </div>
+              <div class="w-12 h-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center text-xl">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity Filter Toolbar & Table Card -->
+          <div class="bg-white rounded-3xl border border-slate-200/80 p-6 space-y-5 shadow-2xs">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+                  <i class="fa-solid fa-clock-rotate-left text-cyan-600"></i>
+                  <span>System Audit Trail & Record History (কার্যক্রমের বিবরণী)</span>
+                </h3>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">কে কখন কী তৈরি, ডিলিট, বা অনুমোদন করেছেন তার সম্পূর্ণ রিয়েলটাইম রেকর্ড</p>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="renderActivityLogsTable()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+                  <i class="fa-solid fa-rotate"></i> <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Multi-Filter Toolbar -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Module (মডিউল)</label>
+                <select id="act-filter-module" onchange="renderActivityLogsTable()" class="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-cyan-500">
+                  <option value="ALL">All Modules (সকল মডিউল)</option>
+                  <option value="Leave">Leave Requests (ছুটি)</option>
+                  <option value="Advance">Advance Salary (অগ্রিম বেতন)</option>
+                  <option value="Fine">Fines / Penalties (জরিমানা)</option>
+                  <option value="Employee">Employees (কর্মচারী)</option>
+                  <option value="Payroll">Payroll (বেতন)</option>
+                  <option value="Notice">Notice Board (নোটিশ)</option>
+                  <option value="Document">Documents (ডকুমেন্ট)</option>
+                  <option value="Attendance">Attendance (উপস্থিতি)</option>
+                  <option value="Settings">Settings & Roles (সেটিংস)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Action Type (কাজের ধরন)</label>
+                <select id="act-filter-action" onchange="renderActivityLogsTable()" class="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-cyan-500">
+                  <option value="ALL">All Actions (সকল কাজ)</option>
+                  <option value="DELETE">DELETE (মুছে ফেলা)</option>
+                  <option value="APPROVE">APPROVE (অনুমোদন)</option>
+                  <option value="REJECT">REJECT (প্রত্যাখ্যান)</option>
+                  <option value="CREATE">CREATE (নতুন তৈরি)</option>
+                  <option value="UPDATE">UPDATE (আপডেট)</option>
+                  <option value="INCREMENT">INCREMENT (ইনক্রিমেন্ট)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Filter by Date (তারিখ)</label>
+                <input type="date" id="act-filter-date" onchange="renderActivityLogsTable()" class="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-cyan-500">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Search (সার্চ)</label>
+                <div class="relative">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                  <input type="text" id="act-filter-search" oninput="renderActivityLogsTable()" placeholder="Email, name, details..." class="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-cyan-500">
+                </div>
+              </div>
+            </div>
+
+            <!-- Activity Logs Table -->
+            <div class="overflow-x-auto rounded-2xl border border-slate-100">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th class="px-6 py-3.5">Time & Date</th>
+                    <th class="px-6 py-3.5">Action</th>
+                    <th class="px-6 py-3.5">Module</th>
+                    <th class="px-6 py-3.5">User / Performed By</th>
+                    <th class="px-6 py-3.5">Activity Details</th>
+                  </tr>
+                </thead>
+                <tbody id="activity-table-body" class="divide-y divide-slate-100">
+                  <tr>
+                    <td colspan="5" class="py-8 text-center text-slate-400 font-medium">
+                      <i class="fa-solid fa-circle-notch fa-spin mr-2 text-cyan-600"></i>অ্যাক্টিভিটি ডাটা লোড হচ্ছে...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 

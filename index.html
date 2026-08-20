@@ -1131,6 +1131,9 @@
         };
         img.src = evt.target.result;
       };
+      reader.readAsDataURL(file);
+    };
+
     window.uploadMyOwnProfilePhoto = async function(e) {
       const file = e.target.files[0];
       if (!file) return;

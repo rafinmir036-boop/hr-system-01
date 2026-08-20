@@ -1380,12 +1380,17 @@
       }
     };
 
-    // ZKBio Time / ZKTeco CSV File Import Handler
+    // ZKBio Time / ZKTeco CSV File Import Handler (With Date Validation & 10:20 Late Cutoff)
     window.handleZKLogUpload = async function(e) {
       const file = e.target.files[0];
       if (!file) return;
 
       const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate) {
+        showToast('warning', 'দয়া করে আগে একটি তারিখ নির্বাচন করুন');
+        return;
+      }
+
       const reader = new FileReader();
 
       reader.onload = async function(event) {
@@ -1395,7 +1400,7 @@
 
         Swal.fire({
           title: 'পাঞ্চ ডাটা সিঙ্ক হচ্ছে...',
-          text: 'ZKTeco ফাইল থেকে উপস্থিতি আপডেট করা হচ্ছে',
+          text: `${selectedDate} তারিখের বায়োমেট্রিক উপস্থিতি চেক করা হচ্ছে...`,
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
@@ -1404,12 +1409,28 @@
           line = line.trim();
           if (!line) continue;
 
+          // ১. তারিখ ভ্যালিডেশন (শুধুমাত্র সিলেক্ট করা তারিখের পাঞ্চ নেওয়া হবে)
+          const altDateSlash = selectedDate.replace(/-/g, '/');
+          const parts = selectedDate.split('-');
+          const altDateDMY = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+          const hasSelectedDate = line.includes(selectedDate) || line.includes(altDateSlash) || line.includes(altDateDMY);
+          
+          // যদি লাইনে অন্য কোনো তারিখ থাকে তবে বাদ যাবে
+          if (!hasSelectedDate && (line.includes('202') || line.includes('2024') || line.includes('2025') || line.includes('2026'))) {
+            continue;
+          }
+
           const tokens = line.split(/[\t,; ]+/);
           const candidateId = tokens[0];
-          const timeToken = tokens.find(t => t.includes(':')) || '10:00:00';
+          
+          // সময় (Time) খুঁজে নেওয়া (যেমন: 09:15:00 বা 10:25:30)
+          const timeToken = tokens.find(t => /^\d{1,2}:\d{2}(:\d{2})?$/.test(t)) || tokens.find(t => t.includes(':'));
+          if (!timeToken) continue;
 
-          const emp = employeeList.find(e => e.customEmpCode == candidateId || e.id == candidateId);
+          const emp = employeeList.find(e => String(e.customEmpCode).trim() === String(candidateId).trim() || e.id === candidateId);
           if (emp && isItemInActiveBranch(emp.branch)) {
+            // সকাল ১০:২০:০০ এর পর পাঞ্চ করলে Late
             const isLate = timeToken > '10:20:00';
             const status = isLate ? 'Late' : 'Present';
 
@@ -1426,7 +1447,7 @@
           }
         }
 
-        Swal.fire('সিঙ্ক সম্পন্ন!', `মোট ${matchedCount} জন কর্মচারীর বায়োমেট্রিক উপস্থিতি আপডেট হয়েছে!`, 'success');
+        Swal.fire('সিঙ্ক সম্পন্ন!', `শুধুমাত্র ${selectedDate} তারিখের মোট ${matchedCount} জন উপস্থিত কর্মচারীর ডাটা আপডেট হয়েছে!`, 'success');
       };
       reader.readAsText(file);
     };

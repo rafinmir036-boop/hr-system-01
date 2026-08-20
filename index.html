@@ -1074,7 +1074,12 @@
         });
 
         if (myEmployeeProfile) {
-          document.getElementById('emp-p-photo').src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
+          const userAvatarUrl = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
+          const empPhotoElem = document.getElementById('emp-p-photo');
+          if (empPhotoElem) empPhotoElem.src = userAvatarUrl;
+          const settingsPhotoElem = document.getElementById('settings-profile-photo');
+          if (settingsPhotoElem) settingsPhotoElem.src = userAvatarUrl;
+
           document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
           document.getElementById('emp-p-desig').innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department}) • 🏢 ${myEmployeeProfile.branch || 'Head Office'}`;
           document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
@@ -1123,6 +1128,58 @@
           document.getElementById('emp-photo').value = dataUrl;
           const preview = document.getElementById('emp-photo-preview');
           if (preview) preview.src = dataUrl;
+        };
+        img.src = evt.target.result;
+      };
+    window.uploadMyOwnProfilePhoto = async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!myEmployeeProfile || !myEmployeeProfile.id) {
+        showToast('warning', 'আপনার কর্মচারী প্রোফাইল ডাটাবেজে পাওয়া যায়নি');
+        return;
+      }
+
+      Swal.fire({
+        title: 'ছবি আপলোড হচ্ছে...',
+        text: 'ছবি প্রসেস ও ডাটাবেজে সেভ করা হচ্ছে...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = async function() {
+          const canvas = document.createElement('canvas');
+          const maxW = 350, maxH = 350;
+          let width = img.width, height = img.height;
+          if (width > height) {
+            if (width > maxW) { height *= maxW / width; width = maxW; }
+          } else {
+            if (height > maxH) { width *= maxH / height; height = maxH; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+
+          try {
+            await updateDoc(doc(db, "employees", myEmployeeProfile.id), {
+              photoUrl: dataUrl
+            });
+
+            myEmployeeProfile.photoUrl = dataUrl;
+            const pPhoto = document.getElementById('emp-p-photo');
+            if (pPhoto) pPhoto.src = dataUrl;
+            const settingsPhoto = document.getElementById('settings-profile-photo');
+            if (settingsPhoto) settingsPhoto.src = dataUrl;
+
+            Swal.fire('সফল!', 'আপনার প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে! 🎉', 'success');
+          } catch (err) {
+            Swal.fire('ব্যর্থ!', err.message, 'error');
+          }
         };
         img.src = evt.target.result;
       };
@@ -3853,8 +3910,21 @@
           <!-- Employee Self Profile (Shown when Role = Employee) -->
           <div id="emp-dash-profile" class="hidden bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
             <div class="flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6 border-b border-slate-100 pb-6">
-              <img id="emp-p-photo" src="" alt="Avatar" class="w-24 h-24 rounded-2xl object-cover border-2 border-indigo-500 shadow-md">
-              <div class="text-center md:text-left space-y-1">
+              <div class="flex flex-col items-center shrink-0 space-y-2">
+                <div class="relative group">
+                  <img id="emp-p-photo" src="" alt="Avatar" class="w-24 h-24 rounded-2xl object-cover border-2 border-indigo-500 shadow-md">
+                  <label for="emp-self-photo-input" class="absolute inset-0 bg-slate-950/60 backdrop-blur-2xs text-white rounded-2xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition duration-200 text-[11px] font-bold">
+                    <i class="fa-solid fa-camera text-lg mb-1"></i>
+                    <span>Change</span>
+                  </label>
+                  <input type="file" id="emp-self-photo-input" accept="image/*" onchange="uploadMyOwnProfilePhoto(event)" class="hidden">
+                </div>
+                <button onclick="document.getElementById('emp-self-photo-input').click()" class="text-[11px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-1.5 rounded-xl transition border border-indigo-200 flex items-center space-x-1.5 shadow-2xs">
+                  <i class="fa-solid fa-camera text-indigo-500"></i>
+                  <span>Upload Photo</span>
+                </button>
+              </div>
+              <div class="text-center md:text-left space-y-1 flex-1">
                 <h2 id="emp-p-name" class="text-xl font-bold text-slate-900">Loading Profile...</h2>
                 <p id="emp-p-desig" class="text-xs text-indigo-600 font-semibold">---</p>
                 <div class="flex flex-wrap gap-2 justify-center md:justify-start pt-2">
@@ -4416,18 +4486,47 @@
             
             <!-- Password Update Card -->
             <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">Password Update</h3>
+              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center space-x-2">
+                <i class="fa-solid fa-key text-indigo-600"></i>
+                <span>Password Update</span>
+              </h3>
               <form id="change-pass-form" onsubmit="changeUserPassword(event)" class="space-y-3">
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">New Password</label>
-                  <input type="password" id="settings-new-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <input type="password" id="settings-new-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
                 </div>
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Confirm Password</label>
-                  <input type="password" id="settings-confirm-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <input type="password" id="settings-confirm-pass" required minlength="6" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••">
                 </div>
                 <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-xs font-bold transition">Update Password</button>
               </form>
+            </div>
+
+            <!-- Profile Picture Update Card -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+              <h3 class="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center space-x-2">
+                <i class="fa-solid fa-image-portrait text-emerald-600"></i>
+                <span>Update Profile Photo (প্রোফাইল ছবি পরিবর্তন)</span>
+              </h3>
+              <div class="flex items-center space-x-4 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                <div class="relative group shrink-0">
+                  <img id="settings-profile-photo" src="https://ui-avatars.com/api/?name=Employee&background=6366f1&color=fff" class="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-500 shadow-sm">
+                  <label for="settings-photo-input" class="absolute inset-0 bg-slate-950/60 backdrop-blur-2xs text-white rounded-2xl flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition text-[10px] font-bold">
+                    <i class="fa-solid fa-camera mb-0.5"></i>
+                    <span>Change</span>
+                  </label>
+                </div>
+                <div class="flex-1 space-y-1.5">
+                  <p class="text-xs font-bold text-slate-800">নিজের ছবি আপলোড করুন</p>
+                  <p class="text-[11px] text-slate-500">JPG, PNG বা WEBP ফরম্যাটে সর্বোচ্চ ৩MB সাইজ</p>
+                  <input type="file" id="settings-photo-input" accept="image/*" onchange="uploadMyOwnProfilePhoto(event)" class="hidden">
+                  <button type="button" onclick="document.getElementById('settings-photo-input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1.5 shadow-xs">
+                    <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
+                    <span>Upload New Photo</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Role & User Permission Matrix Card (Admin / Permitted Only) -->

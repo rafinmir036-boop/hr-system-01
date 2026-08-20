@@ -1410,7 +1410,7 @@
 
           const emp = employeeList.find(e => e.customEmpCode == candidateId || e.id == candidateId);
           if (emp && isItemInActiveBranch(emp.branch)) {
-            const isLate = timeToken > '09:30:00';
+            const isLate = timeToken > '10:20:00';
             const status = isLate ? 'Late' : 'Present';
 
             await setDoc(doc(db, `attendance_${selectedDate}`, emp.id), {

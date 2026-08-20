@@ -220,6 +220,7 @@
         loadPerformanceRealtime();
         loadNoticesRealtime();
         loadActivityLogsRealtime();
+        loadWhatsAppSettingsRealtime();
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
@@ -2284,6 +2285,209 @@
       }
     };
 
+    // ==========================================
+    // WHATSAPP AUTOMATION & NOTIFICATION ENGINE
+    // ==========================================
+    let whatsappConfig = {
+      adminPhone: '8801700000000',
+      notifyOnLeaveApply: true,
+      notifyOnLeaveDecision: true,
+      autoOpen: true
+    };
+
+    function loadWhatsAppSettingsRealtime() {
+      try {
+        const localSaved = localStorage.getItem('hrms_whatsapp_config');
+        if (localSaved) {
+          whatsappConfig = { ...whatsappConfig, ...JSON.parse(localSaved) };
+          populateWhatsAppSettingsUI();
+        }
+      } catch (e) {}
+
+      onSnapshot(doc(db, "system_settings", "whatsapp"), (docSnap) => {
+        if (docSnap.exists()) {
+          whatsappConfig = { ...whatsappConfig, ...docSnap.data() };
+          try { localStorage.setItem('hrms_whatsapp_config', JSON.stringify(whatsappConfig)); } catch (e) {}
+          populateWhatsAppSettingsUI();
+        }
+      });
+    }
+
+    function populateWhatsAppSettingsUI() {
+      const phoneInput = document.getElementById('setting-admin-whatsapp');
+      const applyToggle = document.getElementById('setting-wa-apply-toggle');
+      const decisionToggle = document.getElementById('setting-wa-decision-toggle');
+      const autoToggle = document.getElementById('setting-wa-auto-toggle');
+
+      if (phoneInput) phoneInput.value = whatsappConfig.adminPhone || '';
+      if (applyToggle) applyToggle.checked = whatsappConfig.notifyOnLeaveApply !== false;
+      if (decisionToggle) decisionToggle.checked = whatsappConfig.notifyOnLeaveDecision !== false;
+      if (autoToggle) autoToggle.checked = whatsappConfig.autoOpen !== false;
+    }
+
+    window.saveWhatsAppSettings = async function(e) {
+      if (e) e.preventDefault();
+      const adminPhone = document.getElementById('setting-admin-whatsapp') ? document.getElementById('setting-admin-whatsapp').value.trim() : '';
+      const notifyOnLeaveApply = document.getElementById('setting-wa-apply-toggle') ? document.getElementById('setting-wa-apply-toggle').checked : true;
+      const notifyOnLeaveDecision = document.getElementById('setting-wa-decision-toggle') ? document.getElementById('setting-wa-decision-toggle').checked : true;
+      const autoOpen = document.getElementById('setting-wa-auto-toggle') ? document.getElementById('setting-wa-auto-toggle').checked : true;
+
+      whatsappConfig = {
+        adminPhone: formatWhatsAppPhone(adminPhone),
+        notifyOnLeaveApply,
+        notifyOnLeaveDecision,
+        autoOpen,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUserEmail
+      };
+
+      try {
+        await setDoc(doc(db, "system_settings", "whatsapp"), whatsappConfig);
+        try { localStorage.setItem('hrms_whatsapp_config', JSON.stringify(whatsappConfig)); } catch (e) {}
+        await logSystemActivity(
+          'UPDATE',
+          'Settings',
+          `${currentUserEmail} updated WhatsApp Notification settings (Admin Phone: ${whatsappConfig.adminPhone || 'None'})`,
+          { adminPhone: whatsappConfig.adminPhone }
+        );
+        showToast('success', 'হোয়াটসঅ্যাপ সেটিংস সফলভাবে সংরক্ষিত হয়েছে!');
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.formatWhatsAppPhone = function(rawPhone) {
+      if (!rawPhone) return '';
+      let clean = String(rawPhone).replace(/[^\d+]/g, '');
+      if (clean.startsWith('+')) clean = clean.substring(1);
+      
+      // If starts with 01 (BD local format e.g. 017xxxxxxxx -> 88017xxxxxxxx)
+      if (/^01[3-9]\d{8}$/.test(clean)) {
+        clean = '88' + clean;
+      }
+      return clean;
+    };
+
+    window.calculateLeaveDays = function(startDate, endDate) {
+      if (!startDate || !endDate) return 1;
+      try {
+        const s = new Date(startDate);
+        const e = new Date(endDate);
+        const diffTime = Math.abs(e - s);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        return isNaN(diffDays) || diffDays < 1 ? 1 : diffDays;
+      } catch (err) {
+        return 1;
+      }
+    };
+
+    window.triggerWhatsAppNotification = function(targetPhone, messageText, title, subtitle) {
+      const cleanPhone = formatWhatsAppPhone(targetPhone);
+      const waUrl = cleanPhone 
+        ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(messageText)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(messageText)}`;
+
+      if (whatsappConfig.autoOpen) {
+        window.open(waUrl, '_blank');
+      }
+
+      Swal.fire({
+        title: title || 'WhatsApp Notification',
+        html: `
+          <div class="text-left space-y-3 text-xs">
+            <p class="text-slate-600 font-medium">${subtitle || 'হোয়াটসঅ্যাপে নিচের মেসেজটি পাঠানো হচ্ছে:'}</p>
+            <div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl font-mono text-[11px] text-emerald-950 whitespace-pre-line max-h-56 overflow-y-auto leading-relaxed shadow-inner">
+${messageText}
+            </div>
+            <div class="text-slate-600 font-semibold flex items-center justify-between pt-1 border-t border-slate-100">
+              <span>📱 প্রাপক (Phone): <b class="text-indigo-700">${cleanPhone || 'WhatsApp Chat'}</b></span>
+              <span class="text-[10px] text-slate-400">HRMS WhatsApp System</span>
+            </div>
+          </div>
+        `,
+        icon: 'success',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: '<i class="fa-brands fa-whatsapp mr-1.5 text-sm"></i> WhatsApp ওপেন করুন',
+        cancelButtonText: 'বন্ধ করুন (Close)'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.open(waUrl, '_blank');
+        }
+      });
+    };
+
+    window.sendLeaveWhatsAppNotification = function(leaveId) {
+      const lv = leaveList.find(l => l.id === leaveId);
+      if (!lv) return;
+
+      const emp = employeeList.find(e => e.id === lv.employeeId || e.name === lv.employeeName);
+      const targetPhone = (emp && emp.phone) ? emp.phone : (lv.employeePhone || '');
+      const empName = lv.employeeName || (emp ? emp.name : 'Staff');
+      const empCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (lv.customEmpCode || 'N/A');
+      const empBranch = lv.branch || (emp ? emp.branch : 'Head Office') || 'Head Office';
+      const daysCount = calculateLeaveDays(lv.startDate, lv.endDate);
+      const approver = lv.approvedBy || currentUserEmail || 'Management';
+      const nowStr = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      let msg = '';
+      if (lv.status === 'Approved') {
+        msg = `✨ *ছুটি অনুমোদন নিশ্চিতকরণ (LEAVE APPROVED)* ✨\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `প্রিয় *${empName}*,\n` +
+              `আপনার ছুটির আবেদনটি সফলভাবে *অনুমোদিত (APPROVED) ✅* হয়েছে।\n\n` +
+              `📋 *ছুটির বিস্তারিত বিবরণ:* \n` +
+              `▫️ *কর্মচারী:* ${empName} (ID: ${empCode})\n` +
+              `▫️ *ছুটির ধরন (Type):* ${lv.leaveType}\n` +
+              `▫️ *শুরুর তারিখ:* ${lv.startDate}\n` +
+              `▫️ *শেষের তারিখ:* ${lv.endDate}\n` +
+              `▫️ *মোট ছুটি:* ${daysCount} দিন\n` +
+              `▫️ *শাখা (Branch):* 🏢 ${empBranch}\n\n` +
+              `👤 *অনুমোদনকারী:* ${approver}\n` +
+              `🕒 *অনুমোদনের তারিখ:* ${nowStr}\n\n` +
+              `🌟 _ছুটির দিনগুলো আপনার সুন্দর ও আনন্দময় কাটুক। যথাসময়ে পুনরায় কাজে যোগদানের জন্য অনুরোধ করা হলো।_\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `🏢 *HRMS Enterprise Management*`;
+      } else if (lv.status === 'Rejected') {
+        msg = `⚠️ *ছুটির আবেদনের সিদ্ধান্ত (LEAVE REJECTED)* ⚠️\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `প্রিয় *${empName}*,\n` +
+              `দুঃখের সাথে জানানো যাচ্ছে যে, প্রশাসনিক/কাজের প্রয়োজনে আপনার ছুটির আবেদনটি *প্রত্যাখ্যাত (REJECTED) ❌* করা হয়েছে।\n\n` +
+              `📋 *আবেদনের বিবরণ:*\n` +
+              `▫️ *কর্মচারী:* ${empName} (ID: ${empCode})\n` +
+              `▫️ *ছুটির ধরন:* ${lv.leaveType}\n` +
+              `▫️ *সময়কাল:* ${lv.startDate} থেকে ${lv.endDate} (${daysCount} দিন)\n` +
+              `▫️ *শাখা:* 🏢 ${empBranch}\n` +
+              `▫️ *সিদ্ধান্ত গ্রহণকারী:* ${approver}\n\n` +
+              `💡 _কোনো জরুরি প্রয়োজনে বা বিস্তারিত জানতে সরাসরি HR বা ব্রাঞ্চ ম্যানেজারের সাথে যোগাযোগ করুন।_\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `🏢 *HRMS Enterprise Management*`;
+      } else {
+        msg = `🔔 *ছুটির আবেদন স্থিতি (LEAVE APPLICATION STATUS)* 🔔\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `প্রিয় *${empName}*,\n` +
+              `আপনার ছুটির আবেদনটি পর্যালোচনার জন্য অপেক্ষমাণ রয়েছে।\n\n` +
+              `📋 *আবেদনের বিবরণ:*\n` +
+              `▫️ *কর্মচারী:* ${empName} (ID: ${empCode})\n` +
+              `▫️ *ছুটির ধরন:* ${lv.leaveType}\n` +
+              `▫️ *সময়কাল:* ${lv.startDate} থেকে ${lv.endDate} (${daysCount} দিন)\n` +
+              `▫️ *শাখা:* 🏢 ${empBranch}\n` +
+              `▫️ *কারণ:* ${lv.reason || 'N/A'}\n` +
+              `▫️ *বর্তমান অবস্থা:* ⏳ Pending Approval (অপেক্ষমাণ)\n\n` +
+              `_অনুমোদন সম্পন্ন হলে আপনাকে পুনরায় নিশ্চিত করা হবে।_\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `🏢 *HRMS Enterprise Management*`;
+      }
+
+      triggerWhatsAppNotification(
+        targetPhone,
+        msg,
+        `WhatsApp: ${empName}`,
+        `কর্মচারী "${empName}" কে সুন্দরভাবে প্রস্তুতকৃত ছুটির বার্তা পাঠান:`
+      );
+    };
+
     // Leave Management Realtime
     function loadLeaveRequestsRealtime() {
       onSnapshot(collection(db, "leaves"), (snapshot) => {
@@ -2337,6 +2541,13 @@
           }
         }
 
+        // WhatsApp direct button
+        actionButtons += `
+          <button onclick="sendLeaveWhatsAppNotification('${lv.id}')" title="হোয়াটসঅ্যাপে সুন্দর নোটিফিকেশন পাঠান" class="p-1.5 ml-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition inline-flex items-center">
+            <i class="fa-brands fa-whatsapp text-sm"></i>
+          </button>
+        `;
+
         if (canManage) {
           actionButtons += `
             <button onclick="deleteLeaveRequest('${lv.id}')" title="ছুটির আবেদন ডিলিট করুন" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition inline-flex items-center">
@@ -2384,6 +2595,59 @@
         );
 
         showToast('success', `ছুটি ${status === 'Approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} হয়েছে`);
+
+        // Trigger WhatsApp notification to Employee if enabled
+        if (whatsappConfig.notifyOnLeaveDecision !== false && lv) {
+          const emp = employeeList.find(e => e.id === lv.employeeId || e.name === lv.employeeName);
+          const empPhone = (emp && emp.phone) ? emp.phone : (lv.employeePhone || '');
+          const empName = lv.employeeName || (emp ? emp.name : 'Staff');
+          const empCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (lv.customEmpCode || 'N/A');
+          const empBranch = lv.branch || (emp ? emp.branch : 'Head Office') || 'Head Office';
+          const daysCount = calculateLeaveDays(lv.startDate, lv.endDate);
+          const approver = currentUserEmail || 'Management';
+          const nowStr = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+
+          let msg = '';
+          if (status === 'Approved') {
+            msg = `✨ *ছুটি অনুমোদন নিশ্চিতকরণ (LEAVE APPROVED)* ✨\n` +
+                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                  `প্রিয় *${empName}*,\n` +
+                  `আপনার ছুটির আবেদনটি সফলভাবে *অনুমোদিত (APPROVED) ✅* হয়েছে।\n\n` +
+                  `📋 *ছুটির বিস্তারিত বিবরণ:* \n` +
+                  `▫️ *কর্মচারী:* ${empName} (ID: ${empCode})\n` +
+                  `▫️ *ছুটির ধরন (Type):* ${lv.leaveType}\n` +
+                  `▫️ *শুরুর তারিখ:* ${lv.startDate}\n` +
+                  `▫️ *শেষের তারিখ:* ${lv.endDate}\n` +
+                  `▫️ *মোট ছুটি:* ${daysCount} দিন\n` +
+                  `▫️ *শাখা (Branch):* 🏢 ${empBranch}\n\n` +
+                  `👤 *অনুমোদনকারী:* ${approver}\n` +
+                  `🕒 *অনুমোদনের তারিখ:* ${nowStr}\n\n` +
+                  `🌟 _ছুটির দিনগুলো আপনার সুন্দর ও আনন্দময় কাটুক। যথাসময়ে পুনরায় কাজে যোগদানের জন্য অনুরোধ করা হলো।_\n` +
+                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                  `🏢 *HRMS Enterprise Management*`;
+          } else {
+            msg = `⚠️ *ছুটির আবেদনের সিদ্ধান্ত (LEAVE REJECTED)* ⚠️\n` +
+                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                  `প্রিয় *${empName}*,\n` +
+                  `দুঃখের সাথে জানানো যাচ্ছে যে, প্রশাসনিক/কাজের প্রয়োজনে আপনার ছুটির আবেদনটি *প্রত্যাখ্যাত (REJECTED) ❌* করা হয়েছে।\n\n` +
+                  `📋 *আবেদনের বিবরণ:*\n` +
+                  `▫️ *কর্মচারী:* ${empName} (ID: ${empCode})\n` +
+                  `▫️ *ছুটির ধরন:* ${lv.leaveType}\n` +
+                  `▫️ *সময়কাল:* ${lv.startDate} থেকে ${lv.endDate} (${daysCount} দিন)\n` +
+                  `▫️ *শাখা:* 🏢 ${empBranch}\n` +
+                  `▫️ *সিদ্ধান্ত গ্রহণকারী:* ${approver}\n\n` +
+                  `💡 _কোনো জরুরি প্রয়োজনে বা বিস্তারিত জানতে সরাসরি HR বা ব্রাঞ্চ ম্যানেজারের সাথে যোগাযোগ করুন।_\n` +
+                  `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                  `🏢 *HRMS Enterprise Management*`;
+          }
+
+          triggerWhatsAppNotification(
+            empPhone,
+            msg,
+            status === 'Approved' ? '✨ ছুটি অনুমোদনের বার্তা পাঠান' : '⚠️ ছুটির সিদ্ধান্ত পাঠান',
+            `"${empName}" এর ছুটির আবেদন ${status === 'Approved' ? 'অনুমোদিত' : 'প্রত্যাখ্যাত'} হয়েছে। সুন্দর ফরম্যাটের বার্তা প্রস্তুত:`
+          );
+        }
       } catch (err) {
         showToast('error', err.message);
       }
@@ -2439,11 +2703,17 @@
       }
 
       const emp = employeeList.find(e => e.id === empId);
+      const empPhone = emp ? (emp.phone || '') : '';
+      const empName = emp ? emp.name : 'Unknown Staff';
+      const empBranch = emp ? (emp.branch || 'Head Office') : 'Head Office';
+      const empCode = emp ? (emp.customEmpCode || '') : '';
 
       await addDoc(collection(db, "leaves"), {
         employeeId: empId,
-        employeeName: emp ? emp.name : 'Unknown Staff',
-        branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
+        employeeName: empName,
+        employeePhone: empPhone,
+        customEmpCode: empCode,
+        branch: empBranch,
         leaveType: type,
         startDate: start,
         endDate: end,
@@ -2456,13 +2726,43 @@
       await logSystemActivity(
         'CREATE',
         'Leave',
-        `${currentUserEmail} applied for ${type} (${start} to ${end}) for employee "${emp ? emp.name : 'Staff'}"`,
-        { employeeName: emp ? emp.name : '', leaveType: type, startDate: start, endDate: end }
+        `${currentUserEmail} applied for ${type} (${start} to ${end}) for employee "${empName}"`,
+        { employeeName: empName, leaveType: type, startDate: start, endDate: end }
       );
 
       document.getElementById('leave-form').reset();
       toggleModal('add-leave-modal', false);
       showToast('success', 'ছুটির আবেদন জমা দেওয়া হয়েছে!');
+
+      // Notify Admin via WhatsApp
+      if (whatsappConfig.notifyOnLeaveApply !== false) {
+        const daysCount = calculateLeaveDays(start, end);
+        const appliedTimeStr = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        const msg = `🔔 *নতুন ছুটির আবেদন (NEW LEAVE REQUEST)* 🔔\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `সম্মানিত অ্যাডমিন, একজন কর্মচারী ছুটির আবেদন জমা দিয়েছেন।\n\n` +
+                    `👤 *কর্মচারীর তথ্য:*\n` +
+                    `▫️ *নাম:* ${empName}\n` +
+                    `▫️ *আইডি (Emp Code):* ${empCode || 'N/A'}\n` +
+                    `▫️ *শাখা:* 🏢 ${empBranch}\n\n` +
+                    `📋 *ছুটির বিবরণ:*\n` +
+                    `▫️ *ছুটির ধরন:* ${type}\n` +
+                    `▫️ *সময়কাল:* ${start} থেকে ${end} (${daysCount} দিন)\n` +
+                    `▫️ *ছুটির কারণ:* ${reason || 'জরুরি ব্যক্তিগত প্রয়োজন'}\n` +
+                    `▫️ *আবেদনের সময়:* ${appliedTimeStr}\n` +
+                    `⏳ *স্ট্যাটাস:* Pending Approval (অপেক্ষমাণ)\n\n` +
+                    `🔗 _HRMS পোর্টালে লগইন করে আবেদনটি পর্যালোচনা ও অনুমোদন করতে পারবেন।_\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `🏢 *HRMS Enterprise Management*`;
+
+        triggerWhatsAppNotification(
+          whatsappConfig.adminPhone,
+          msg,
+          `🔔 অ্যাডমিনকে ছুটির আবেদনের বার্তা পাঠান`,
+          `ছুটির আবেদন সফলভাবে জমা হয়েছে। অ্যাডমিনকে সুন্দরভাবে সাজানো WhatsApp নোটিফিকেশন পাঠানো হচ্ছে:`
+        );
+      }
     };
 
     // ==========================================
@@ -5103,6 +5403,59 @@
                   <tbody id="branch-table-body"></tbody>
                 </table>
               </div>
+            </div>
+
+            <!-- WhatsApp Notification Configuration Card -->
+            <div id="sec-settings-whatsapp" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4 md:col-span-2">
+              <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+                    <i class="fa-brands fa-whatsapp text-emerald-600 text-base"></i>
+                    <span>WhatsApp Notification Settings (হোয়াটসঅ্যাপ নোটিফিকেশন কনফিগারেশন)</span>
+                  </h3>
+                  <p class="text-xs text-slate-500">ছুটির আবেদন ও অনুমোদনের মেসেজ স্বয়ংক্রিয়ভাবে হোয়াটসঅ্যাপে পাঠানোর সেটিংস</p>
+                </div>
+              </div>
+
+              <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">
+                      Admin / HR WhatsApp Number (অ্যাডমিনের হোয়াটসঅ্যাপ নম্বর) *
+                    </label>
+                    <div class="relative">
+                      <i class="fa-brands fa-whatsapp absolute left-3 top-3 text-emerald-600 text-sm"></i>
+                      <input type="text" id="setting-admin-whatsapp" placeholder="e.g. 01712345678 বা 8801712345678" class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">কর্মচারী ছুটির আবেদন জমা দিলে এই নম্বরে নোটিফিকেশন যাবে</p>
+                  </div>
+
+                  <div class="space-y-2.5 pt-1">
+                    <label class="block text-xs font-bold text-slate-700">Notification Rules (নিয়মাবলী)</label>
+                    <div class="space-y-2">
+                      <label class="flex items-center space-x-2.5 cursor-pointer text-xs">
+                        <input type="checkbox" id="setting-wa-apply-toggle" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                        <span class="font-medium text-slate-700">ছুটির আবেদন জমা হলে অ্যাডমিনকে WhatsApp মেসেজ পাঠানো হবে</span>
+                      </label>
+                      <label class="flex items-center space-x-2.5 cursor-pointer text-xs">
+                        <input type="checkbox" id="setting-wa-decision-toggle" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                        <span class="font-medium text-slate-700">ছুটি অনুমোদন/বাতিল হলে কর্মচারীকে WhatsApp মেসেজ পাঠানো হবে</span>
+                      </label>
+                      <label class="flex items-center space-x-2.5 cursor-pointer text-xs">
+                        <input type="checkbox" id="setting-wa-auto-toggle" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                        <span class="font-medium text-slate-700">সরাসরি WhatsApp উইন্ডো ওপেন করুন (Auto-open WhatsApp tab)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex justify-end">
+                  <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save WhatsApp Settings</span>
+                  </button>
+                </div>
+              </form>
             </div>
 
           </div>

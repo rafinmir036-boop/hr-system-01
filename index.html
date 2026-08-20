@@ -843,6 +843,8 @@
             id: id,
             role: p.role,
             branch: p.branch || 'ALL',
+            employeeId: p.employeeId || '',
+            employeeName: p.employeeName || '',
             permissions: p.permissions || getDefaultPermissionsForRole(p.role)
           };
         });
@@ -1078,6 +1080,9 @@
         
         employeeList = [];
 
+        const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
+        myEmployeeProfile = null;
+
         snapshot.forEach((docSnap) => {
           const emp = docSnap.data();
           const id = docSnap.id;
@@ -1087,7 +1092,16 @@
             permEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}] - 🏢 ${emp.branch || 'Head Office'}</option>`;
           }
 
-          if (emp.email && emp.email.toLowerCase() === currentUserEmail) {
+          let isMatch = false;
+          if (emp.email && emp.email.trim().toLowerCase() === currentUserEmail.trim().toLowerCase()) {
+            isMatch = true;
+          } else if (assignedRoleInfo && assignedRoleInfo.employeeId && assignedRoleInfo.employeeId === id) {
+            isMatch = true;
+          } else if (assignedRoleInfo && assignedRoleInfo.employeeName && emp.name && assignedRoleInfo.employeeName.trim().toLowerCase() === emp.name.trim().toLowerCase()) {
+            isMatch = true;
+          }
+
+          if (isMatch) {
             myEmployeeProfile = { id, ...emp };
           }
 
@@ -1126,6 +1140,20 @@
           tbody.innerHTML += row;
         });
 
+        // Fallback matching if not matched yet and user is employee:
+        if (!myEmployeeProfile && currentUserRole === 'Employee') {
+          const emailPrefix = currentUserEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+          const found = employeeList.find(e => {
+            const n = (e.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const em = (e.email || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const c = (e.customEmpCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return (emailPrefix && (n.includes(emailPrefix) || emailPrefix.includes(n) || em.includes(emailPrefix) || c === emailPrefix));
+          });
+          if (found) {
+            myEmployeeProfile = { ...found };
+          }
+        }
+
         if (myEmployeeProfile) {
           const userAvatarUrl = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
           const empPhotoElem = document.getElementById('emp-p-photo');
@@ -1133,15 +1161,28 @@
           const settingsPhotoElem = document.getElementById('settings-profile-photo');
           if (settingsPhotoElem) settingsPhotoElem.src = userAvatarUrl;
 
-          document.getElementById('emp-p-name').innerText = myEmployeeProfile.name;
-          document.getElementById('emp-p-desig').innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department}) • 🏢 ${myEmployeeProfile.branch || 'Head Office'}`;
-          document.getElementById('emp-p-joining').innerText = myEmployeeProfile.joiningDate || 'N/A';
-          document.getElementById('emp-p-phone').innerText = myEmployeeProfile.phone || 'N/A';
-          document.getElementById('emp-p-salary').innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
+          const pName = document.getElementById('emp-p-name');
+          if (pName) pName.innerText = myEmployeeProfile.name;
+          const pDesig = document.getElementById('emp-p-desig');
+          if (pDesig) pDesig.innerText = `Machine ID: ${myEmployeeProfile.customEmpCode || 'N/A'} | ${myEmployeeProfile.designation} (${myEmployeeProfile.department}) • 🏢 ${myEmployeeProfile.branch || 'Head Office'}`;
+          const pJoin = document.getElementById('emp-p-joining');
+          if (pJoin) pJoin.innerText = myEmployeeProfile.joiningDate || 'N/A';
+          const pPhone = document.getElementById('emp-p-phone');
+          if (pPhone) pPhone.innerText = myEmployeeProfile.phone || 'N/A';
+          const pSalary = document.getElementById('emp-p-salary');
+          if (pSalary) pSalary.innerText = `৳ ${myEmployeeProfile.salary ? myEmployeeProfile.salary.toLocaleString() : 0}`;
+          const pAddress = document.getElementById('emp-p-address');
+          if (pAddress) pAddress.innerText = myEmployeeProfile.address || 'N/A';
+          const pBlood = document.getElementById('emp-p-blood');
+          if (pBlood) pBlood.innerText = myEmployeeProfile.bloodGroup || 'N/A';
+          const pEmergency = document.getElementById('emp-p-emergency');
+          if (pEmergency) pEmergency.innerText = myEmployeeProfile.emergencyPhone || 'N/A';
 
           if (leaveSelect) leaveSelect.value = myEmployeeProfile.id;
+          populateSettingsSelfProfileForm();
         }
 
+        applyRoleAccessUI();
         updateAttendanceDashboardMetrics();
         renderAttendanceTable();
         checkIncrementDues();
@@ -1240,6 +1281,194 @@
         img.src = evt.target.result;
       };
       reader.readAsDataURL(file);
+    };
+
+    window.openSelfProfileModal = function() {
+      if (!myEmployeeProfile) {
+        const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
+        const matched = employeeList.find(e => 
+          (e.email && e.email.toLowerCase() === currentUserEmail) ||
+          (assignedRoleInfo && assignedRoleInfo.employeeId === e.id) ||
+          (assignedRoleInfo && assignedRoleInfo.employeeName && e.name && assignedRoleInfo.employeeName.toLowerCase() === e.name.toLowerCase())
+        );
+        if (matched) myEmployeeProfile = matched;
+      }
+
+      if (!myEmployeeProfile) {
+        showToast('warning', 'আপনার প্রোফাইল ডাটা লোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন');
+        return;
+      }
+
+      document.getElementById('self-modal-name').value = myEmployeeProfile.name || '';
+      document.getElementById('self-modal-phone').value = myEmployeeProfile.phone || '';
+      document.getElementById('self-modal-email').value = myEmployeeProfile.email || currentUserEmail;
+      document.getElementById('self-modal-emergency').value = myEmployeeProfile.emergencyPhone || '';
+      document.getElementById('self-modal-address').value = myEmployeeProfile.address || '';
+      document.getElementById('self-modal-blood').value = myEmployeeProfile.bloodGroup || '';
+      document.getElementById('self-modal-nid').value = myEmployeeProfile.nid || '';
+      document.getElementById('self-modal-guardian').value = myEmployeeProfile.guardianName || '';
+      
+      const prev = document.getElementById('self-modal-photo-preview');
+      if (prev) {
+        prev.src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
+      }
+
+      toggleModal('self-profile-modal', true);
+    };
+
+    window.saveSelfProfile = async function(e) {
+      e.preventDefault();
+      if (!myEmployeeProfile || !myEmployeeProfile.id) {
+        showToast('error', 'প্রোফাইল আইডি পাওয়া যায়নি');
+        return;
+      }
+
+      const name = document.getElementById('self-modal-name').value.trim();
+      const phone = document.getElementById('self-modal-phone').value.trim();
+      const email = document.getElementById('self-modal-email').value.trim();
+      const emergencyPhone = document.getElementById('self-modal-emergency').value.trim();
+      const address = document.getElementById('self-modal-address').value.trim();
+      const bloodGroup = document.getElementById('self-modal-blood').value.trim();
+      const nid = document.getElementById('self-modal-nid').value.trim();
+      const guardianName = document.getElementById('self-modal-guardian').value.trim();
+
+      if (!name) {
+        showToast('warning', 'আপনার পূর্ণ নাম প্রদান করুন');
+        return;
+      }
+
+      try {
+        const updatePayload = {
+          name,
+          phone,
+          email,
+          emergencyPhone,
+          address,
+          bloodGroup,
+          nid,
+          guardianName,
+          updatedAt: new Date().toISOString()
+        };
+
+        await updateDoc(doc(db, "employees", myEmployeeProfile.id), updatePayload);
+        Object.assign(myEmployeeProfile, updatePayload);
+        
+        const empPName = document.getElementById('emp-p-name');
+        if (empPName) empPName.innerText = name;
+        const empPPhone = document.getElementById('emp-p-phone');
+        if (empPPhone) empPPhone.innerText = phone || 'N/A';
+        const empPAddress = document.getElementById('emp-p-address');
+        if (empPAddress) empPAddress.innerText = address || 'N/A';
+        const empPBlood = document.getElementById('emp-p-blood');
+        if (empPBlood) empPBlood.innerText = bloodGroup || 'N/A';
+        const empPEmergency = document.getElementById('emp-p-emergency');
+        if (empPEmergency) empPEmergency.innerText = emergencyPhone || 'N/A';
+
+        populateSettingsSelfProfileForm();
+
+        await logSystemActivity(
+          'UPDATE',
+          'Employee',
+          `${currentUserEmail} updated their personal employee profile details ("${name}")`,
+          { employeeId: myEmployeeProfile.id, name, phone, email }
+        );
+
+        toggleModal('self-profile-modal', false);
+        Swal.fire({
+          icon: 'success',
+          title: 'প্রোফাইল আপডেট সফল হয়েছে!',
+          text: 'আপনার ব্যক্তিগত তথ্য সফলভাবে সংরক্ষিত হয়েছে। 🎉',
+          confirmButtonColor: '#4f46e5'
+        });
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.saveSettingsSelfProfile = async function(e) {
+      e.preventDefault();
+      if (!myEmployeeProfile || !myEmployeeProfile.id) {
+        showToast('error', 'প্রোফাইল আইডি পাওয়া যায়নি');
+        return;
+      }
+
+      const name = document.getElementById('self-settings-name').value.trim();
+      const phone = document.getElementById('self-settings-phone').value.trim();
+      const email = document.getElementById('self-settings-email').value.trim();
+      const emergencyPhone = document.getElementById('self-settings-emergency').value.trim();
+      const address = document.getElementById('self-settings-address').value.trim();
+      const bloodGroup = document.getElementById('self-settings-blood').value.trim();
+      const nid = document.getElementById('self-settings-nid').value.trim();
+      const guardianName = document.getElementById('self-settings-guardian').value.trim();
+
+      if (!name) {
+        showToast('warning', 'আপনার পূর্ণ নাম প্রদান করুন');
+        return;
+      }
+
+      try {
+        const updatePayload = {
+          name,
+          phone,
+          email,
+          emergencyPhone,
+          address,
+          bloodGroup,
+          nid,
+          guardianName,
+          updatedAt: new Date().toISOString()
+        };
+
+        await updateDoc(doc(db, "employees", myEmployeeProfile.id), updatePayload);
+        Object.assign(myEmployeeProfile, updatePayload);
+
+        const empPName = document.getElementById('emp-p-name');
+        if (empPName) empPName.innerText = name;
+        const empPPhone = document.getElementById('emp-p-phone');
+        if (empPPhone) empPPhone.innerText = phone || 'N/A';
+        const empPAddress = document.getElementById('emp-p-address');
+        if (empPAddress) empPAddress.innerText = address || 'N/A';
+        const empPBlood = document.getElementById('emp-p-blood');
+        if (empPBlood) empPBlood.innerText = bloodGroup || 'N/A';
+        const empPEmergency = document.getElementById('emp-p-emergency');
+        if (empPEmergency) empPEmergency.innerText = emergencyPhone || 'N/A';
+
+        await logSystemActivity(
+          'UPDATE',
+          'Employee',
+          `${currentUserEmail} updated their employee profile details from Settings ("${name}")`,
+          { employeeId: myEmployeeProfile.id, name, phone, email }
+        );
+
+        Swal.fire({
+          icon: 'success',
+          title: 'প্রোফাইল সংরক্ষিত হয়েছে!',
+          text: 'আপনার প্রোফাইল তথ্য সফলভাবে আপডেট হয়েছে। 🎉',
+          confirmButtonColor: '#4f46e5'
+        });
+      } catch (err) {
+        showToast('error', err.message);
+      }
+    };
+
+    window.populateSettingsSelfProfileForm = function() {
+      if (!myEmployeeProfile) return;
+      const sName = document.getElementById('self-settings-name');
+      if (sName) sName.value = myEmployeeProfile.name || '';
+      const sPhone = document.getElementById('self-settings-phone');
+      if (sPhone) sPhone.value = myEmployeeProfile.phone || '';
+      const sEmail = document.getElementById('self-settings-email');
+      if (sEmail) sEmail.value = myEmployeeProfile.email || currentUserEmail;
+      const sEmergency = document.getElementById('self-settings-emergency');
+      if (sEmergency) sEmergency.value = myEmployeeProfile.emergencyPhone || '';
+      const sAddress = document.getElementById('self-settings-address');
+      if (sAddress) sAddress.value = myEmployeeProfile.address || '';
+      const sBlood = document.getElementById('self-settings-blood');
+      if (sBlood) sBlood.value = myEmployeeProfile.bloodGroup || '';
+      const sNid = document.getElementById('self-settings-nid');
+      if (sNid) sNid.value = myEmployeeProfile.nid || '';
+      const sGuardian = document.getElementById('self-settings-guardian');
+      if (sGuardian) sGuardian.value = myEmployeeProfile.guardianName || '';
     };
 
     window.openEmployeeModal = function(id = '') {
@@ -2689,8 +2918,20 @@ ${messageText}
     window.saveLeaveRequest = async function(e) {
       e.preventDefault();
       let empId = document.getElementById('leave-emp-id').value;
-      if(currentUserRole === 'Employee' && myEmployeeProfile) {
-        empId = myEmployeeProfile.id;
+      if (currentUserRole === 'Employee') {
+        if (!myEmployeeProfile) {
+          const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
+          const matched = employeeList.find(e => 
+            (e.email && e.email.toLowerCase() === currentUserEmail) ||
+            (assignedRoleInfo && assignedRoleInfo.employeeId === e.id) ||
+            (assignedRoleInfo && assignedRoleInfo.employeeName && e.name && assignedRoleInfo.employeeName.toLowerCase() === e.name.toLowerCase()) ||
+            e.name.toLowerCase().includes(currentUserEmail.split('@')[0])
+          );
+          if (matched) myEmployeeProfile = matched;
+        }
+        if (myEmployeeProfile) {
+          empId = myEmployeeProfile.id;
+        }
       }
       const type = document.getElementById('leave-type').value;
       const start = document.getElementById('leave-start').value;
@@ -4282,11 +4523,38 @@ ${messageText}
         if (id === 'add-leave-modal') {
           const leaveEmpSelect = document.getElementById('leave-emp-id');
           const leaveEmpBox = document.getElementById('leave-emp-select-box');
-          if (currentUserRole === 'Employee' && myEmployeeProfile && leaveEmpSelect) {
-            leaveEmpSelect.value = myEmployeeProfile.id;
+          const leaveSelfBanner = document.getElementById('leave-emp-self-banner');
+          const leaveSelfName = document.getElementById('leave-self-name');
+          const leaveSelfSub = document.getElementById('leave-self-sub');
+          const leaveSelfAvatar = document.getElementById('leave-self-avatar');
+
+          if (currentUserRole === 'Employee') {
             if (leaveEmpBox) leaveEmpBox.classList.add('hidden');
-          } else if (leaveEmpBox) {
-            leaveEmpBox.classList.remove('hidden');
+            if (leaveSelfBanner) leaveSelfBanner.classList.remove('hidden');
+
+            if (!myEmployeeProfile) {
+              const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
+              const matched = employeeList.find(e => 
+                (e.email && e.email.toLowerCase() === currentUserEmail) ||
+                (assignedRoleInfo && assignedRoleInfo.employeeId === e.id) ||
+                (assignedRoleInfo && assignedRoleInfo.employeeName && e.name && assignedRoleInfo.employeeName.toLowerCase() === e.name.toLowerCase()) ||
+                e.name.toLowerCase().includes(currentUserEmail.split('@')[0])
+              );
+              if (matched) myEmployeeProfile = matched;
+            }
+
+            if (myEmployeeProfile) {
+              if (leaveEmpSelect) leaveEmpSelect.value = myEmployeeProfile.id;
+              if (leaveSelfName) leaveSelfName.innerText = `${myEmployeeProfile.name} (ID: ${myEmployeeProfile.customEmpCode || 'N/A'})`;
+              if (leaveSelfSub) leaveSelfSub.innerText = `${myEmployeeProfile.designation} • 🏢 ${myEmployeeProfile.branch || 'Head Office'}`;
+              if (leaveSelfAvatar) leaveSelfAvatar.src = myEmployeeProfile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(myEmployeeProfile.name)}&background=6366f1&color=fff`;
+            } else {
+              if (leaveSelfName) leaveSelfName.innerText = currentUserEmail;
+              if (leaveSelfSub) leaveSelfSub.innerText = 'Employee (Self Application)';
+            }
+          } else {
+            if (leaveEmpBox) leaveEmpBox.classList.remove('hidden');
+            if (leaveSelfBanner) leaveSelfBanner.classList.add('hidden');
           }
         }
       } else {
@@ -4575,13 +4843,31 @@ ${messageText}
                   <span>Upload Photo</span>
                 </button>
               </div>
-              <div class="text-center md:text-left space-y-1 flex-1">
-                <h2 id="emp-p-name" class="text-xl font-bold text-slate-900">Loading Profile...</h2>
-                <p id="emp-p-desig" class="text-xs text-indigo-600 font-semibold">---</p>
+              <div class="text-center md:text-left space-y-1.5 flex-1">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 id="emp-p-name" class="text-xl font-bold text-slate-900">Loading Profile...</h2>
+                    <p id="emp-p-desig" class="text-xs text-indigo-600 font-semibold mt-0.5">---</p>
+                  </div>
+                  <div class="flex flex-wrap gap-2 justify-center sm:justify-end">
+                    <button onclick="openSelfProfileModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs flex items-center space-x-1.5">
+                      <i class="fa-solid fa-user-pen"></i>
+                      <span>Edit My Profile (প্রোফাইল এডিট)</span>
+                    </button>
+                    <button onclick="toggleModal('add-leave-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs flex items-center space-x-1.5">
+                      <i class="fa-solid fa-calendar-plus"></i>
+                      <span>Apply for Leave</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div class="flex flex-wrap gap-2 justify-center md:justify-start pt-2">
                   <span class="bg-slate-100 text-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg">Joined: <strong id="emp-p-joining">---</strong></span>
                   <span class="bg-slate-100 text-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg">Phone: <strong id="emp-p-phone">---</strong></span>
-                  <span class="bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-lg">Current Salary: <strong id="emp-p-salary">৳ 0</strong></span>
+                  <span class="bg-slate-100 text-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg">Emergency: <strong id="emp-p-emergency">---</strong></span>
+                  <span class="bg-slate-100 text-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg">Blood: <strong id="emp-p-blood">---</strong></span>
+                  <span class="bg-slate-100 text-slate-600 text-[11px] font-semibold px-2.5 py-1 rounded-lg">Address: <strong id="emp-p-address">---</strong></span>
+                  <span class="bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-emerald-200">Current Salary: <strong id="emp-p-salary">৳ 0</strong></span>
                 </div>
               </div>
             </div>
@@ -5178,6 +5464,79 @@ ${messageText}
                   </button>
                 </div>
               </div>
+            </div>
+
+            <!-- Employee Self Profile Edit Card (Settings Section) -->
+            <div id="sec-settings-self-profile" class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4 md:col-span-2">
+              <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+                    <i class="fa-solid fa-id-card-clip text-indigo-600 text-base"></i>
+                    <span>My Profile Information (আমার ব্যক্তিগত প্রোফাইল তথ্য)</span>
+                  </h3>
+                  <p class="text-xs text-slate-500">আপনার নাম, মোবাইল নম্বর, ঠিকানা ও জরুরি যোগাযোগের তথ্য আপডেট করুন</p>
+                </div>
+              </div>
+
+              <form id="settings-self-profile-form" onsubmit="saveSettingsSelfProfile(event)" class="space-y-4 bg-slate-50/70 p-5 rounded-2xl border border-slate-200">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Full Name (পূর্ণ নাম) *</label>
+                    <input type="text" id="self-settings-name" required class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Mobile Phone (মোবাইল নম্বর) *</label>
+                    <input type="text" id="self-settings-phone" placeholder="017xxxxxxxx" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Email Address (ইমেইল)</label>
+                    <input type="email" id="self-settings-email" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Emergency Phone (জরুরি যোগাযোগ নম্বর)</label>
+                    <input type="text" id="self-settings-emergency" placeholder="পিতা/মাতা/অভিভাবকের ফোন" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Blood Group (রক্তের গ্রুপ)</label>
+                    <select id="self-settings-blood" class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <option value="">-- নির্বাচন করুন --</option>
+                      <option value="A+">A+ (A Positive)</option>
+                      <option value="A-">A- (A Negative)</option>
+                      <option value="B+">B+ (B Positive)</option>
+                      <option value="B-">B- (B Negative)</option>
+                      <option value="O+">O+ (O Positive)</option>
+                      <option value="O-">O- (O Negative)</option>
+                      <option value="AB+">AB+ (AB Positive)</option>
+                      <option value="AB-">AB- (AB Negative)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">National ID / NID (জাতীয় পরিচয়পত্র)</label>
+                    <input type="text" id="self-settings-nid" placeholder="NID নম্বর..." class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Father / Mother / Guardian (অভিভাবকের নাম)</label>
+                    <input type="text" id="self-settings-guardian" placeholder="পিতা/মাতা/অভিভাবক..." class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Present Address (বর্তমান ঠিকানা)</label>
+                    <input type="text" id="self-settings-address" placeholder="বাসা/গ্রাম, থানা, জেলা..." class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex justify-end">
+                  <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Profile Changes</span>
+                  </button>
+                </div>
+              </form>
             </div>
 
             <!-- Role & User Permission Matrix Card (Admin / Permitted Only) -->
@@ -5864,6 +6223,18 @@ ${messageText}
       </div>
 
       <form id="leave-form" onsubmit="saveLeaveRequest(event)" class="space-y-3">
+        <!-- If Employee: Self Profile Banner (Only visible for Employee role) -->
+        <div id="leave-emp-self-banner" class="hidden bg-indigo-50/90 border border-indigo-200 p-3.5 rounded-2xl flex items-center space-x-3 shadow-2xs">
+          <img id="leave-self-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-11 h-11 rounded-full object-cover border-2 border-indigo-400 shrink-0">
+          <div class="space-y-0.5 flex-1 min-w-0">
+            <div class="font-bold text-xs text-indigo-950 flex items-center space-x-1.5 truncate">
+              <span id="leave-self-name" class="truncate font-black">নাম</span>
+              <span class="bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md shrink-0">My Self</span>
+            </div>
+            <div class="text-[11px] text-indigo-700 font-medium truncate" id="leave-self-sub">কর্মচারী তথ্য</div>
+          </div>
+        </div>
+
         <div id="leave-emp-select-box">
           <label class="block text-xs font-bold text-slate-700 mb-1">Select Employee</label>
           <select id="leave-emp-id" class="w-full p-2.5 border rounded-xl text-xs bg-white font-medium outline-none"></select>
@@ -6069,6 +6440,94 @@ ${messageText}
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
           <button type="button" onclick="toggleModal('add-perf-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
           <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition">Save Review</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 9. EMPLOYEE SELF PROFILE EDIT MODAL -->
+  <div id="self-profile-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+            <i class="fa-solid fa-user-pen text-indigo-600"></i>
+            <span>Edit My Profile (আমার প্রোফাইল তথ্য এডিট)</span>
+          </h3>
+          <p class="text-xs text-slate-500">আপনার ব্যক্তিগত ও যোগাযোগের তথ্যসমূহ আপডেট করুন</p>
+        </div>
+        <button onclick="toggleModal('self-profile-modal', false)" class="text-slate-400 hover:text-slate-700 text-sm"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="self-profile-form" onsubmit="saveSelfProfile(event)" class="space-y-3.5">
+        <!-- Photo & Avatar Section -->
+        <div class="flex items-center space-x-4 bg-indigo-50/70 p-3.5 rounded-2xl border border-indigo-100">
+          <img id="self-modal-photo-preview" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-14 h-14 rounded-full object-cover border-2 border-indigo-500 shrink-0">
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-indigo-950">Profile Picture (ছবি পরিবর্তন)</label>
+            <input type="file" id="self-modal-photo-file" accept="image/*" onchange="uploadMyOwnProfilePhoto(event)" class="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Full Name (পূর্ণ নাম) *</label>
+            <input type="text" id="self-modal-name" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Mobile Phone (মোবাইল নম্বর) *</label>
+            <input type="text" id="self-modal-phone" placeholder="e.g. 017xxxxxxxx" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Email Address (ইমেইল)</label>
+            <input type="email" id="self-modal-email" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Emergency Phone (জরুরি যোগাযোগ)</label>
+            <input type="text" id="self-modal-emergency" placeholder="পরিবারের কারো ফোন নম্বর" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Blood Group (রক্তের গ্রুপ)</label>
+            <select id="self-modal-blood" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="">-- নির্বাচন করুন --</option>
+              <option value="A+">A+ (A Positive)</option>
+              <option value="A-">A- (A Negative)</option>
+              <option value="B+">B+ (B Positive)</option>
+              <option value="B-">B- (B Negative)</option>
+              <option value="O+">O+ (O Positive)</option>
+              <option value="O-">O- (O Negative)</option>
+              <option value="AB+">AB+ (AB Positive)</option>
+              <option value="AB-">AB- (AB Negative)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">National ID / NID (জাতীয় পরিচয়পত্র)</label>
+            <input type="text" id="self-modal-nid" placeholder="NID নম্বর..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Father / Mother / Guardian (পিতা/মাতা/অভিভাবকের নাম)</label>
+          <input type="text" id="self-modal-guardian" placeholder="অভিভাবকের নাম লিখুন..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Present Address (বর্তমান ঠিকানা)</label>
+          <textarea id="self-modal-address" rows="2" placeholder="বাড়ি নং, রোড নং, এলাকা, শহর..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+          <button type="button" onclick="toggleModal('self-profile-modal', false)" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">বাতিল (Cancel)</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>Save Profile (সংরক্ষণ করুন)</span>
+          </button>
         </div>
       </form>
     </div>

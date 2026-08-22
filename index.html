@@ -1031,6 +1031,13 @@
     window.getValidAttendanceRecord = function(emp, rawRec) {
       if (!rawRec) return null;
       const bName = (emp && emp.branch) ? emp.branch : 'Head Office';
+      const recBranch = (rawRec && typeof rawRec === 'object' && rawRec.branch) ? rawRec.branch : 'Head Office';
+      
+      // If record has a specific branch and it doesn't match employee's branch, ignore
+      if (typeof rawRec === 'object' && rawRec.branch && recBranch !== bName) {
+        return null;
+      }
+
       // Biometric punch is strictly for Head Office.
       // If employee belongs to another branch and the record method is ZKTeco / Biometric, ignore it.
       if (bName !== 'Head Office') {
@@ -1042,6 +1049,35 @@
       return rawRec;
     };
 
+    window.findAttendanceForEmployee = function(emp, attendanceMap) {
+      if (!emp || !attendanceMap) return null;
+      
+      // 1. Direct match by unique Employee Document ID (Guaranteed unique across branches)
+      if (attendanceMap[emp.id]) {
+        return getValidAttendanceRecord(emp, attendanceMap[emp.id]);
+      }
+
+      // 2. Strict match by both Branch AND CustomEmpCode (Prevents cross-branch collision)
+      const empBranch = emp.branch || 'Head Office';
+      const empCode = String(emp.customEmpCode || '').trim();
+      
+      if (empCode) {
+        for (const key in attendanceMap) {
+          const rec = attendanceMap[key];
+          if (rec && typeof rec === 'object') {
+            const recBranch = rec.branch || 'Head Office';
+            const recCode = String(rec.customEmpCode || '').trim();
+            const recEmpId = rec.employeeId || key;
+            if (recEmpId === emp.id || (recBranch === empBranch && recCode === empCode)) {
+              return getValidAttendanceRecord(emp, rec);
+            }
+          }
+        }
+      }
+
+      return null;
+    };
+
     function updateAttendanceDashboardMetrics() {
       let presentCount = 0, absentCount = 0, leaveCount = 0, dayOffCount = 0, totalEmpInScope = 0;
       const todayStr = new Date().toISOString().split('T')[0];
@@ -1050,8 +1086,7 @@
         if (!isItemInActiveBranch(emp.branch)) return;
         totalEmpInScope++;
 
-        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const att = getValidAttendanceRecord(emp, rawAtt);
+        const att = findAttendanceForEmployee(emp, todayAttendanceData);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         
         if (!st) {
@@ -1206,8 +1241,7 @@
         allScopeList.push(emp);
 
         // Check Attendance
-        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const att = getValidAttendanceRecord(emp, rawAtt);
+        const att = findAttendanceForEmployee(emp, todayAttendanceData);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         let punchTime = (att && typeof att === 'object') ? (att.punchTime || att.time || '') : '';
         let method = (att && typeof att === 'object') ? (att.method || '') : '';
@@ -1276,8 +1310,7 @@
       else if (currentDashModalCategory === 'Increment Due') targetRecords = incDueList;
       else {
         targetRecords = allScopeList.map(emp => {
-          const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-          const att = getValidAttendanceRecord(emp, rawAtt);
+          const att = findAttendanceForEmployee(emp, todayAttendanceData);
           let st = att ? (typeof att === 'object' ? att.status : att) : null;
           const activeLeave = leaveList.find(l => 
             (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) &&
@@ -2027,9 +2060,6 @@
           const data = docSnap.data();
           const targetKey = data.employeeId || docSnap.id;
           todayAttendanceData[targetKey] = data;
-          if (data.customEmpCode) {
-            todayAttendanceData[data.customEmpCode] = data;
-          }
         });
 
         updateAttendanceDashboardMetrics();
@@ -2047,8 +2077,7 @@
       listToRender.forEach((emp) => {
         if (!isItemInActiveBranch(emp.branch)) return;
 
-        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const attRecord = getValidAttendanceRecord(emp, rawAtt);
+        const attRecord = findAttendanceForEmployee(emp, todayAttendanceData);
         
         let currentStatus = 'Absent';
         let punchTime = '--:--';
@@ -3798,7 +3827,6 @@ ${messageText}
                 const data = docSnap.data();
                 const k1 = data.employeeId || docSnap.id;
                 dayMap[k1] = data;
-                if (data.customEmpCode) dayMap[data.customEmpCode] = data;
               });
               return { date: dStr, logs: dayMap };
             }).catch(() => ({ date: dStr, logs: {} }))
@@ -3814,8 +3842,7 @@ ${messageText}
         let absentDays = 0;
 
         monthDaysResults.forEach(({ date, logs }) => {
-          const rawRec = logs[emp.id] || (emp.customEmpCode ? logs[emp.customEmpCode] : null);
-          const rec = getValidAttendanceRecord(emp, rawRec);
+          const rec = findAttendanceForEmployee(emp, logs);
           let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
 
           if (!st) {
@@ -4733,8 +4760,7 @@ ${messageText}
       const todayStr = new Date().toISOString().split('T')[0];
 
       activeEmployees.forEach(emp => {
-        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
-        const att = getValidAttendanceRecord(emp, rawAtt);
+        const att = findAttendanceForEmployee(emp, todayAttendanceData);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         
         if (!st) {
@@ -4859,7 +4885,6 @@ ${messageText}
                 const data = docSnap.data();
                 const k1 = data.employeeId || docSnap.id;
                 dayMap[k1] = data;
-                if (data.customEmpCode) dayMap[data.customEmpCode] = data;
               });
               return { date: dStr, logs: dayMap };
             }).catch(() => ({ date: dStr, logs: {} }))
@@ -4917,8 +4942,7 @@ ${messageText}
           let empLeave = 0;
 
           monthDaysResults.forEach(({ date, logs }) => {
-            const rawRec = logs[emp.id] || (emp.customEmpCode ? logs[emp.customEmpCode] : null);
-            const rec = getValidAttendanceRecord(emp, rawRec);
+            const rec = findAttendanceForEmployee(emp, logs);
             let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
 
             if (!st) {
@@ -4997,7 +5021,6 @@ ${messageText}
             const d = docSnap.data();
             const k = d.employeeId || docSnap.id;
             dayAttendanceMap[k] = d;
-            if (d.customEmpCode) dayAttendanceMap[d.customEmpCode] = d;
           });
         } catch(e) {}
 
@@ -5030,8 +5053,7 @@ ${messageText}
         }
 
         targetEmployees.forEach(emp => {
-          const rawRec = dayAttendanceMap[emp.id] || (emp.customEmpCode ? dayAttendanceMap[emp.customEmpCode] : null);
-          const rec = getValidAttendanceRecord(emp, rawRec);
+          const rec = findAttendanceForEmployee(emp, dayAttendanceMap);
           let st = 'Absent';
           let punch = '--:--';
           let isHeadOffice = (emp.branch || 'Head Office') === 'Head Office';

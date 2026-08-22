@@ -2200,12 +2200,16 @@
             if (timeToken.length === 7) timeToken = '0' + timeToken;
           }
 
-          // Employee খোঁজা (ID বা CustomEmpCode এর সাথে ম্যাচ)
+          // Employee খোঁজা (ID বা CustomEmpCode এর সাথে ম্যাচ - শুধুমাত্র Head Office কর্মচারীদের জন্য)
           let matchedEmp = null;
           let candidateId = '';
 
           for (const token of tokens) {
             const emp = employeeList.find(e => {
+              // বায়োমেট্রিক মেশিন শুধুমাত্র Head Office এর জন্য নির্ধারিত
+              const bName = e.branch || 'Head Office';
+              if (bName !== 'Head Office') return false;
+
               const codeStr = String(e.customEmpCode || '').trim();
               if (!codeStr) return false;
               if (codeStr === token) return true;
@@ -5544,10 +5548,10 @@ ${messageText}
               <span class="text-xs font-bold text-slate-700">তারিখ:</span>
               <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 focus:bg-white outline-none">
               
-              <!-- ZKTeco log punch file import -->
-              <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5">
+              <!-- ZKTeco log punch file import (Head Office Only) -->
+              <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="শুধুমাত্র হেড অফিসের বায়োমেট্রিক ডিভাইসের ফাইল আপলোড করুন">
                 <i class="fa-solid fa-fingerprint"></i>
-                <span>Import ZKTeco Log</span>
+                <span>Import ZKTeco Log (Head Office)</span>
                 <input type="file" id="zk-log-file" onchange="handleZKLogUpload(event)" accept=".dat,.txt,.csv,.log" class="hidden">
               </label>
             </div>

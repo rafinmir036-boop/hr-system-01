@@ -2213,6 +2213,71 @@
       }
     };
 
+    window.resetTodayAttendance = async function() {
+      const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate) {
+        showToast('warning', 'তারিখ নির্বাচন করুন');
+        return;
+      }
+
+      const branchTitle = selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch;
+      const result = await Swal.fire({
+        title: `${selectedDate} তারিখের হাজিরা রিসেট করবেন?`,
+        html: `আপনি কি নিশ্চিতভাবে <b>${branchTitle}</b>-এর সংরক্ষিত সকল হাজিরা ডাটা মুছে ফেলতে চান?<br><br><span class="text-xs text-rose-600 font-semibold">⚠️ এটি ডাটাবেজ থেকে মুছে যাবে এবং কর্মচারীদের হাজিরা প্রেজেন্ট ০ হয়ে সবাই Absent হয়ে যাবে।</span>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'হ্যাঁ, সম্পূর্ণ রিসেট করুন',
+        cancelButtonText: 'বাতিল'
+      });
+
+      if (!result.isConfirmed) return;
+
+      Swal.fire({
+        title: 'হাজিরা রিসেট হচ্ছে...',
+        text: 'ডাটাবেজ থেকে এন্ট্রি মুছে ফেলা হচ্ছে...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      try {
+        const snap = await getDocs(collection(db, `attendance_${selectedDate}`));
+        const targetEmployees = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+        const targetIds = new Set(targetEmployees.map(e => e.id));
+        const targetCodes = new Set(targetEmployees.map(e => e.customEmpCode).filter(Boolean));
+
+        const deletePromises = [];
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const empId = d.employeeId || docSnap.id;
+          const empCode = d.customEmpCode || '';
+          
+          if (selectedActiveBranch === 'ALL' || targetIds.has(empId) || targetCodes.has(empCode)) {
+            deletePromises.push(deleteDoc(doc(db, `attendance_${selectedDate}`, docSnap.id)));
+          }
+        });
+
+        await Promise.all(deletePromises);
+
+        await logSystemActivity(
+          'DELETE',
+          'Attendance',
+          `${currentUserEmail} reset attendance records (${deletePromises.length} entries) for "${branchTitle}" on ${selectedDate}`,
+          { branch: branchTitle, date: selectedDate, count: deletePromises.length }
+        );
+
+        Swal.fire({
+          icon: 'success',
+          title: 'হাজিরা রিসেট সফল হয়েছে! 🎉',
+          text: `${selectedDate} তারিখের ${deletePromises.length}টি হাজিরা এন্ট্রি সফলভাবে মুছে দেওয়া হয়েছে।`,
+          confirmButtonColor: '#4f46e5'
+        });
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+      }
+    };
+
     // ZKBio Time / ZKTeco CSV File Import Handler (Smart Multi-format & Adaptive Parser)
     window.handleZKLogUpload = async function(e) {
       const file = e.target.files[0];
@@ -3690,30 +3755,114 @@ ${messageText}
       });
     }
 
-    window.openPayrollModalForEmployee = function() {
+    window.openPayrollModalForEmployee = async function() {
       const empId = document.getElementById('pay-emp-id').value;
       const month = document.getElementById('pay-month').value;
       const emp = employeeList.find(e => e.id === empId);
 
-      if (emp) {
-        document.getElementById('pay-basic').value = emp.salary || 0;
-        
-        let autoAdvance = 0;
-        if (month) {
-          const pendingAdvances = advanceList.filter(a => a.employeeId === empId && a.month === month && (a.status === 'Pending' || a.status === 'Approved'));
-          autoAdvance = pendingAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-        }
-        document.getElementById('pay-advance').value = autoAdvance;
+      const attBox = document.getElementById('pay-att-summary-box');
+      if (!emp) return;
 
-        let autoFine = 0;
-        if (month) {
-          const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
-          autoFine = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-        }
-        document.getElementById('pay-fine').value = autoFine;
+      const baseSalary = Number(emp.salary) || 0;
 
-        calculateNetSalary();
+      // 1. Calculate Advance & Fine for that month
+      let autoAdvance = 0;
+      if (month) {
+        const pendingAdvances = advanceList.filter(a => a.employeeId === empId && a.month === month && (a.status === 'Pending' || a.status === 'Approved'));
+        autoAdvance = pendingAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       }
+      document.getElementById('pay-advance').value = autoAdvance;
+
+      let autoFine = 0;
+      if (month) {
+        const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
+        autoFine = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      }
+      document.getElementById('pay-fine').value = autoFine;
+
+      // 2. Attendance & Absent deduction calculation
+      if (month && emp) {
+        const [yearStr, mStr] = month.split('-');
+        const y = parseInt(yearStr);
+        const m = parseInt(mStr);
+        const daysInMonth = new Date(y, m, 0).getDate();
+
+        // Fetch daily logs for the month
+        const dailyPromises = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+          dailyPromises.push(
+            getDocs(collection(db, `attendance_${dStr}`)).then(snap => {
+              const dayMap = {};
+              snap.forEach(docSnap => {
+                const data = docSnap.data();
+                const k1 = data.employeeId || docSnap.id;
+                dayMap[k1] = data;
+                if (data.customEmpCode) dayMap[data.customEmpCode] = data;
+              });
+              return { date: dStr, logs: dayMap };
+            }).catch(() => ({ date: dStr, logs: {} }))
+          );
+        }
+
+        const monthDaysResults = await Promise.all(dailyPromises);
+
+        let presentDays = 0;
+        let lateDays = 0;
+        let dayOffDays = 0;
+        let leaveDays = 0;
+        let absentDays = 0;
+
+        monthDaysResults.forEach(({ date, logs }) => {
+          const rawRec = logs[emp.id] || (emp.customEmpCode ? logs[emp.customEmpCode] : null);
+          const rec = getValidAttendanceRecord(emp, rawRec);
+          let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+
+          if (!st) {
+            const hasLeave = leaveList.some(l => 
+              l.employeeId === emp.id && 
+              l.status === 'Approved' && 
+              date >= l.startDate && 
+              date <= l.endDate
+            );
+            if (hasLeave) st = 'On Leave';
+          }
+
+          if (st === 'Present') presentDays++;
+          else if (st === 'Late') lateDays++;
+          else if (st === 'Day Off') dayOffDays++;
+          else if (st === 'On Leave') leaveDays++;
+          else absentDays++;
+        });
+
+        const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
+        const absentDeduction = Math.round(absentDays * perDaySalary);
+        const earnedBasic = Math.max(0, Math.round(baseSalary - absentDeduction));
+
+        document.getElementById('pay-basic').value = earnedBasic;
+
+        if (attBox) {
+          attBox.classList.remove('hidden');
+          const sumPres = document.getElementById('pay-sum-present');
+          const sumDayOff = document.getElementById('pay-sum-dayoff');
+          const sumLeave = document.getElementById('pay-sum-leave');
+          const sumAbsent = document.getElementById('pay-sum-absent');
+          const sumDeduct = document.getElementById('pay-sum-deduct');
+          const sumTotal = document.getElementById('pay-summary-total-days');
+
+          if (sumPres) sumPres.innerText = presentDays + lateDays;
+          if (sumDayOff) sumDayOff.innerText = dayOffDays;
+          if (sumLeave) sumLeave.innerText = leaveDays;
+          if (sumAbsent) sumAbsent.innerText = absentDays;
+          if (sumDeduct) sumDeduct.innerText = absentDeduction.toLocaleString();
+          if (sumTotal) sumTotal.innerText = `মাসের মোট দিন: ${daysInMonth} দিন (মূল বেতন: ৳${baseSalary.toLocaleString()})`;
+        }
+      } else {
+        document.getElementById('pay-basic').value = baseSalary;
+        if (attBox) attBox.classList.add('hidden');
+      }
+
+      calculateNetSalary();
     };
 
     window.calculateNetSalary = function() {
@@ -3737,16 +3886,26 @@ ${messageText}
 
       const emp = employeeList.find(e => e.id === empId);
 
+      const presentCount = document.getElementById('pay-sum-present') ? (parseInt(document.getElementById('pay-sum-present').innerText) || 0) : 0;
+      const dayOffCount = document.getElementById('pay-sum-dayoff') ? (parseInt(document.getElementById('pay-sum-dayoff').innerText) || 0) : 0;
+      const leaveCount = document.getElementById('pay-sum-leave') ? (parseInt(document.getElementById('pay-sum-leave').innerText) || 0) : 0;
+      const absentCount = document.getElementById('pay-sum-absent') ? (parseInt(document.getElementById('pay-sum-absent').innerText) || 0) : 0;
+
       await addDoc(collection(db, "payrolls"), {
         employeeId: empId,
         employeeName: emp ? emp.name : 'Unknown Staff',
         branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
         month: month,
+        baseSalary: emp ? (Number(emp.salary) || basic) : basic,
         basicSalary: basic,
         bonus: bonus,
         advance: advance,
         fine: fine,
         netSalary: net,
+        presentDays: presentCount,
+        dayOffDays: dayOffCount,
+        leaveDays: leaveCount,
+        absentDays: absentCount,
         status: 'Paid',
         createdDate: new Date().toISOString()
       });
@@ -3798,8 +3957,9 @@ ${messageText}
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; }
             .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 20px; }
             .header h1 { margin: 0; color: #4f46e5; font-size: 24px; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 30px 0; font-size: 14px; line-height: 1.8; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 25px 0 15px 0; font-size: 14px; line-height: 1.8; }
+            .att-summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
             th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
             th { background: #f8fafc; font-weight: bold; }
             .net-row { font-weight: bold; background: #e0e7ff; color: #3730a3; font-size: 16px; }
@@ -3823,18 +3983,30 @@ ${messageText}
               <strong>Currency:</strong> BDT (৳)
             </div>
           </div>
+
+          <div class="att-summary-box">
+            <span>🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
+            <span>🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
+            <span>🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
+            <span>🔴 Absent: <strong style="color: #e11d48;">${p.absentDays || 0} Days</strong></span>
+          </div>
+
           <table>
             <thead>
               <tr><th>Earnings & Additions</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td>Basic Salary</td><td>৳ ${p.basicSalary.toLocaleString()}</td>
-                <td>Advance Salary Deducted</td><td>৳ ${(p.advance || 0).toLocaleString()}</td>
+                <td>Earned Basic Salary ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full: ৳${p.baseSalary.toLocaleString()})</small>` : ''}</td>
+                <td>৳ ${p.basicSalary.toLocaleString()}</td>
+                <td>Advance Salary Deducted</td>
+                <td>৳ ${(p.advance || 0).toLocaleString()}</td>
               </tr>
               <tr>
-                <td>Performance Bonus</td><td>৳ ${(p.bonus || 0).toLocaleString()}</td>
-                <td>Fines / Late Penalties</td><td>৳ ${(p.fine || 0).toLocaleString()}</td>
+                <td>Performance Bonus</td>
+                <td>৳ ${(p.bonus || 0).toLocaleString()}</td>
+                <td>Fines / Late Penalties</td>
+                <td>৳ ${(p.fine || 0).toLocaleString()}</td>
               </tr>
               <tr class="net-row">
                 <td colspan="2">Net Payable Salary</td>
@@ -5679,6 +5851,10 @@ ${messageText}
                 <i class="fa-solid fa-user-xmark"></i>
                 <span>সবাইকে Absent</span>
               </button>
+              <button onclick="resetTodayAttendance()" title="নির্বাচিত তারিখের হাজিরা ডাটাবেজ থেকে মুছে রিসেট করুন" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs ml-1">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>হাজিরা রিসেট (Reset)</span>
+              </button>
             </div>
           </div>
 
@@ -7002,6 +7178,21 @@ ${messageText}
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Salary Month *</label>
           <input type="month" id="pay-month" required onchange="openPayrollModalForEmployee()" class="w-full p-2.5 border rounded-xl text-xs font-bold outline-none">
+        </div>
+
+        <!-- Real-time Attendance & Days Calculation Summary Box -->
+        <div id="pay-att-summary-box" class="hidden p-3 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-1.5 shadow-2xs">
+          <div class="font-bold text-slate-700 flex justify-between items-center text-[11px]">
+            <span>📅 হাজিরা ও কার্যদিবস বিশ্লেষণ:</span>
+            <span id="pay-summary-total-days" class="text-indigo-700 font-extrabold text-[11px]"></span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 text-[10px] font-bold pt-1">
+            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg">🟢 উপস্থিত: <b id="pay-sum-present">0</b> দিন</span>
+            <span class="bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-lg">🔵 ডে অফ: <b id="pay-sum-dayoff">0</b> দিন</span>
+            <span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-lg">🟣 ছুটি: <b id="pay-sum-leave">0</b> দিন</span>
+            <span class="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg">🔴 অনুপস্থিত: <b id="pay-sum-absent">0</b> দিন (-৳<span id="pay-sum-deduct">0</span>)</span>
+          </div>
+          <p class="text-[10px] text-slate-400 italic pt-0.5">⚠️ উপস্থিত, ডে অফ এবং অনুমোদিত ছুটি পূর্ণ বেতনভুক্ত। শুধুমাত্র অনুপস্থিতির টাকা কাটা হয়েছে। আপনি নিচে নিজের মতো যেকোনো মান পরিবর্তন করতে পারেন।</p>
         </div>
 
         <div class="grid grid-cols-2 gap-3">

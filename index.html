@@ -1028,6 +1028,20 @@
       }
     }
 
+    window.getValidAttendanceRecord = function(emp, rawRec) {
+      if (!rawRec) return null;
+      const bName = (emp && emp.branch) ? emp.branch : 'Head Office';
+      // Biometric punch is strictly for Head Office.
+      // If employee belongs to another branch and the record method is ZKTeco / Biometric, ignore it.
+      if (bName !== 'Head Office') {
+        const meth = typeof rawRec === 'object' ? (rawRec.method || '') : '';
+        if (meth === 'ZKTeco Machine Punch' || meth === 'Biometric Machine' || meth.includes('ZKTeco') || meth.includes('Biometric')) {
+          return null;
+        }
+      }
+      return rawRec;
+    };
+
     function updateAttendanceDashboardMetrics() {
       let presentCount = 0, absentCount = 0, leaveCount = 0, dayOffCount = 0, totalEmpInScope = 0;
       const todayStr = new Date().toISOString().split('T')[0];
@@ -1036,7 +1050,8 @@
         if (!isItemInActiveBranch(emp.branch)) return;
         totalEmpInScope++;
 
-        const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const att = getValidAttendanceRecord(emp, rawAtt);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         
         if (!st) {
@@ -1191,7 +1206,8 @@
         allScopeList.push(emp);
 
         // Check Attendance
-        const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const att = getValidAttendanceRecord(emp, rawAtt);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         let punchTime = (att && typeof att === 'object') ? (att.punchTime || att.time || '') : '';
         let method = (att && typeof att === 'object') ? (att.method || '') : '';
@@ -1260,7 +1276,8 @@
       else if (currentDashModalCategory === 'Increment Due') targetRecords = incDueList;
       else {
         targetRecords = allScopeList.map(emp => {
-          const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+          const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+          const att = getValidAttendanceRecord(emp, rawAtt);
           let st = att ? (typeof att === 'object' ? att.status : att) : null;
           const activeLeave = leaveList.find(l => 
             (l.employeeId === emp.id || (l.employeeName && emp.name && l.employeeName.toLowerCase() === emp.name.toLowerCase())) &&
@@ -2030,11 +2047,13 @@
       listToRender.forEach((emp) => {
         if (!isItemInActiveBranch(emp.branch)) return;
 
-        const attRecord = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const attRecord = getValidAttendanceRecord(emp, rawAtt);
         
         let currentStatus = 'Absent';
         let punchTime = '--:--';
-        let method = 'Not Punched';
+        let isHeadOffice = (emp.branch || 'Head Office') === 'Head Office';
+        let method = isHeadOffice ? 'Not Punched' : 'Manual Branch';
 
         if (attRecord) {
           if (typeof attRecord === 'string') {
@@ -2042,7 +2061,7 @@
           } else {
             currentStatus = attRecord.status || 'Absent';
             punchTime = attRecord.punchTime || attRecord.time || '--:--';
-            method = attRecord.method || (attRecord.status === 'Present' ? 'Biometric Machine' : 'Manual');
+            method = attRecord.method || (attRecord.status === 'Present' ? (isHeadOffice ? 'Biometric Machine' : 'Manual') : 'Manual');
           }
         }
 
@@ -2052,21 +2071,26 @@
               <img src="${emp.photoUrl}" alt="Photo" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
               <div>
                 <div class="font-bold text-slate-800">${emp.name}</div>
-                <div class="text-[11px] text-slate-500 font-semibold">ID: ${emp.customEmpCode || 'N/A'} • ${emp.designation} <span class="bg-slate-100 text-slate-600 font-bold px-1.5 rounded ml-1">🏢 ${emp.branch || 'Head Office'}</span></div>
+                <div class="text-[11px] text-slate-500 font-semibold flex items-center flex-wrap gap-1 mt-0.5">
+                  <span>ID: <b class="text-indigo-600 font-bold">${emp.customEmpCode || 'N/A'}</b> • ${emp.designation}</span>
+                  <span class="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.2 rounded">🏢 ${emp.branch || 'Head Office'}</span>
+                  ${isHeadOffice ? '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-1.5 py-0.2 rounded">Biometric Device</span>' : '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold px-1.5 py-0.2 rounded">Manual Attendance</span>'}
+                </div>
               </div>
             </td>
             <td class="px-6 py-4">
               <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
                 ${currentStatus}
               </span>
+              <div class="text-[10px] text-slate-400 font-medium mt-1">${method} ${punchTime !== '--:--' ? `• ${punchTime}` : ''}</div>
             </td>
-            <td class="px-6 py-4 text-right space-x-1.5">
+            <td class="px-6 py-4 text-right space-x-1">
               ${currentUserRole !== 'Employee' ? `
-                <button onclick="markAttendance('${emp.id}', 'Present')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Present</button>
-                <button onclick="markAttendance('${emp.id}', 'Late')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-xs">Late</button>
-                <button onclick="markAttendance('${emp.id}', 'Day Off')" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Day Off</button>
-                <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-xs">Absent</button>
-              ` : '<span class="text-xs text-slate-400 font-semibold">Biometric Verified</span>'}
+                <button onclick="markAttendance('${emp.id}', 'Present')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Present</button>
+                <button onclick="markAttendance('${emp.id}', 'Late')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-2xs">Late</button>
+                <button onclick="markAttendance('${emp.id}', 'Day Off')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Day Off</button>
+                <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Absent</button>
+              ` : '<span class="text-xs text-slate-400 font-semibold">Self View</span>'}
             </td>
           </tr>
         `;
@@ -2118,6 +2142,74 @@
         showToast('success', `${emp ? emp.name : 'কর্মচারী'} এর উপস্থিতি (${status}) আপডেট করা হয়েছে`);
       } catch (err) {
         showToast('error', err.message);
+      }
+    };
+
+    window.markAllAttendanceForBranch = async function(status) {
+      const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate) {
+        showToast('warning', 'তারিখ নির্বাচন করুন');
+        return;
+      }
+
+      const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+      if (targetList.length === 0) {
+        showToast('warning', 'কোনো কর্মচারী পাওয়া যায়নি');
+        return;
+      }
+
+      const branchTitle = selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch;
+      const result = await Swal.fire({
+        title: `${branchTitle}-এর সকল কর্মচারীকে ${status} করবেন?`,
+        text: `মোট ${targetList.length} জন কর্মচারীর উপস্থিতি "${status}" হিসেবে সংরক্ষিত হবে।`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: status === 'Present' ? '#10b981' : (status === 'Absent' ? '#ef4444' : '#0ea5e9'),
+        confirmButtonText: `হ্যাঁ, সবাইকে ${status} করুন`,
+        cancelButtonText: 'বাতিল'
+      });
+
+      if (!result.isConfirmed) return;
+
+      Swal.fire({
+        title: 'হাজিরা সংরক্ষণ হচ্ছে...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      try {
+        const promises = targetList.map(emp => {
+          return setDoc(doc(db, `attendance_${selectedDate}`, emp.id), {
+            employeeId: emp.id,
+            customEmpCode: emp.customEmpCode || '',
+            branch: emp.branch || 'Head Office',
+            status: status,
+            punchTime: status !== 'Absent' ? timeStr : '--:--',
+            method: 'Manual Branch Batch Mark',
+            updatedAt: now.toISOString()
+          });
+        });
+
+        await Promise.all(promises);
+
+        await logSystemActivity(
+          'UPDATE',
+          'Attendance',
+          `${currentUserEmail} batch marked all ${targetList.length} employees of "${branchTitle}" as ${status} on ${selectedDate}`,
+          { branch: branchTitle, status, count: targetList.length, date: selectedDate }
+        );
+
+        Swal.fire({
+          icon: 'success',
+          title: 'হাজিরা সম্পন্ন!',
+          text: `${branchTitle}-এর ${targetList.length} জন কর্মচারীকে "${status}" মার্ক করা হয়েছে।`,
+          confirmButtonColor: '#4f46e5'
+        });
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
       }
     };
 
@@ -4469,7 +4561,8 @@ ${messageText}
       const todayStr = new Date().toISOString().split('T')[0];
 
       activeEmployees.forEach(emp => {
-        const att = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const rawAtt = todayAttendanceData[emp.id] || (emp.customEmpCode ? todayAttendanceData[emp.customEmpCode] : null);
+        const att = getValidAttendanceRecord(emp, rawAtt);
         let st = att ? (typeof att === 'object' ? att.status : att) : null;
         
         if (!st) {
@@ -4652,7 +4745,8 @@ ${messageText}
           let empLeave = 0;
 
           monthDaysResults.forEach(({ date, logs }) => {
-            const rec = logs[emp.id] || (emp.customEmpCode ? logs[emp.customEmpCode] : null);
+            const rawRec = logs[emp.id] || (emp.customEmpCode ? logs[emp.customEmpCode] : null);
+            const rec = getValidAttendanceRecord(emp, rawRec);
             let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
 
             if (!st) {
@@ -4764,15 +4858,17 @@ ${messageText}
         }
 
         targetEmployees.forEach(emp => {
-          const rec = dayAttendanceMap[emp.id] || (emp.customEmpCode ? dayAttendanceMap[emp.customEmpCode] : null);
+          const rawRec = dayAttendanceMap[emp.id] || (emp.customEmpCode ? dayAttendanceMap[emp.customEmpCode] : null);
+          const rec = getValidAttendanceRecord(emp, rawRec);
           let st = 'Absent';
           let punch = '--:--';
-          let meth = 'Not Punched';
+          let isHeadOffice = (emp.branch || 'Head Office') === 'Head Office';
+          let meth = isHeadOffice ? 'Not Punched' : 'Manual Branch';
 
           if (rec) {
             st = rec.status || 'Absent';
             punch = rec.punchTime || rec.time || '--:--';
-            meth = rec.method || (st === 'Present' ? 'Biometric Machine' : 'Manual');
+            meth = rec.method || (st === 'Present' ? (isHeadOffice ? 'Biometric Machine' : 'Manual') : 'Manual');
           } else {
             const hasLeave = leaveList.some(l => 
               l.employeeId === emp.id && 
@@ -5540,8 +5636,11 @@ ${messageText}
         <section id="sec-attendance" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h2 class="text-base font-bold text-slate-800">Daily Attendance Log</h2>
-              <p class="text-xs text-slate-500">কর্মচারীদের দৈনিক উপস্থিতি ট্র্যাকিং</p>
+              <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                <i class="fa-solid fa-clock text-amber-500"></i>
+                <span>Daily Attendance Log (দৈনিক উপস্থিতি ট্র্যাকিং)</span>
+              </h2>
+              <p class="text-xs text-slate-500">হেড অফিসে বায়োমেট্রিক সিঙ্ক এবং অন্যান্য শাখায় ম্যানুয়াল হাজিরা</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2">
@@ -5551,9 +5650,35 @@ ${messageText}
               <!-- ZKTeco log punch file import (Head Office Only) -->
               <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="শুধুমাত্র হেড অফিসের বায়োমেট্রিক ডিভাইসের ফাইল আপলোড করুন">
                 <i class="fa-solid fa-fingerprint"></i>
-                <span>Import ZKTeco Log (Head Office)</span>
+                <span>Import ZKTeco Log (Head Office Only)</span>
                 <input type="file" id="zk-log-file" onchange="handleZKLogUpload(event)" accept=".dat,.txt,.csv,.log" class="hidden">
               </label>
+            </div>
+          </div>
+
+          <!-- Branch Manual Attendance Quick Batch Control Bar -->
+          <div class="bg-indigo-50/70 border border-indigo-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
+              <div class="text-xs">
+                <span class="font-black text-indigo-950">হাজিরা নিয়ম:</span>
+                <span class="text-indigo-800 font-medium ml-1">🏢 <b>Head Office:</b> বায়োমেট্রিক সিঙ্ক • 🏢 <b>শাখাগুলো (Branches):</b> নিচে ম্যানুয়ালি মার্ক করুন</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] font-bold text-slate-600 mr-1">কুইক একশন:</span>
+              <button onclick="markAllAttendanceForBranch('Present')" title="বর্তমান ব্রাঞ্চের সবাইকে উপস্থিত করুন" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
+                <i class="fa-solid fa-user-check"></i>
+                <span>সবাইকে Present</span>
+              </button>
+              <button onclick="markAllAttendanceForBranch('Day Off')" title="বর্তমান ব্রাঞ্চের সবাইকে ডে অফ দিন" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
+                <i class="fa-solid fa-mug-hot"></i>
+                <span>সবাইকে Day Off</span>
+              </button>
+              <button onclick="markAllAttendanceForBranch('Absent')" title="বর্তমান ব্রাঞ্চের সবাইকে অনুপস্থিত করুন" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
+                <i class="fa-solid fa-user-xmark"></i>
+                <span>সবাইকে Absent</span>
+              </button>
             </div>
           </div>
 

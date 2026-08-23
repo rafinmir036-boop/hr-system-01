@@ -213,28 +213,30 @@
       onSnapshot(collection(db, "branches"), (snapshot) => {
         const storedBranches = [];
         const tbody = document.getElementById('branch-table-body');
-        if (tbody) tbody.innerHTML = '';
+        let rowsHtml = '';
 
         snapshot.forEach(docSnap => {
           const b = docSnap.data();
           storedBranches.push(b.name);
-          if (tbody) {
-            tbody.innerHTML += `
-              <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
-                <td class="px-4 py-3 font-bold text-slate-800">${b.name}</td>
-                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${b.code || 'BR'}</span></td>
-                <td class="px-4 py-3 text-slate-600">${b.city || '-'}</td>
-                <td class="px-4 py-3 text-slate-600 font-medium">${b.managerEmail || 'Unassigned'}</td>
-                <td class="px-4 py-3 text-right">
-                  <button onclick="deleteBranchRecord('${docSnap.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button>
-                </td>
-              </tr>
-            `;
-          }
+          rowsHtml += `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+              <td class="px-4 py-3 font-bold text-slate-800">${b.name}</td>
+              <td class="px-4 py-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${b.code || 'BR'}</span></td>
+              <td class="px-4 py-3 text-slate-600">${b.city || '-'}</td>
+              <td class="px-4 py-3 text-slate-600 font-medium">${b.managerEmail || 'Unassigned'}</td>
+              <td class="px-4 py-3 text-right">
+                <button onclick="deleteBranchRecord('${docSnap.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50"><i class="fa-solid fa-trash-can"></i></button>
+              </td>
+            </tr>
+          `;
         });
 
-        if (tbody && storedBranches.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 text-xs font-medium">কোনো ব্রাঞ্চ যুক্ত করা হয়নি। উপরের ফর্ম থেকে ব্রাঞ্চ তৈরি করুন।</td></tr>`;
+        if (tbody) {
+          if (storedBranches.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 text-xs font-medium">কোনো ব্রাঞ্চ যুক্ত করা হয়নি। উপরের ফর্ম থেকে ব্রাঞ্চ তৈরি করুন।</td></tr>`;
+          } else {
+            tbody.innerHTML = rowsHtml;
+          }
         }
 
         branchList = storedBranches;
@@ -782,13 +784,13 @@
     function renderAssignedRolesTable(rolesList) {
       const tbody = document.getElementById('perm-table-body');
       if (!tbody) return;
-      tbody.innerHTML = '';
 
       if (rolesList.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400 font-medium">কোনো ইউজার পারমিশন পাওয়া যায়নি</td></tr>';
         return;
       }
 
+      let rowsHtml = '';
       rolesList.forEach((p) => {
         const perms = p.permissions || getDefaultPermissionsForRole(p.role);
         const permKeys = Object.keys(perms).filter(k => perms[k]);
@@ -805,7 +807,7 @@
 
         const encodedDoc = encodeURIComponent(JSON.stringify(p));
 
-        tbody.innerHTML += `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50/80 transition text-xs">
             <td class="px-4 py-3">
               <div class="font-bold text-slate-800">${p.email}</div>
@@ -825,6 +827,7 @@
           </tr>
         `;
       });
+      tbody.innerHTML = rowsHtml;
     }
 
     function loadPermissionsRealtime(userEmail) {
@@ -1525,20 +1528,14 @@
         const repEmpSelect = document.getElementById('rep-filter-emp');
         const permEmpSelect = document.getElementById('perm-emp-select');
 
-        tbody.innerHTML = '';
-        leaveSelect.innerHTML = '<option value="">Select Employee</option>';
-        payEmpSelect.innerHTML = '<option value="">Select Employee</option>';
-        if(advEmpSelect) advEmpSelect.innerHTML = '<option value="">Select Employee</option>';
-        if(fineEmpSelect) fineEmpSelect.innerHTML = '<option value="">Select Employee</option>';
-        perfEmpSelect.innerHTML = '<option value="">Select Employee</option>';
-        docEmpSelect.innerHTML = '<option value="General">General / All Employees</option>';
-        if(repEmpSelect) repEmpSelect.innerHTML = '<option value="ALL">All Employees</option>';
+        let permOptions = '<option value="">-- Select from Employee List (কর্মচারী তালিকা থেকে বেছে নিন) --</option>';
+        let genOptions = '<option value="">Select Employee</option>';
+        let fineOptions = '<option value="">Select Employee</option>';
+        let docOptions = '<option value="General">General / All Employees</option>';
+        let repOptions = '<option value="ALL">All Employees</option>';
+        let tableRows = '';
         
         let savedPermEmpVal = permEmpSelect ? permEmpSelect.value : '';
-        if (permEmpSelect) {
-          permEmpSelect.innerHTML = '<option value="">-- Select from Employee List (কর্মচারী তালিকা থেকে বেছে নিন) --</option>';
-        }
-        
         employeeList = [];
 
         const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
@@ -1549,9 +1546,7 @@
           const id = docSnap.id;
           employeeList.push({ id, ...emp });
 
-          if (permEmpSelect) {
-            permEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}] - 🏢 ${emp.branch || 'Head Office'}</option>`;
-          }
+          permOptions += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}] - 🏢 ${emp.branch || 'Head Office'}</option>`;
 
           let isMatch = false;
           if (emp.email && emp.email.trim().toLowerCase() === currentUserEmail.trim().toLowerCase()) {
@@ -1568,15 +1563,12 @@
 
           if (!isItemInActiveBranch(emp.branch)) return;
 
-          leaveSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
-          payEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
-          if(advEmpSelect) advEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
-          if(fineEmpSelect) fineEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}]</option>`;
-          perfEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
-          docEmpSelect.innerHTML += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
-          if(repEmpSelect) repEmpSelect.innerHTML += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          genOptions += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
+          fineOptions += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}]</option>`;
+          docOptions += `<option value="${emp.name}">${emp.name} (${emp.designation})</option>`;
+          repOptions += `<option value="${id}">${emp.name} (${emp.designation})</option>`;
 
-          const row = `
+          tableRows += `
             <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition text-xs">
               <td class="px-6 py-4 flex items-center space-x-3">
                 <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-xs" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
@@ -1598,8 +1590,20 @@
               </td>
             </tr>
           `;
-          tbody.innerHTML += row;
         });
+
+        if (tbody) tbody.innerHTML = tableRows || '<tr><td colspan="8" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারী পাওয়া যায়নি</td></tr>';
+        if (leaveSelect) leaveSelect.innerHTML = genOptions;
+        if (payEmpSelect) payEmpSelect.innerHTML = genOptions;
+        if (advEmpSelect) advEmpSelect.innerHTML = genOptions;
+        if (perfEmpSelect) perfEmpSelect.innerHTML = genOptions;
+        if (fineEmpSelect) fineEmpSelect.innerHTML = fineOptions;
+        if (docEmpSelect) docEmpSelect.innerHTML = docOptions;
+        if (repEmpSelect) repEmpSelect.innerHTML = repOptions;
+        if (permEmpSelect) {
+          permEmpSelect.innerHTML = permOptions;
+          if (savedPermEmpVal) permEmpSelect.value = savedPermEmpVal;
+        }
 
         // Fallback matching if not matched yet and user is employee:
         if (!myEmployeeProfile && currentUserRole === 'Employee') {
@@ -2093,8 +2097,7 @@
     function renderAttendanceTable() {
       const tbody = document.getElementById('att-table-body');
       if (!tbody) return;
-      tbody.innerHTML = '';
-
+      let rowsHtml = '';
       let listToRender = (currentUserRole === 'Employee' && myEmployeeProfile) ? [myEmployeeProfile] : employeeList;
 
       listToRender.forEach((emp) => {
@@ -2117,7 +2120,7 @@
           }
         }
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 flex items-center space-x-3">
               <img src="${emp.photoUrl}" alt="Photo" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff'">
@@ -2146,8 +2149,8 @@
             </td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="3" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারীর উপস্থিতি তথ্য নেই</td></tr>';
     }
 
     function getStatusBadge(status) {
@@ -2585,8 +2588,9 @@
       if (commitBtn) commitBtn.disabled = false;
       if (countLabel) countLabel.innerText = `মোট ${parsedBulkEmployees.length} জন কর্মচারী প্রস্তুত`;
 
+      let rowsHtml = '';
       parsedBulkEmployees.forEach((emp, index) => {
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
             <td class="px-4 py-2.5 font-bold text-indigo-700">${emp.customEmpCode}</td>
             <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name}</td>
@@ -2599,8 +2603,8 @@
             </td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+      tbody.innerHTML = rowsHtml;
     }
 
     window.removeBulkParsedItem = function(index) {
@@ -2734,7 +2738,6 @@
     window.renderAdvanceTable = function() {
       const tbody = document.getElementById('adv-table-body');
       if (!tbody) return;
-      tbody.innerHTML = '';
 
       const filterMonth = document.getElementById('adv-filter-month') ? document.getElementById('adv-filter-month').value : '';
       const filterStatus = document.getElementById('adv-filter-status') ? document.getElementById('adv-filter-status').value : 'ALL';
@@ -2742,6 +2745,7 @@
       let totalMonthAdvance = 0;
       let totalPending = 0;
       let totalCleared = 0;
+      let rowsHtml = '';
 
       const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile) 
         ? advanceList.filter(a => a.employeeId === myEmployeeProfile.id || (myEmployeeProfile.email && a.employeeEmail === myEmployeeProfile.email))
@@ -2826,7 +2830,7 @@
           }
         }
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4">
               <div class="font-bold text-slate-800">${adv.employeeName}</div>
@@ -2840,8 +2844,9 @@
             <td class="px-6 py-4 text-right">${actionButtons}</td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-medium">কোনো অগ্রিম বেতনের আবেদন নেই</td></tr>';
 
       if (document.getElementById('adv-stat-total')) {
         document.getElementById('adv-stat-total').innerText = `৳ ${totalMonthAdvance.toLocaleString()}`;
@@ -2959,7 +2964,6 @@
     window.renderFineTable = function() {
       const tbody = document.getElementById('fine-table-body');
       if (!tbody) return;
-      tbody.innerHTML = '';
 
       const filterMonth = document.getElementById('fine-filter-month') ? document.getElementById('fine-filter-month').value : '';
       const filterStatus = document.getElementById('fine-filter-status') ? document.getElementById('fine-filter-status').value : 'ALL';
@@ -2968,6 +2972,7 @@
       let totalMonthFine = 0;
       let totalPending = 0;
       let totalDeducted = 0;
+      let rowsHtml = '';
 
       const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
         ? fineList.filter(f => f.employeeId === myEmployeeProfile.id || (myEmployeeProfile.email && f.employeeEmail === myEmployeeProfile.email))
@@ -3042,7 +3047,7 @@
           }
         }
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4">
               <div class="font-bold text-slate-800">${fn.employeeName}</div>
@@ -3063,8 +3068,9 @@
             <td class="px-6 py-4 text-right">${actionButtons}</td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="8" class="text-center py-6 text-slate-400 font-medium">কোনো জরিমানার রেকর্ড নেই</td></tr>';
 
       if (document.getElementById('fine-stat-total')) {
         document.getElementById('fine-stat-total').innerText = `৳ ${totalMonthFine.toLocaleString()}`;
@@ -3334,7 +3340,6 @@ ${messageText}
     function renderLeaveTable() {
       const tbody = document.getElementById('leave-table-body');
       if(!tbody) return;
-      tbody.innerHTML = '';
 
       const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
         ? leaveList.filter(l => l.employeeId === myEmployeeProfile.id)
@@ -3342,6 +3347,7 @@ ${messageText}
 
       const canApprove = hasPermission('can_leave_approve');
       const canManage = currentUserRole === 'Admin' || hasPermission('can_leave_approve');
+      let rowsHtml = '';
 
       listToRender.forEach((lv) => {
         if (!isItemInActiveBranch(lv.branch)) return;
@@ -3387,7 +3393,7 @@ ${messageText}
           `;
         }
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${lv.employeeName || 'Staff'} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${lv.branch || 'Head Office'}</span></td>
             <td class="px-6 py-4 font-semibold text-indigo-700">${lv.leaveType}</td>
@@ -3399,8 +3405,9 @@ ${messageText}
             <td class="px-6 py-4 text-right space-x-1">${actionButtons}</td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="6" class="text-center py-6 text-slate-400 font-medium">কোনো ছুটির আবেদন পাওয়া যায়নি</td></tr>';
     }
 
     function getLeaveBadge(st) {
@@ -3672,7 +3679,6 @@ ${messageText}
     window.renderActivityLogsTable = function() {
       const tbody = document.getElementById('activity-table-body');
       if (!tbody) return;
-      tbody.innerHTML = '';
 
       const filterModule = document.getElementById('activity-filter-module') ? document.getElementById('activity-filter-module').value : 'ALL';
       const filterAction = document.getElementById('activity-filter-action') ? document.getElementById('activity-filter-action').value : 'ALL';
@@ -3683,6 +3689,7 @@ ${messageText}
       let totalCreates = 0;
       let totalDeletes = 0;
       let totalApprovals = 0;
+      let rowsHtml = '';
 
       activityLogList.forEach((log) => {
         if (!isItemInActiveBranch(log.branch)) return;
@@ -3733,7 +3740,7 @@ ${messageText}
 
         const timeFormatted = log.timestamp ? new Date(log.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'N/A';
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-5 py-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap">
               <div class="font-bold text-slate-700">${timeFormatted}</div>
@@ -3752,8 +3759,9 @@ ${messageText}
             </td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="5" class="text-center py-6 text-slate-400 font-medium">কোনো অডিট লগ রেকর্ড পাওয়া যায়নি</td></tr>';
 
       if (document.getElementById('act-stat-total')) document.getElementById('act-stat-total').innerText = totalLogs;
       if (document.getElementById('act-stat-creates')) document.getElementById('act-stat-creates').innerText = totalCreates;
@@ -3794,6 +3802,8 @@ ${messageText}
 
       const canManage = currentUserRole === 'Admin' || hasPermission('can_payroll');
 
+      let rowsHtml = '';
+
       listToRender.forEach((p) => {
         if (!isItemInActiveBranch(p.branch)) return;
 
@@ -3825,7 +3835,7 @@ ${messageText}
         const emp = employeeList.find(e => e.id === p.employeeId);
         const avatarUrl = emp && emp.photoUrl ? emp.photoUrl : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.employeeName || 'Staff')}&background=6366f1&color=fff`;
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-5 py-3.5 flex items-center space-x-3">
               <img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover border border-slate-200" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.employeeName)}&background=6366f1&color=fff'">
@@ -3873,11 +3883,12 @@ ${messageText}
             </td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
 
       if (totalCount === 0) {
         tbody.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400 font-medium"><i class="fa-solid fa-folder-open text-2xl mb-2 text-slate-300 block"></i>কোনো পে-রোল ডাটা পাওয়া যায়নি। ব্রাঞ্চ বা মাস ফিল্টার পরিবর্তন করে দেখুন।</td></tr>';
+      } else {
+        tbody.innerHTML = rowsHtml;
       }
 
       // Update Top Summary Stats
@@ -4462,11 +4473,10 @@ ${messageText}
       const incAlertCount = document.getElementById('inc-alert-count');
       const dashIncDue = document.getElementById('dash-inc-due');
 
-      if(tbody) tbody.innerHTML = '';
-      if(incAlertList) incAlertList.innerHTML = '';
-
       const today = new Date();
       let dueCount = 0;
+      let rowsHtml = '';
+      let alertsHtml = '';
 
       employeeList.forEach(emp => {
         if (!isItemInActiveBranch(emp.branch)) return;
@@ -4479,17 +4489,15 @@ ${messageText}
 
         if (isEligible) {
           dueCount++;
-          if (incAlertList) {
-            incAlertList.innerHTML += `
-              <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 shadow-2xs">
-                <span>${emp.name} (${emp.designation})</span>
-              </span>
-            `;
-          }
+          alertsHtml += `
+            <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1 shadow-2xs">
+              <span>${emp.name} (${emp.designation})</span>
+            </span>
+          `;
         }
 
         if (tbody) {
-          const row = `
+          rowsHtml += `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
               <td class="px-6 py-4 font-bold text-slate-800">${emp.name} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${emp.branch || 'Head Office'}</span></td>
               <td class="px-6 py-4 text-slate-600">${emp.designation}</td>
@@ -4509,9 +4517,11 @@ ${messageText}
               </td>
             </tr>
           `;
-          tbody.innerHTML += row;
         }
       });
+
+      if (tbody) tbody.innerHTML = rowsHtml || '<tr><td colspan="6" class="text-center py-6 text-slate-400 font-medium">কোনো ইনক্রিমেন্ট ডিউ নেই</td></tr>';
+      if (incAlertList) incAlertList.innerHTML = alertsHtml;
 
       if (dashIncDue) dashIncDue.innerText = dueCount;
       if (incAlertCount) incAlertCount.innerText = dueCount;
@@ -4646,7 +4656,7 @@ ${messageText}
       }, 6000);
 
       if (listContainer) {
-        listContainer.innerHTML = '';
+        let noticesHtml = '';
         visibleNotices.forEach(n => {
           const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
           const isHeadOffice = n.targetBranch === 'Head Office';
@@ -4655,7 +4665,7 @@ ${messageText}
             : (isHeadOffice ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200');
           const branchLabel = isGlobal ? '🌐 All Branches & Head Office' : `🏢 ${n.targetBranch} Only`;
 
-          listContainer.innerHTML += `
+          noticesHtml += `
             <div class="p-5 rounded-2xl border border-slate-200/80 bg-white space-y-2 shadow-2xs hover:shadow-xs transition">
               <div class="flex justify-between items-start">
                 <div>
@@ -4677,6 +4687,7 @@ ${messageText}
             </div>
           `;
         });
+        listContainer.innerHTML = noticesHtml;
       }
     }
 
@@ -4806,7 +4817,6 @@ ${messageText}
     function renderDocsTable() {
       const tbody = document.getElementById('docs-table-body');
       if(!tbody) return;
-      tbody.innerHTML = '';
 
       const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
         ? docList.filter(d => d.targetEmployee === 'General' || d.targetEmployee === myEmployeeProfile.name)
@@ -4817,11 +4827,12 @@ ${messageText}
         return;
       }
 
+      let rowsHtml = '';
       listToRender.forEach(docItem => {
         const isImage = docItem.fileType ? docItem.fileType.startsWith('image/') : (docItem.fileUrl && docItem.fileUrl.startsWith('data:image'));
         const iconClass = isImage ? 'fa-image text-emerald-500' : 'fa-file-lines text-indigo-500';
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800 flex items-center space-x-2.5">
               <div class="w-8 h-8 rounded-lg ${isImage ? 'bg-emerald-50' : 'bg-indigo-50'} flex items-center justify-center">
@@ -4839,14 +4850,14 @@ ${messageText}
               <button onclick="viewOrDownloadDoc('${docItem.id}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition inline-flex items-center space-x-1">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> <span>View / Download</span>
               </button>
-              ${currentUserRole !== 'Employee' ? `
-                <button onclick="deleteDocRecord('${docItem.id}')" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Delete Document"><i class="fa-solid fa-trash-can"></i></button>
+              ${currentUserRole === 'Admin' ? `
+                <button onclick="deleteDocRecord('${docItem.id}')" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Delete Document (Admin Only)"><i class="fa-solid fa-trash-can"></i></button>
               ` : ''}
             </td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+      tbody.innerHTML = rowsHtml;
     }
 
     window.viewOrDownloadDoc = function(docId) {
@@ -4890,6 +4901,16 @@ ${messageText}
     };
 
     window.deleteDocRecord = async function(id) {
+      if (currentUserRole !== 'Admin') {
+        Swal.fire({
+          icon: 'warning',
+          title: 'অনুমতি নেই',
+          text: 'শুধুমাত্র অ্যাডমিন ডকুমেন্ট মুছে ফেলতে পারবেন। ম্যানেজারদের ডকুমেন্ট ডিলিট করার অনুমতি নেই।',
+          confirmButtonColor: '#4f46e5'
+        });
+        return;
+      }
+
       const d = docList.find(x => x.id === id);
       const title = d ? d.title : 'ডকুমেন্ট';
       if (confirm(`এই ডকুমেন্ট "${title}" মুছে ফেলতে চান?`)) {
@@ -4968,12 +4989,12 @@ ${messageText}
     function renderPerformanceTable() {
       const tbody = document.getElementById('perf-table-body');
       if(!tbody) return;
-      tbody.innerHTML = '';
 
+      let rowsHtml = '';
       perfList.forEach(rev => {
         if (!isItemInActiveBranch(rev.branch)) return;
 
-        const row = `
+        rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${rev.employeeName} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${rev.branch || 'Head Office'}</span></td>
             <td class="px-6 py-4">
@@ -4986,8 +5007,8 @@ ${messageText}
             <td class="px-6 py-4 text-slate-500">${rev.reviewDate}</td>
           </tr>
         `;
-        tbody.innerHTML += row;
       });
+      tbody.innerHTML = rowsHtml || '<tr><td colspan="5" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মক্ষমতা মূল্যায়ন পাওয়া যায়নি</td></tr>';
     }
 
     window.savePerformanceReview = async function(e) {
@@ -5038,10 +5059,17 @@ ${messageText}
     };
 
     // Charts Engine
-    // Charts Engine
+    let dashboardChartDebounceTimer = null;
     function renderDashboardCharts() {
       if(currentUserRole === 'Employee') return;
+      if (dashboardChartDebounceTimer) clearTimeout(dashboardChartDebounceTimer);
+      dashboardChartDebounceTimer = setTimeout(() => {
+        _execRenderDashboardCharts();
+      }, 50);
+    }
 
+    function _execRenderDashboardCharts() {
+      if(currentUserRole === 'Employee') return;
       const activeEmployees = employeeList.filter(e => isItemInActiveBranch(e.branch));
 
       // 1. Department Distribution Chart (Normalized names)

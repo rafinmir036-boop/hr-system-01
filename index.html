@@ -3822,17 +3822,6 @@
       }
     };
 
-    window.formatWhatsAppPhone = function(rawPhone) {
-      if (!rawPhone) return '';
-      let clean = String(rawPhone).replace(/[^\d+]/g, '');
-      if (clean.startsWith('+')) clean = clean.substring(1);
-      
-      // If starts with 01 (BD local format e.g. 017xxxxxxxx -> 88017xxxxxxxx)
-      if (/^01[3-9]\d{8}$/.test(clean)) {
-        clean = '88' + clean;
-      }
-      return clean;
-    };
 
     window.calculateLeaveDays = function(startDate, endDate) {
       if (!startDate || !endDate) return 1;
@@ -4160,8 +4149,24 @@ ${messageText}
       activePayrollOtpState.timerInterval = setInterval(updateTimer, 1000);
     }
 
+    window.formatWhatsAppPhone = function(rawPhone) {
+      if (!rawPhone) return '';
+      let clean = String(rawPhone).replace(/[^\d]/g, '');
+      if (clean.startsWith('8801') && clean.length === 13) {
+        return clean;
+      }
+      if (clean.startsWith('01') && clean.length === 11) {
+        return '88' + clean;
+      }
+      if (clean.startsWith('1') && clean.length === 10) {
+        return '880' + clean;
+      }
+      return clean;
+    };
+
     function sendPayrollOtpWhatsAppMessage(code) {
       const { empName, empCode, month, netSalary, empPhone } = activePayrollOtpState;
+      const cleanPhone = formatWhatsAppPhone(empPhone);
       const nowStr = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
 
       const otpMsg = `🔐 *HRMS - বেতন গ্রহণের গোপন OTP কোড* 🔐\n` +
@@ -4175,12 +4180,82 @@ ${messageText}
                      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                      `🏢 *HRMS Enterprise Payroll System*`;
 
+      const waUrl = cleanPhone 
+        ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(otpMsg)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(otpMsg)}`;
+
+      activePayrollOtpState.currentOtpMsg = otpMsg;
+      activePayrollOtpState.currentWaUrl = waUrl;
+
+      // Update Modal Buttons & Links
+      const waBtn = document.getElementById('pay-otp-wa-btn');
+      if (waBtn) {
+        waBtn.href = waUrl;
+      }
+
+      const phoneDisplay = document.getElementById('pay-otp-emp-phone');
+      if (phoneDisplay) {
+        phoneDisplay.innerHTML = cleanPhone 
+          ? `<i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> <span class="text-emerald-800 font-bold font-mono">${cleanPhone}</span>`
+          : `<span class="text-rose-600 font-bold">⚠️ কর্মচারীর ফোন নম্বর নেই! নিচে নম্বর লিখে পাঠান</span>`;
+      }
+
+      // If ultraMsg/cloud API is configured, attempt background send
+      if (whatsappConfig.ultramsgInstance && whatsappConfig.ultramsgToken && cleanPhone) {
+        sendViaUltraMsgApi(cleanPhone, otpMsg);
+      }
+
       triggerWhatsAppNotification(
         empPhone,
         otpMsg,
         `WhatsApp OTP: ${empName}`,
         `কর্মচারী "${empName}" এর হোয়াটসঅ্যাপে পাঠানো OTP বার্তা:`
       );
+    }
+
+    window.updateOtpTargetPhone = function() {
+      const newPhone = document.getElementById('pay-otp-phone-input') ? document.getElementById('pay-otp-phone-input').value.trim() : '';
+      if (!newPhone) {
+        showToast('warning', 'একটি সঠিক মোবাইল নম্বর লিখুন (e.g. 017xxxxxxxx)');
+        return;
+      }
+
+      const clean = formatWhatsAppPhone(newPhone);
+      activePayrollOtpState.empPhone = clean;
+      sendPayrollOtpWhatsAppMessage(activePayrollOtpState.otp);
+      showToast('success', `নম্বর আপডেট করে (${clean}) হোয়াটসঅ্যাপ লিংক প্রস্তুত করা হয়েছে`);
+    };
+
+    window.copyOtpMessageToClipboard = function() {
+      if (activePayrollOtpState.currentOtpMsg) {
+        navigator.clipboard.writeText(activePayrollOtpState.currentOtpMsg).then(() => {
+          showToast('success', 'OTP মেসেজটি ক্লিপবোর্ডে কপি করা হয়েছে!');
+        }).catch(() => {
+          showToast('info', 'মেসেজ কপি করতে ব্যর্থ হয়েছে');
+        });
+      }
+    };
+
+    async function sendViaUltraMsgApi(phone, message) {
+      try {
+        const instanceId = whatsappConfig.ultramsgInstance;
+        const token = whatsappConfig.ultramsgToken;
+        if (!instanceId || !token) return;
+
+        const url = `https://api.ultramsg.com/${instanceId}/messages/chat`;
+        const params = new URLSearchParams();
+        params.append('token', token);
+        params.append('to', phone);
+        params.append('body', message);
+
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params
+        });
+      } catch (err) {
+        console.warn("UltraMsg background send notice:", err);
+      }
     }
 
     window.resendPayrollWhatsAppOTP = function() {
@@ -9229,10 +9304,33 @@ ${messageText}
           <div id="pay-otp-amount" class="text-2xl font-black text-indigo-700 mt-0.5">৳ 0</div>
         </div>
 
+        <!-- Direct 1-Click WhatsApp Dispatch Button -->
+        <div class="space-y-1.5">
+          <a id="pay-otp-wa-btn" href="#" target="_blank" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md hover:shadow-lg">
+            <i class="fa-brands fa-whatsapp text-lg"></i>
+            <span>কর্মচারীর WhatsApp চ্যাট ওপেন করুন ও OTP পাঠান 🚀</span>
+          </a>
+          <div class="flex items-center justify-between text-[11px] px-1 text-slate-500">
+            <span>সরাসরি চ্যাট না খুললে:</span>
+            <button type="button" onclick="copyOtpMessageToClipboard()" class="text-indigo-600 hover:text-indigo-800 font-bold underline">
+              <i class="fa-solid fa-copy mr-1"></i>OTP মেসেজ কপি করুন
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Phone Updater if missing/incorrect -->
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+          <label class="block text-[11px] font-bold text-slate-600">নম্বর পরিবর্তন বা ঠিক করতে চাইলে লিখুন:</label>
+          <div class="flex items-center space-x-1.5">
+            <input type="text" id="pay-otp-phone-input" placeholder="017xxxxxxxx" class="p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 flex-1 outline-none">
+            <button type="button" onclick="updateOtpTargetPhone()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition">আপডেট ও সেন্ড</button>
+          </div>
+        </div>
+
         <!-- 6-digit OTP Input Box -->
         <div class="space-y-2">
           <div class="flex justify-between items-center">
-            <label class="block text-xs font-bold text-slate-700">কর্মচারীর WhatsApp এ পাঠানো ৬ ডিজিটের OTP লিখুন *</label>
+            <label class="block text-xs font-bold text-slate-700">কর্মচারীর WhatsApp থেকে প্রাপ্ত ৬ ডিজিটের OTP লিখুন *</label>
           </div>
 
           <div class="relative">
@@ -9254,7 +9352,7 @@ ${messageText}
         <!-- Demo / Test Helper Badge -->
         <div class="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 flex items-center justify-between">
           <span>💡 <b>টেস্ট কোড (Demo):</b> <span id="pay-otp-demo-code" class="font-mono font-black text-indigo-700 text-xs tracking-wider">------</span></span>
-          <span class="text-[10px] text-amber-700 italic">(WhatsApp ওপেন না হলেও এটি ইনপুট দিতে পারেন)</span>
+          <span class="text-[10px] text-amber-700 italic">(টেস্ট করার জন্য এটি ইনপুট দিতে পারেন)</span>
         </div>
 
         <!-- Modal Actions -->

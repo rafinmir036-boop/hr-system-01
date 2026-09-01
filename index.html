@@ -205,7 +205,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, onSnapshot, setDoc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB20hWCqKPSt2aZxVOYa3cz2FVX2MSCs1U",
@@ -1704,12 +1704,14 @@
         const docEmpSelect = document.getElementById('doc-emp-id');
         const repEmpSelect = document.getElementById('rep-filter-emp');
         const permEmpSelect = document.getElementById('perm-emp-select');
+        const monthAttEmpSelect = document.getElementById('month-att-emp-id');
 
         let permOptions = '<option value="">-- Select from Employee List (কর্মচারী তালিকা থেকে বেছে নিন) --</option>';
         let genOptions = '<option value="">Select Employee</option>';
         let fineOptions = '<option value="">Select Employee</option>';
         let docOptions = '<option value="General">General / All Employees</option>';
         let repOptions = '<option value="ALL">All Employees</option>';
+        let monthAttOptions = '<option value="">-- কর্মচারী নির্বাচন করুন (Select Employee) --</option>';
         let tableRows = '';
         
         let savedPermEmpVal = permEmpSelect ? permEmpSelect.value : '';
@@ -1742,11 +1744,13 @@
 
           const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
           const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : ' [ID: N/A]';
+          const salaryTag = emp.salary ? ` (৳${Number(emp.salary).toLocaleString()})` : '';
 
           genOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
           fineOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
           docOptions += `<option value="${emp.name}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
           repOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
+          monthAttOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}${salaryTag}</option>`;
 
           tableRows += `
             <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition text-xs">
@@ -1780,6 +1784,7 @@
         if (fineEmpSelect) fineEmpSelect.innerHTML = fineOptions;
         if (docEmpSelect) docEmpSelect.innerHTML = docOptions;
         if (repEmpSelect) repEmpSelect.innerHTML = repOptions;
+        if (monthAttEmpSelect) monthAttEmpSelect.innerHTML = monthAttOptions;
         if (permEmpSelect) {
           permEmpSelect.innerHTML = permOptions;
           if (savedPermEmpVal) permEmpSelect.value = savedPermEmpVal;
@@ -2274,14 +2279,28 @@
       });
     }
 
-    function renderAttendanceTable() {
+    window.renderAttendanceTable = function() {
       const tbody = document.getElementById('att-table-body');
       if (!tbody) return;
       let rowsHtml = '';
       let listToRender = (currentUserRole === 'Employee' && myEmployeeProfile) ? [myEmployeeProfile] : employeeList;
+      const searchTxt = document.getElementById('att-search-input') ? document.getElementById('att-search-input').value.toLowerCase().trim() : '';
 
       listToRender.forEach((emp) => {
         if (!isItemInActiveBranch(emp.branch)) return;
+
+        // Apply Search Filter (by ID number, name, branch, designation, department)
+        if (searchTxt) {
+          const code = (emp.customEmpCode || '').toLowerCase();
+          const name = (emp.name || '').toLowerCase();
+          const branch = (emp.branch || '').toLowerCase();
+          const desig = (emp.designation || '').toLowerCase();
+          const dept = (emp.department || '').toLowerCase();
+          const empId = (emp.id || '').toLowerCase();
+          if (!code.includes(searchTxt) && !name.includes(searchTxt) && !branch.includes(searchTxt) && !desig.includes(searchTxt) && !dept.includes(searchTxt) && !empId.includes(searchTxt)) {
+            return;
+          }
+        }
 
         const attRecord = findAttendanceForEmployee(emp, todayAttendanceData);
         
@@ -2319,8 +2338,12 @@
               </span>
               <div class="text-[10px] text-slate-400 font-medium mt-1">${method} ${punchTime !== '--:--' ? `• ${punchTime}` : ''}</div>
             </td>
-            <td class="px-6 py-4 text-right space-x-1">
+            <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
               ${currentUserRole !== 'Employee' ? `
+                <button onclick="openMonthlyTotalAttendanceModal('${emp.id}')" title="ইন-টোটাল / মাসিক হাজিরা দিন নির্ধারণ করুন" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition shadow-2xs inline-flex items-center space-x-1">
+                  <i class="fa-solid fa-calendar-check"></i>
+                  <span>মোট হাজিরা</span>
+                </button>
                 <button onclick="markAttendance('${emp.id}', 'Present')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Present</button>
                 <button onclick="markAttendance('${emp.id}', 'Late')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-2xs">Late</button>
                 <button onclick="markAttendance('${emp.id}', 'Day Off')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Day Off</button>
@@ -2331,7 +2354,7 @@
         `;
       });
       tbody.innerHTML = rowsHtml || '<tr><td colspan="3" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারীর উপস্থিতি তথ্য নেই</td></tr>';
-    }
+    };
 
     function getStatusBadge(status) {
       if (status === 'Present') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
@@ -2341,6 +2364,370 @@
       if (status === 'On Leave') return 'bg-purple-50 text-purple-700 border border-purple-200';
       return 'bg-slate-100 text-slate-600';
     }
+
+    // Monthly / In-Total Attendance Management
+    window.openMonthlyTotalAttendanceModal = function(empId = null) {
+      const monthInput = document.getElementById('month-att-month');
+      if (monthInput && !monthInput.value) {
+        monthInput.value = new Date().toISOString().substring(0, 7);
+      }
+
+      const searchBox = document.getElementById('month-att-emp-search');
+      if (searchBox) searchBox.value = '';
+
+      populateMonthlyAttEmployeeDropdown('', empId);
+      toggleModal('monthly-attendance-modal', true);
+      loadEmployeeMonthlyAttendanceSummary();
+    };
+
+    window.populateMonthlyAttEmployeeDropdown = function(filterTxt = '', selectedId = '') {
+      const select = document.getElementById('month-att-emp-id');
+      if (!select) return;
+
+      const q = (filterTxt || '').toLowerCase().trim();
+      const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+      let optionsHtml = '<option value="">-- কর্মচারী নির্বাচন করুন (Select Employee) --</option>';
+      let autoMatched = null;
+
+      targetList.forEach(emp => {
+        const code = (emp.customEmpCode || '').toLowerCase();
+        const name = (emp.name || '').toLowerCase();
+        const branch = (emp.branch || 'Head Office').toLowerCase();
+        const desig = (emp.designation || '').toLowerCase();
+        const id = (emp.id || '').toLowerCase();
+
+        const isMatch = !q || code === q || code.includes(q) || name.includes(q) || branch.includes(q) || desig.includes(q) || id.includes(q);
+
+        if (isMatch) {
+          if (!autoMatched && q && (code === q || code.includes(q) || name.includes(q))) {
+            autoMatched = emp.id;
+          }
+          const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
+          const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : ' [ID: N/A]';
+          const salaryTag = emp.salary ? ` (৳${Number(emp.salary).toLocaleString()})` : '';
+          optionsHtml += `<option value="${emp.id}">${emp.name} (${emp.designation})${codeTag}${branchTag}${salaryTag}</option>`;
+        }
+      });
+
+      select.innerHTML = optionsHtml;
+      if (selectedId) {
+        select.value = selectedId;
+      } else if (autoMatched) {
+        select.value = autoMatched;
+      }
+    };
+
+    window.filterMonthlyAttendanceEmpDropdown = function(query) {
+      populateMonthlyAttEmployeeDropdown(query);
+      const select = document.getElementById('month-att-emp-id');
+      if (select && select.value) {
+        loadEmployeeMonthlyAttendanceSummary();
+      }
+    };
+
+    window.loadEmployeeMonthlyAttendanceSummary = async function() {
+      const empId = document.getElementById('month-att-emp-id')?.value;
+      const month = document.getElementById('month-att-month')?.value;
+      const emp = employeeList.find(e => e.id === empId);
+
+      const overviewBox = document.getElementById('month-att-overview-box');
+      if (!emp || !month) {
+        if (overviewBox) overviewBox.classList.add('hidden');
+        return;
+      }
+
+      if (overviewBox) overviewBox.classList.remove('hidden');
+
+      const [yearStr, mStr] = month.split('-');
+      const y = parseInt(yearStr);
+      const m = parseInt(mStr);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const baseSalary = Number(emp.salary) || 0;
+      const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
+
+      const badgeMonth = document.getElementById('month-att-info-month');
+      const badgeDays = document.getElementById('month-att-info-days');
+      const badgeSalary = document.getElementById('month-att-info-salary');
+      const badgePerDay = document.getElementById('month-att-info-perday');
+
+      if (badgeMonth) badgeMonth.innerText = month;
+      if (badgeDays) badgeDays.innerText = `${daysInMonth} দিন`;
+      if (badgeSalary) badgeSalary.innerText = `৳ ${baseSalary.toLocaleString()}`;
+      if (badgePerDay) badgePerDay.innerText = `৳ ${Math.round(perDaySalary).toLocaleString()}/দিন`;
+
+      // Check if already has a saved monthly summary
+      let present = 0;
+      let dayoff = 0;
+      let leave = 0;
+      let absent = 0;
+      let isSavedSummary = false;
+
+      try {
+        const summaryDoc = await getDoc(doc(db, "attendance_summaries", `${empId}_${month}`));
+        if (summaryDoc.exists()) {
+          const sumData = summaryDoc.data();
+          present = Number(sumData.presentDays) || 0;
+          dayoff = Number(sumData.dayOffDays) || 0;
+          leave = Number(sumData.leaveDays) || 0;
+          absent = Number(sumData.absentDays) || 0;
+          isSavedSummary = true;
+        }
+      } catch(e) {
+        console.warn("Could not load summary from Firestore", e);
+      }
+
+      if (!isSavedSummary) {
+        // Fetch daily counts as starting point
+        const dailyPromises = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+          dailyPromises.push(
+            getDocs(collection(db, `attendance_${dStr}`)).then(snap => {
+              const dayMap = {};
+              snap.forEach(docSnap => {
+                const data = docSnap.data();
+                const k1 = data.employeeId || docSnap.id;
+                dayMap[k1] = data;
+              });
+              return { date: dStr, logs: dayMap };
+            }).catch(() => ({ date: dStr, logs: {} }))
+          );
+        }
+
+        const results = await Promise.all(dailyPromises);
+        let lateDays = 0;
+        results.forEach(({ date, logs }) => {
+          const rec = findAttendanceForEmployee(emp, logs);
+          let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+          if (!st) {
+            const hasLeave = leaveList.some(l => 
+              l.employeeId === emp.id && 
+              l.status === 'Approved' && 
+              date >= l.startDate && 
+              date <= l.endDate
+            );
+            if (hasLeave) st = 'On Leave';
+          }
+          if (st === 'Present') present++;
+          else if (st === 'Late') lateDays++;
+          else if (st === 'Day Off') dayoff++;
+          else if (st === 'On Leave') leave++;
+          else absent++;
+        });
+        present += lateDays;
+      }
+
+      const presInput = document.getElementById('month-att-present');
+      const dayoffInput = document.getElementById('month-att-dayoff');
+      const leaveInput = document.getElementById('month-att-leave');
+      const absentInput = document.getElementById('month-att-absent');
+
+      if (presInput) presInput.value = present;
+      if (dayoffInput) dayoffInput.value = dayoff;
+      if (leaveInput) leaveInput.value = leave;
+      if (absentInput) absentInput.value = absent;
+
+      updateMonthlyAttendancePreview();
+    };
+
+    window.onMonthlyAttDaysChanged = function(field) {
+      const month = document.getElementById('month-att-month')?.value;
+      if (!month) return;
+      const [yearStr, mStr] = month.split('-');
+      const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
+
+      let pres = Number(document.getElementById('month-att-present')?.value) || 0;
+      let dayoff = Number(document.getElementById('month-att-dayoff')?.value) || 0;
+      let leave = Number(document.getElementById('month-att-leave')?.value) || 0;
+      let absent = Number(document.getElementById('month-att-absent')?.value) || 0;
+
+      if (field === 'present' || field === 'dayoff' || field === 'leave') {
+        const remaining = Math.max(0, daysInMonth - (pres + dayoff + leave));
+        const absInput = document.getElementById('month-att-absent');
+        if (absInput) absInput.value = remaining;
+      } else if (field === 'absent') {
+        if (pres + dayoff + leave + absent > daysInMonth) {
+          const over = (pres + dayoff + leave + absent) - daysInMonth;
+          if (pres >= over) {
+            pres -= over;
+            const pInput = document.getElementById('month-att-present');
+            if (pInput) pInput.value = pres;
+          }
+        }
+      }
+
+      updateMonthlyAttendancePreview();
+    };
+
+    window.applyMonthlyAttPreset = function(presetType) {
+      const month = document.getElementById('month-att-month')?.value;
+      if (!month) return;
+      const [yearStr, mStr] = month.split('-');
+      const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
+
+      if (presetType === 'standard') {
+        const dOff = Math.min(4, daysInMonth);
+        const pres = Math.max(0, daysInMonth - dOff);
+        document.getElementById('month-att-present').value = pres;
+        document.getElementById('month-att-dayoff').value = dOff;
+        document.getElementById('month-att-leave').value = 0;
+        document.getElementById('month-att-absent').value = 0;
+      } else if (presetType === 'all_present') {
+        document.getElementById('month-att-present').value = daysInMonth;
+        document.getElementById('month-att-dayoff').value = 0;
+        document.getElementById('month-att-leave').value = 0;
+        document.getElementById('month-att-absent').value = 0;
+      } else if (presetType === 'load_daily') {
+        loadEmployeeMonthlyAttendanceSummary();
+        return;
+      }
+      updateMonthlyAttendancePreview();
+    };
+
+    window.updateMonthlyAttendancePreview = function() {
+      const empId = document.getElementById('month-att-emp-id')?.value;
+      const month = document.getElementById('month-att-month')?.value;
+      const emp = employeeList.find(e => e.id === empId);
+      if (!emp || !month) return;
+
+      const [yearStr, mStr] = month.split('-');
+      const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
+      const baseSalary = Number(emp.salary) || 0;
+      const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
+
+      const pres = Number(document.getElementById('month-att-present')?.value) || 0;
+      const dayoff = Number(document.getElementById('month-att-dayoff')?.value) || 0;
+      const leave = Number(document.getElementById('month-att-leave')?.value) || 0;
+      const absent = Number(document.getElementById('month-att-absent')?.value) || 0;
+
+      const totalCalculated = pres + dayoff + leave + absent;
+      const paidDays = pres + dayoff + leave;
+      const absentDeduction = Math.round(absent * perDaySalary);
+      const earnedBasic = Math.max(0, Math.round(baseSalary - absentDeduction));
+
+      const totalDaysElem = document.getElementById('month-att-prev-total-days');
+      const paidDaysElem = document.getElementById('month-att-prev-paid-days');
+      const deductElem = document.getElementById('month-att-prev-deduct');
+      const earnedElem = document.getElementById('month-att-prev-earned');
+      const matchStatusElem = document.getElementById('month-att-match-status');
+
+      if (totalDaysElem) totalDaysElem.innerText = `${totalCalculated} / ${daysInMonth} দিন`;
+      if (paidDaysElem) paidDaysElem.innerText = `${paidDays} দিন`;
+      if (deductElem) deductElem.innerText = `৳ ${absentDeduction.toLocaleString()}`;
+      if (earnedElem) earnedElem.innerText = `৳ ${earnedBasic.toLocaleString()}`;
+
+      if (matchStatusElem) {
+        if (totalCalculated === daysInMonth) {
+          matchStatusElem.className = 'text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg';
+          matchStatusElem.innerHTML = '<i class="fa-solid fa-check-circle mr-1"></i>হিসাব সঠিক আছে (' + daysInMonth + ' দিন)';
+        } else {
+          matchStatusElem.className = 'text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg';
+          matchStatusElem.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>দিনের সংখ্যা ' + totalCalculated + ' দিন (মাসের মোট দিন ' + daysInMonth + ')';
+        }
+      }
+    };
+
+    window.saveMonthlyTotalAttendance = async function(e) {
+      e.preventDefault();
+      const empId = document.getElementById('month-att-emp-id')?.value;
+      const month = document.getElementById('month-att-month')?.value;
+      const emp = employeeList.find(e => e.id === empId);
+
+      if (!emp || !month) {
+        showToast('error', 'কর্মচারী এবং মাস নির্বাচন করুন');
+        return;
+      }
+
+      const pres = Number(document.getElementById('month-att-present')?.value) || 0;
+      const dayoff = Number(document.getElementById('month-att-dayoff')?.value) || 0;
+      const leave = Number(document.getElementById('month-att-leave')?.value) || 0;
+      const absent = Number(document.getElementById('month-att-absent')?.value) || 0;
+      const syncDaily = document.getElementById('month-att-sync-daily')?.checked;
+
+      const [yearStr, mStr] = month.split('-');
+      const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
+
+      try {
+        Swal.fire({
+          title: 'সংরক্ষণ করা হচ্ছে...',
+          html: '<i class="fa-solid fa-spinner fa-spin text-3xl text-indigo-600 my-3"></i><br>হাজিরা তথ্য আপডেট হচ্ছে...',
+          showConfirmButton: false,
+          allowOutsideClick: false
+        });
+
+        // 1. Save summary document
+        await setDoc(doc(db, "attendance_summaries", `${empId}_${month}`), {
+          employeeId: empId,
+          customEmpCode: emp.customEmpCode || '',
+          employeeName: emp.name,
+          branch: emp.branch || 'Head Office',
+          month: month,
+          totalDays: daysInMonth,
+          presentDays: pres,
+          dayOffDays: dayoff,
+          leaveDays: leave,
+          absentDays: absent,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUserEmail
+        });
+
+        // 2. If sync daily logs checked, write daily logs
+        if (syncDaily) {
+          const nowIso = new Date().toISOString();
+          const writePromises = [];
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+            let st = 'Absent';
+            if (d <= pres) st = 'Present';
+            else if (d <= pres + dayoff) st = 'Day Off';
+            else if (d <= pres + dayoff + leave) st = 'On Leave';
+
+            writePromises.push(
+              setDoc(doc(db, `attendance_${dStr}`, empId), {
+                employeeId: empId,
+                customEmpCode: emp.customEmpCode || '',
+                branch: emp.branch || 'Head Office',
+                status: st,
+                punchTime: st === 'Present' ? '09:00:00 AM' : '--:--',
+                method: 'Monthly In-Total Sync',
+                updatedAt: nowIso
+              })
+            );
+          }
+          await Promise.all(writePromises);
+        }
+
+        // 3. Log Activity
+        await logSystemActivity(
+          'UPDATE',
+          'Attendance',
+          `${currentUserEmail} updated in-total monthly attendance for "${emp.name}" (Month: ${month}, Present: ${pres}d, DayOff: ${dayoff}d, Leave: ${leave}d, Absent: ${absent}d)`,
+          { employeeId: empId, employeeName: emp.name, month, present: pres, dayoff, leave, absent }
+        );
+
+        Swal.close();
+        toggleModal('monthly-attendance-modal', false);
+
+        Swal.fire({
+          icon: 'success',
+          title: 'ইন-টোটাল হাজিরা সংরক্ষিত হয়েছে!',
+          html: `<b>${emp.name}</b> [ID: ${emp.customEmpCode || 'N/A'}]<br>মাস: <b>${month}</b><br><br>🟢 উপস্থিত: <b>${pres} দিন</b> • 🔵 ডে অফ: <b>${dayoff} দিন</b><br>🟣 ছুটি: <b>${leave} দিন</b> • 🔴 অনুপস্থিত: <b>${absent} দিন</b><br><br><span class="text-xs text-indigo-700 font-semibold">পে-রোল মডিউলে এই হিসাব সরাসরি ব্যবহৃত হবে।</span>`,
+          confirmButtonColor: '#4f46e5',
+          confirmButtonText: 'ঠিক আছে'
+        });
+
+        renderAttendanceTable();
+        updateAttendanceDashboardMetrics();
+        if (typeof renderPayrollTable === 'function') renderPayrollTable();
+
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'হাজিরা সংরক্ষণে ত্রুটি',
+          text: err.message
+        });
+      }
+    };
 
     window.markAttendance = async function(empId, status) {
       const selectedDate = document.getElementById('att-date').value;
@@ -4022,12 +4409,16 @@ ${messageText}
         // Apply Month Filter
         if (filterMonth && p.month !== filterMonth) return;
 
-        // Apply Search Filter
+        // Apply Search Filter (ID number, Employee Name, Branch, Month, Status, Employee ID)
         if (searchTxt) {
+          const emp = employeeList.find(e => e.id === p.employeeId);
+          const empCode = ((emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || '')).toLowerCase();
           const name = (p.employeeName || '').toLowerCase();
           const branch = (p.branch || '').toLowerCase();
           const month = (p.month || '').toLowerCase();
-          if (!name.includes(searchTxt) && !branch.includes(searchTxt) && !month.includes(searchTxt)) return;
+          const pEmpId = (p.employeeId || '').toLowerCase();
+          const pStatus = (p.status || '').toLowerCase();
+          if (!name.includes(searchTxt) && !empCode.includes(searchTxt) && !pEmpId.includes(searchTxt) && !branch.includes(searchTxt) && !month.includes(searchTxt) && !pStatus.includes(searchTxt)) return;
         }
 
         const basic = Number(p.basicSalary) || 0;
@@ -4107,6 +4498,44 @@ ${messageText}
       if (document.getElementById('pay-stat-net')) document.getElementById('pay-stat-net').innerText = `৳ ${totalNet.toLocaleString()}`;
     };
 
+    // Filter Employee dropdown in Add Payroll modal by ID number / Name
+    window.filterPayrollEmpDropdown = function(query) {
+      const q = (query || '').toLowerCase().trim();
+      const select = document.getElementById('pay-emp-id');
+      if (!select) return;
+
+      const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+      let matchedEmpId = null;
+      let optionsHtml = '<option value="">-- কর্মচারী নির্বাচন করুন (Select Employee) --</option>';
+
+      targetList.forEach(emp => {
+        const code = (emp.customEmpCode || '').toLowerCase();
+        const name = (emp.name || '').toLowerCase();
+        const branch = (emp.branch || 'Head Office').toLowerCase();
+        const desig = (emp.designation || '').toLowerCase();
+        const id = (emp.id || '').toLowerCase();
+
+        const isMatch = !q || code === q || code.includes(q) || name.includes(q) || branch.includes(q) || desig.includes(q) || id.includes(q);
+
+        if (isMatch) {
+          if (!matchedEmpId && q && (code === q || code.includes(q) || name.includes(q))) {
+            matchedEmpId = emp.id;
+          }
+          const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
+          const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : ' [ID: N/A]';
+          const salaryTag = emp.salary ? ` (৳${Number(emp.salary).toLocaleString()})` : '';
+          optionsHtml += `<option value="${emp.id}">${emp.name} (${emp.designation})${codeTag}${branchTag}${salaryTag}</option>`;
+        }
+      });
+
+      select.innerHTML = optionsHtml;
+
+      if (matchedEmpId) {
+        select.value = matchedEmpId;
+        openPayrollModalForEmployee();
+      }
+    };
+
     window.openPayrollModalForEmployee = async function() {
       const empId = document.getElementById('pay-emp-id').value;
       const month = document.getElementById('pay-month').value;
@@ -4139,51 +4568,71 @@ ${messageText}
         const m = parseInt(mStr);
         const daysInMonth = new Date(y, m, 0).getDate();
 
-        // Fetch daily logs for the month
-        const dailyPromises = [];
-        for (let d = 1; d <= daysInMonth; d++) {
-          const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
-          dailyPromises.push(
-            getDocs(collection(db, `attendance_${dStr}`)).then(snap => {
-              const dayMap = {};
-              snap.forEach(docSnap => {
-                const data = docSnap.data();
-                const k1 = data.employeeId || docSnap.id;
-                dayMap[k1] = data;
-              });
-              return { date: dStr, logs: dayMap };
-            }).catch(() => ({ date: dStr, logs: {} }))
-          );
-        }
-
-        const monthDaysResults = await Promise.all(dailyPromises);
-
         let presentDays = 0;
-        let lateDays = 0;
         let dayOffDays = 0;
         let leaveDays = 0;
         let absentDays = 0;
+        let hasSavedSummary = false;
 
-        monthDaysResults.forEach(({ date, logs }) => {
-          const rec = findAttendanceForEmployee(emp, logs);
-          let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+        // Check if in-total monthly attendance summary exists
+        try {
+          const summarySnap = await getDoc(doc(db, "attendance_summaries", `${empId}_${month}`));
+          if (summarySnap.exists()) {
+            const sumData = summarySnap.data();
+            presentDays = Number(sumData.presentDays) || 0;
+            dayOffDays = Number(sumData.dayOffDays) || 0;
+            leaveDays = Number(sumData.leaveDays) || 0;
+            absentDays = Number(sumData.absentDays) || 0;
+            hasSavedSummary = true;
+          }
+        } catch (e) {
+          console.warn("Could not check attendance summary in payroll:", e);
+        }
 
-          if (!st) {
-            const hasLeave = leaveList.some(l => 
-              l.employeeId === emp.id && 
-              l.status === 'Approved' && 
-              date >= l.startDate && 
-              date <= l.endDate
+        if (!hasSavedSummary) {
+          // Fetch daily logs for the month
+          const dailyPromises = [];
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+            dailyPromises.push(
+              getDocs(collection(db, `attendance_${dStr}`)).then(snap => {
+                const dayMap = {};
+                snap.forEach(docSnap => {
+                  const data = docSnap.data();
+                  const k1 = data.employeeId || docSnap.id;
+                  dayMap[k1] = data;
+                });
+                return { date: dStr, logs: dayMap };
+              }).catch(() => ({ date: dStr, logs: {} }))
             );
-            if (hasLeave) st = 'On Leave';
           }
 
-          if (st === 'Present') presentDays++;
-          else if (st === 'Late') lateDays++;
-          else if (st === 'Day Off') dayOffDays++;
-          else if (st === 'On Leave') leaveDays++;
-          else absentDays++;
-        });
+          const monthDaysResults = await Promise.all(dailyPromises);
+
+          let lateDays = 0;
+          monthDaysResults.forEach(({ date, logs }) => {
+            const rec = findAttendanceForEmployee(emp, logs);
+            let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+
+            if (!st) {
+              const hasLeave = leaveList.some(l => 
+                l.employeeId === emp.id && 
+                l.status === 'Approved' && 
+                date >= l.startDate && 
+                date <= l.endDate
+              );
+              if (hasLeave) st = 'On Leave';
+            }
+
+            if (st === 'Present') presentDays++;
+            else if (st === 'Late') lateDays++;
+            else if (st === 'Day Off') dayOffDays++;
+            else if (st === 'On Leave') leaveDays++;
+            else absentDays++;
+          });
+
+          presentDays += lateDays;
+        }
 
         const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
         const absentDeduction = Math.round(absentDays * perDaySalary);
@@ -4193,24 +4642,46 @@ ${messageText}
 
         if (attBox) {
           attBox.classList.remove('hidden');
-          const sumPres = document.getElementById('pay-sum-present');
-          const sumDayOff = document.getElementById('pay-sum-dayoff');
-          const sumLeave = document.getElementById('pay-sum-leave');
-          const sumAbsent = document.getElementById('pay-sum-absent');
+          const sumPresInput = document.getElementById('pay-sum-present-input');
+          const sumDayOffInput = document.getElementById('pay-sum-dayoff-input');
+          const sumLeaveInput = document.getElementById('pay-sum-leave-input');
+          const sumAbsentInput = document.getElementById('pay-sum-absent-input');
           const sumDeduct = document.getElementById('pay-sum-deduct');
           const sumTotal = document.getElementById('pay-summary-total-days');
 
-          if (sumPres) sumPres.innerText = presentDays + lateDays;
-          if (sumDayOff) sumDayOff.innerText = dayOffDays;
-          if (sumLeave) sumLeave.innerText = leaveDays;
-          if (sumAbsent) sumAbsent.innerText = absentDays;
+          if (sumPresInput) sumPresInput.value = presentDays;
+          if (sumDayOffInput) sumDayOffInput.value = dayOffDays;
+          if (sumLeaveInput) sumLeaveInput.value = leaveDays;
+          if (sumAbsentInput) sumAbsentInput.value = absentDays;
           if (sumDeduct) sumDeduct.innerText = absentDeduction.toLocaleString();
-          if (sumTotal) sumTotal.innerText = `মাসের মোট দিন: ${daysInMonth} দিন (মূল বেতন: ৳${baseSalary.toLocaleString()})`;
+          if (sumTotal) sumTotal.innerHTML = `মাসের মোট দিন: <b>${daysInMonth}</b> দিন (মূল বেতন: ৳${baseSalary.toLocaleString()} ${hasSavedSummary ? '<span class="text-emerald-700 bg-emerald-100 text-[10px] font-bold px-1.5 py-0.5 rounded ml-1">✨ ইন-টোটাল ডাটা</span>' : ''})`;
         }
       } else {
         document.getElementById('pay-basic').value = baseSalary;
         if (attBox) attBox.classList.add('hidden');
       }
+
+      calculateNetSalary();
+    };
+
+    window.onPayrollAttDaysChanged = function() {
+      const empId = document.getElementById('pay-emp-id')?.value;
+      const month = document.getElementById('pay-month')?.value;
+      const emp = employeeList.find(e => e.id === empId);
+      if (!emp || !month) return;
+
+      const [yearStr, mStr] = month.split('-');
+      const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
+      const baseSalary = Number(emp.salary) || 0;
+      const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
+
+      const absent = Number(document.getElementById('pay-sum-absent-input')?.value) || 0;
+      const absentDeduction = Math.round(absent * perDaySalary);
+      const earnedBasic = Math.max(0, Math.round(baseSalary - absentDeduction));
+
+      document.getElementById('pay-basic').value = earnedBasic;
+      const sumDeduct = document.getElementById('pay-sum-deduct');
+      if (sumDeduct) sumDeduct.innerText = absentDeduction.toLocaleString();
 
       calculateNetSalary();
     };
@@ -4236,14 +4707,15 @@ ${messageText}
 
       const emp = employeeList.find(e => e.id === empId);
 
-      const presentCount = document.getElementById('pay-sum-present') ? (parseInt(document.getElementById('pay-sum-present').innerText) || 0) : 0;
-      const dayOffCount = document.getElementById('pay-sum-dayoff') ? (parseInt(document.getElementById('pay-sum-dayoff').innerText) || 0) : 0;
-      const leaveCount = document.getElementById('pay-sum-leave') ? (parseInt(document.getElementById('pay-sum-leave').innerText) || 0) : 0;
-      const absentCount = document.getElementById('pay-sum-absent') ? (parseInt(document.getElementById('pay-sum-absent').innerText) || 0) : 0;
+      const presentCount = document.getElementById('pay-sum-present-input') ? (parseInt(document.getElementById('pay-sum-present-input').value) || 0) : 0;
+      const dayOffCount = document.getElementById('pay-sum-dayoff-input') ? (parseInt(document.getElementById('pay-sum-dayoff-input').value) || 0) : 0;
+      const leaveCount = document.getElementById('pay-sum-leave-input') ? (parseInt(document.getElementById('pay-sum-leave-input').value) || 0) : 0;
+      const absentCount = document.getElementById('pay-sum-absent-input') ? (parseInt(document.getElementById('pay-sum-absent-input').value) || 0) : 0;
 
       await addDoc(collection(db, "payrolls"), {
         employeeId: empId,
         employeeName: emp ? emp.name : 'Unknown Staff',
+        customEmpCode: emp ? (emp.customEmpCode || '') : '',
         branch: emp ? (emp.branch || 'Head Office') : 'Head Office',
         month: month,
         baseSalary: emp ? (Number(emp.salary) || basic) : basic,
@@ -4454,6 +4926,16 @@ ${messageText}
         const m = parseInt(mStr);
         const daysInMonth = new Date(y, m, 0).getDate();
 
+        // Fetch all attendance summaries for this month
+        const summaryDocsSnap = await getDocs(collection(db, "attendance_summaries"));
+        const summaryMap = {};
+        summaryDocsSnap.forEach(sDoc => {
+          const sData = sDoc.data();
+          if (sData.month === selectedMonth) {
+            summaryMap[sData.employeeId] = sData;
+          }
+        });
+
         // 1. Fetch attendance records for all days of the month in parallel
         const dailyPromises = [];
         for (let d = 1; d <= daysInMonth; d++) {
@@ -4482,31 +4964,40 @@ ${messageText}
 
           // Attendance calculation
           let presentDays = 0;
-          let lateDays = 0;
           let dayOffDays = 0;
           let leaveDays = 0;
           let absentDays = 0;
 
-          monthDaysResults.forEach(({ date, logs }) => {
-            const rec = findAttendanceForEmployee(emp, logs);
-            let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+          if (summaryMap[emp.id]) {
+            const sData = summaryMap[emp.id];
+            presentDays = Number(sData.presentDays) || 0;
+            dayOffDays = Number(sData.dayOffDays) || 0;
+            leaveDays = Number(sData.leaveDays) || 0;
+            absentDays = Number(sData.absentDays) || 0;
+          } else {
+            let lateDays = 0;
+            monthDaysResults.forEach(({ date, logs }) => {
+              const rec = findAttendanceForEmployee(emp, logs);
+              let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
 
-            if (!st) {
-              const hasLeave = leaveList.some(l => 
-                l.employeeId === emp.id && 
-                l.status === 'Approved' && 
-                date >= l.startDate && 
-                date <= l.endDate
-              );
-              if (hasLeave) st = 'On Leave';
-            }
+              if (!st) {
+                const hasLeave = leaveList.some(l => 
+                  l.employeeId === emp.id && 
+                  l.status === 'Approved' && 
+                  date >= l.startDate && 
+                  date <= l.endDate
+                );
+                if (hasLeave) st = 'On Leave';
+              }
 
-            if (st === 'Present') presentDays++;
-            else if (st === 'Late') lateDays++;
-            else if (st === 'Day Off') dayOffDays++;
-            else if (st === 'On Leave') leaveDays++;
-            else absentDays++;
-          });
+              if (st === 'Present') presentDays++;
+              else if (st === 'Late') lateDays++;
+              else if (st === 'Day Off') dayOffDays++;
+              else if (st === 'On Leave') leaveDays++;
+              else absentDays++;
+            });
+            presentDays += lateDays;
+          }
 
           const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
           const absentDeduction = Math.round(absentDays * perDaySalary);
@@ -5465,6 +5956,16 @@ ${messageText}
 
         const monthDaysResults = await Promise.all(dailyPromises);
 
+        // Check attendance summaries
+        const summaryDocsSnap = await getDocs(collection(db, "attendance_summaries"));
+        const summaryMap = {};
+        summaryDocsSnap.forEach(sDoc => {
+          const sData = sDoc.data();
+          if (sData.month === month) {
+            summaryMap[sData.employeeId] = sData;
+          }
+        });
+
         // 3. Filter target employees
         const targetEmployees = employeeList.filter(emp => {
           if (filterBranch !== 'ALL' && emp.branch !== filterBranch) return false;
@@ -5513,32 +6014,40 @@ ${messageText}
           let empDayOff = 0;
           let empLeave = 0;
 
-          monthDaysResults.forEach(({ date, logs }) => {
-            const rec = findAttendanceForEmployee(emp, logs);
-            let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
+          if (summaryMap[emp.id]) {
+            const sData = summaryMap[emp.id];
+            empPresent = Number(sData.presentDays) || 0;
+            empDayOff = Number(sData.dayOffDays) || 0;
+            empLeave = Number(sData.leaveDays) || 0;
+            empAbsent = Number(sData.absentDays) || 0;
+          } else {
+            monthDaysResults.forEach(({ date, logs }) => {
+              const rec = findAttendanceForEmployee(emp, logs);
+              let st = rec ? (typeof rec === 'object' ? rec.status : rec) : null;
 
-            if (!st) {
-              const hasLeave = leaveList.some(l => 
-                l.employeeId === emp.id && 
-                l.status === 'Approved' && 
-                date >= l.startDate && 
-                date <= l.endDate
-              );
-              if (hasLeave) st = 'On Leave';
-            }
+              if (!st) {
+                const hasLeave = leaveList.some(l => 
+                  l.employeeId === emp.id && 
+                  l.status === 'Approved' && 
+                  date >= l.startDate && 
+                  date <= l.endDate
+                );
+                if (hasLeave) st = 'On Leave';
+              }
 
-            if (st === 'Present') {
-              empPresent++;
-            } else if (st === 'Late') {
-              empLate++;
-            } else if (st === 'Day Off') {
-              empDayOff++;
-            } else if (st === 'On Leave') {
-              empLeave++;
-            } else {
-              empAbsent++;
-            }
-          });
+              if (st === 'Present') {
+                empPresent++;
+              } else if (st === 'Late') {
+                empLate++;
+              } else if (st === 'Day Off') {
+                empDayOff++;
+              } else if (st === 'On Leave') {
+                empLeave++;
+              } else {
+                empAbsent++;
+              }
+            });
+          }
 
           grandTotalPresent += empPresent;
           grandTotalLate += empLate;
@@ -6467,7 +6976,19 @@ ${messageText}
             </div>
             
             <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-bold text-slate-700">তারিখ:</span>
+              <!-- Search Employee by ID / Name in Attendance -->
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="att-search-input" oninput="renderAttendanceTable()" placeholder="আইডি বা নাম দিয়ে খুঁজুন... (e.g. 16, 58)" class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 transition w-44 sm:w-56">
+              </div>
+
+              <!-- Monthly / In-Total Attendance Modal Button -->
+              <button onclick="openMonthlyTotalAttendanceModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="কর্মচারীর পুরো মাসের মোট হাজিরা (Present, Absent, Day Off) একবারে নির্ধারণ করুন">
+                <i class="fa-solid fa-calendar-check"></i>
+                <span>ইন-টোটাল হাজিরা এন্ট্রি</span>
+              </button>
+
+              <span class="text-xs font-bold text-slate-700 ml-1">তারিখ:</span>
               <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 focus:bg-white outline-none">
               
               <!-- ZKTeco log punch file import (Head Office Only) -->
@@ -6748,7 +7269,7 @@ ${messageText}
               <!-- Search Input -->
               <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                <input type="text" id="payroll-search-input" oninput="renderPayrollTable()" placeholder="নাম বা আইডি খুঁজুন..." class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 transition">
+                <input type="text" id="payroll-search-input" oninput="renderPayrollTable()" placeholder="আইডি (e.g. 16) বা নাম খুঁজুন..." class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 transition font-medium">
               </div>
 
               <!-- Batch Generate Button -->
@@ -7898,6 +8419,162 @@ ${messageText}
     </div>
   </div>
 
+  <!-- 3.1 MONTHLY / IN-TOTAL ATTENDANCE MODAL -->
+  <div id="monthly-attendance-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-100 my-8">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-base">
+            <i class="fa-solid fa-calendar-check"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">ইন-টোটাল / মাসিক হাজিরা এন্ট্রি</h3>
+            <p class="text-[11px] text-slate-500 font-medium">আইডি দিয়ে সার্চ করে পুরো মাসের মোট হাজিরা একবারে সেট করুন</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('monthly-attendance-modal', false)" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="monthly-attendance-form" onsubmit="saveMonthlyTotalAttendance(event)" class="space-y-4">
+        <!-- 1. Employee Search & Selection -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-700">১. কর্মচারী খুঁজুন ও নির্বাচন করুন *</label>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="month-att-emp-search" oninput="filterMonthlyAttendanceEmpDropdown(this.value)" placeholder="আইডি লিখুন (e.g. 16, 58) বা নাম..." class="w-full pl-8 pr-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none font-medium">
+          </div>
+          <select id="month-att-emp-id" required onchange="loadEmployeeMonthlyAttendanceSummary()" class="w-full p-2.5 border rounded-xl text-xs bg-white font-bold text-slate-800 outline-none"></select>
+        </div>
+
+        <!-- 2. Month Selection -->
+        <div class="space-y-1">
+          <label class="block text-xs font-bold text-slate-700">২. সাল ও মাস নির্বাচন করুন *</label>
+          <input type="month" id="month-att-month" required onchange="loadEmployeeMonthlyAttendanceSummary()" class="w-full p-2.5 border rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50/50 outline-none">
+        </div>
+
+        <!-- Live Employee & Month Overview Card -->
+        <div id="month-att-overview-box" class="hidden p-3.5 bg-gradient-to-br from-indigo-50/80 to-slate-50 border border-indigo-100 rounded-2xl space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-[11px] font-bold text-indigo-900 flex items-center">
+              <i class="fa-solid fa-circle-info mr-1 text-indigo-600"></i>মাসের বিবরণী:
+            </span>
+            <div id="month-att-match-status" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+              হিসাব লোড হচ্ছে...
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+            <div class="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">মাস</span>
+              <b id="month-att-info-month" class="text-xs text-indigo-900 font-extrabold font-mono">--</b>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">মোট দিন</span>
+              <b id="month-att-info-days" class="text-xs text-indigo-900 font-extrabold">-- দিন</b>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">মূল বেতন</span>
+              <b id="month-att-info-salary" class="text-xs text-emerald-700 font-extrabold">৳ --</b>
+            </div>
+            <div class="bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span class="text-[10px] text-slate-400 font-bold block uppercase">দৈনিক রেট</span>
+              <b id="month-att-info-perday" class="text-xs text-slate-700 font-extrabold">৳ --</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-[11px] font-bold text-slate-600">কুইক প্রিসেট (Quick Fill):</label>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" onclick="applyMonthlyAttPreset('standard')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition">
+              ⚡ ৪ ডে অফ + বাকি প্রেজেন্ট
+            </button>
+            <button type="button" onclick="applyMonthlyAttPreset('all_present')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition">
+              ✨ সব দিন প্রেজেন্ট
+            </button>
+            <button type="button" onclick="applyMonthlyAttPreset('load_daily')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition">
+              🔄 ডেইলি লগ রিলোড
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Total Days Inputs -->
+        <div class="grid grid-cols-2 gap-3 pt-1">
+          <div class="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+            <label class="block text-xs font-bold text-emerald-900 mb-1 flex items-center">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+              মোট উপস্থিত দিন (Present)
+            </label>
+            <input type="number" id="month-att-present" min="0" required oninput="onMonthlyAttDaysChanged('present')" class="w-full p-2 border border-emerald-200 rounded-lg text-sm font-black text-emerald-800 bg-white outline-none">
+          </div>
+
+          <div class="bg-sky-50/50 p-2.5 rounded-xl border border-sky-100">
+            <label class="block text-xs font-bold text-sky-900 mb-1 flex items-center">
+              <span class="w-2 h-2 rounded-full bg-sky-500 mr-1.5"></span>
+              মোট ডে অফ (Day Off)
+            </label>
+            <input type="number" id="month-att-dayoff" min="0" required oninput="onMonthlyAttDaysChanged('dayoff')" class="w-full p-2 border border-sky-200 rounded-lg text-sm font-black text-sky-800 bg-white outline-none">
+          </div>
+
+          <div class="bg-purple-50/50 p-2.5 rounded-xl border border-purple-100">
+            <label class="block text-xs font-bold text-purple-900 mb-1 flex items-center">
+              <span class="w-2 h-2 rounded-full bg-purple-500 mr-1.5"></span>
+              অনুমোদিত ছুটি (Leave)
+            </label>
+            <input type="number" id="month-att-leave" min="0" required oninput="onMonthlyAttDaysChanged('leave')" class="w-full p-2 border border-purple-200 rounded-lg text-sm font-black text-purple-800 bg-white outline-none">
+          </div>
+
+          <div class="bg-rose-50/50 p-2.5 rounded-xl border border-rose-100">
+            <label class="block text-xs font-bold text-rose-900 mb-1 flex items-center">
+              <span class="w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span>
+              মোট অনুপস্থিত (Absent)
+            </label>
+            <input type="number" id="month-att-absent" min="0" required oninput="onMonthlyAttDaysChanged('absent')" class="w-full p-2 border border-rose-200 rounded-lg text-sm font-black text-rose-800 bg-white outline-none">
+          </div>
+        </div>
+
+        <!-- 4. Real-time Calculation Breakdown Preview -->
+        <div class="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-1.5 text-xs">
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-700">
+            <span>📊 হাজিরা প্রভাব ও বেতন বিশ্লেষণ:</span>
+            <span id="month-att-prev-total-days" class="text-indigo-700 font-extrabold">0 / 0 দিন</span>
+          </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-600">
+            <span>বেতনভুক্ত মোট দিন (Present + DayOff + Leave):</span>
+            <b id="month-att-prev-paid-days" class="text-emerald-700">0 দিন</b>
+          </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-600">
+            <span>অনুপস্থিতির জন্য কর্তন (Absent Deduction):</span>
+            <b id="month-att-prev-deduct" class="text-rose-600">৳ 0</b>
+          </div>
+          <div class="flex justify-between items-center text-xs font-bold text-slate-800 pt-1 border-t border-slate-200">
+            <span>প্রত্যাশিত বেসিক বেতন (Payable Basic):</span>
+            <b id="month-att-prev-earned" class="text-indigo-700 text-sm">৳ 0</b>
+          </div>
+        </div>
+
+        <!-- Sync Daily Option -->
+        <div class="flex items-center space-x-2 pt-1">
+          <input type="checkbox" id="month-att-sync-daily" checked class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+          <label for="month-att-sync-daily" class="text-xs text-slate-700 font-bold select-none cursor-pointer">
+            এই মাসের দৈনিক হাজিরা লগেও সংরক্ষণ করুন (Sync to daily logs)
+          </label>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+          <button type="button" onclick="toggleModal('monthly-attendance-modal', false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5">
+            <i class="fa-solid fa-check"></i>
+            <span>হাজিরা সংরক্ষণ করুন (Save)</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 5. ADD PAYROLL MODAL -->
   <div id="add-payroll-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100">
@@ -7908,7 +8585,11 @@ ${messageText}
 
       <form id="payroll-form" onsubmit="savePayrollEntry(event)" class="space-y-3">
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Employee *</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Employee Search & Select (আইডি বা নাম দিয়ে খুঁজুন) *</label>
+          <div class="relative mb-2">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="pay-emp-search-box" oninput="filterPayrollEmpDropdown(this.value)" placeholder="আইডি লিখুন (e.g. 16, 58) বা নাম..." class="w-full pl-8 pr-3 py-2 border rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none font-medium">
+          </div>
           <select id="pay-emp-id" required onchange="openPayrollModalForEmployee()" class="w-full p-2.5 border rounded-xl text-xs bg-white font-medium outline-none"></select>
         </div>
 
@@ -7918,18 +8599,36 @@ ${messageText}
         </div>
 
         <!-- Real-time Attendance & Days Calculation Summary Box -->
-        <div id="pay-att-summary-box" class="hidden p-3 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-1.5 shadow-2xs">
+        <div id="pay-att-summary-box" class="hidden p-3 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs space-y-2 shadow-2xs">
           <div class="font-bold text-slate-700 flex justify-between items-center text-[11px]">
             <span>📅 হাজিরা ও কার্যদিবস বিশ্লেষণ:</span>
             <span id="pay-summary-total-days" class="text-indigo-700 font-extrabold text-[11px]"></span>
           </div>
-          <div class="flex flex-wrap gap-1.5 text-[10px] font-bold pt-1">
-            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg">🟢 উপস্থিত: <b id="pay-sum-present">0</b> দিন</span>
-            <span class="bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-lg">🔵 ডে অফ: <b id="pay-sum-dayoff">0</b> দিন</span>
-            <span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-lg">🟣 ছুটি: <b id="pay-sum-leave">0</b> দিন</span>
-            <span class="bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg">🔴 অনুপস্থিত: <b id="pay-sum-absent">0</b> দিন (-৳<span id="pay-sum-deduct">0</span>)</span>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+            <div class="bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-100 text-center">
+              <span class="text-[10px] text-emerald-800 font-bold block">🟢 উপস্থিত</span>
+              <input type="number" id="pay-sum-present-input" min="0" oninput="onPayrollAttDaysChanged()" class="w-full text-center text-xs font-black bg-white border border-emerald-200 rounded p-0.5 text-emerald-700">
+            </div>
+            <div class="bg-sky-50/70 p-1.5 rounded-lg border border-sky-100 text-center">
+              <span class="text-[10px] text-sky-800 font-bold block">🔵 ডে অফ</span>
+              <input type="number" id="pay-sum-dayoff-input" min="0" oninput="onPayrollAttDaysChanged()" class="w-full text-center text-xs font-black bg-white border border-sky-200 rounded p-0.5 text-sky-700">
+            </div>
+            <div class="bg-purple-50/70 p-1.5 rounded-lg border border-purple-100 text-center">
+              <span class="text-[10px] text-purple-800 font-bold block">🟣 ছুটি</span>
+              <input type="number" id="pay-sum-leave-input" min="0" oninput="onPayrollAttDaysChanged()" class="w-full text-center text-xs font-black bg-white border border-purple-200 rounded p-0.5 text-purple-700">
+            </div>
+            <div class="bg-rose-50/70 p-1.5 rounded-lg border border-rose-100 text-center">
+              <span class="text-[10px] text-rose-800 font-bold block">🔴 অনুপস্থিত</span>
+              <input type="number" id="pay-sum-absent-input" min="0" oninput="onPayrollAttDaysChanged()" class="w-full text-center text-xs font-black bg-white border border-rose-200 rounded p-0.5 text-rose-700">
+            </div>
           </div>
-          <p class="text-[10px] text-slate-400 italic pt-0.5">⚠️ উপস্থিত, ডে অফ এবং অনুমোদিত ছুটি পূর্ণ বেতনভুক্ত। শুধুমাত্র অনুপস্থিতির টাকা কাটা হয়েছে। আপনি নিচে নিজের মতো যেকোনো মান পরিবর্তন করতে পারেন।</p>
+
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-600 pt-0.5">
+            <span>অনুপস্থিতির জন্য কর্তন:</span>
+            <span class="text-rose-600">-৳<span id="pay-sum-deduct">0</span></span>
+          </div>
+          <p class="text-[10px] text-slate-400 italic">⚠️ উপস্থিত, ডে অফ এবং অনুমোদিত ছুটি পূর্ণ বেতনভুক্ত। আপনি চাইলে এখানে দিন পরিবর্তন করতে পারেন।</p>
         </div>
 
         <div class="grid grid-cols-2 gap-3">

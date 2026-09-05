@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HRMS Enterprise - Human Resource Management Suite</title>
+  <title>SANVEE'S - Human Resource Management Suite</title>
   
   <!-- Professional Corporate HRMS SVG Favicon & Web App Icons -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='50%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23grad1)'/%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2'/%3E%3Cpath d='M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/%3E%3Ccircle cx='50' cy='30' r='8' fill='%23ffffff'/%3E%3Ccircle cx='30' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='70' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='50' cy='51' r='5' fill='%2338bdf8' stroke='%23ffffff' stroke-width='2.5'/%3E%3Cpath d='M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z' fill='%23fef08a'/%3E%3C/svg%3E">
@@ -1973,10 +1973,11 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>${title}</title>
+          <title>SANVEE'S - ${title}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; }
-            h2 { margin-bottom: 4px; }
+            h1 { margin: 0 0 4px 0; color: #4f46e5; font-size: 22px; }
+            h2 { margin-top: 0; margin-bottom: 4px; font-size: 16px; color: #1e293b; }
             p { margin-top: 0; color: #64748b; font-size: 13px; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; font-size: 12px; }
             th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
@@ -1984,6 +1985,7 @@
           </style>
         </head>
         <body>
+          <h1>SANVEE'S</h1>
           <h2>${title}</h2>
           <p>${subtitle}</p>
           <table>
@@ -2153,7 +2155,6 @@
         checkIncrementDues();
         renderAdvanceTable();
         renderFineTable();
-        generateReport();
         calculateMyPersonalSummary();
         renderDashboardCharts();
         renderNotices();
@@ -4466,7 +4467,6 @@
         });
         renderAdvanceTable();
         calculateMyPersonalSummary();
-        generateReport();
       });
     }
 
@@ -4733,7 +4733,6 @@
         });
         renderFineTable();
         calculateMyPersonalSummary();
-        generateReport();
       });
     }
 
@@ -5067,7 +5066,7 @@ ${messageText}
               `🕒 *অনুমোদনের তারিখ:* ${nowStr}\n\n` +
               `🌟 _ছুটির দিনগুলো আপনার সুন্দর ও আনন্দময় কাটুক। যথাসময়ে পুনরায় কাজে যোগদানের জন্য অনুরোধ করা হলো।_\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `🏢 *HRMS Enterprise Management*`;
+              `🏢 *SANVEE'S HR Management*`;
       } else if (lv.status === 'Rejected') {
         msg = `⚠️ *ছুটির আবেদনের সিদ্ধান্ত (LEAVE REJECTED)* ⚠️\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -5081,7 +5080,7 @@ ${messageText}
               `▫️ *সিদ্ধান্ত গ্রহণকারী:* ${approver}\n\n` +
               `💡 _কোনো জরুরি প্রয়োজনে বা বিস্তারিত জানতে সরাসরি HR বা ব্রাঞ্চ ম্যানেজারের সাথে যোগাযোগ করুন।_\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `🏢 *HRMS Enterprise Management*`;
+              `🏢 *SANVEE'S HR Management*`;
       } else {
         msg = `🔔 *ছুটির আবেদন স্থিতি (LEAVE APPLICATION STATUS)* 🔔\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -5096,7 +5095,7 @@ ${messageText}
               `▫️ *বর্তমান অবস্থা:* ⏳ Pending Approval (অপেক্ষমাণ)\n\n` +
               `_অনুমোদন সম্পন্ন হলে আপনাকে পুনরায় নিশ্চিত করা হবে।_\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `🏢 *HRMS Enterprise Management*`;
+              `🏢 *SANVEE'S HR Management*`;
       }
 
       triggerWhatsAppNotification(
@@ -5140,9 +5139,9 @@ ${messageText}
               `▫️ *তারিখ:* ${adv.date || nowStr}\n` +
               `▫️ *কারণ / নোট:* ${adv.note || 'ব্যক্তিগত প্রয়োজন'}\n` +
               `▫️ *বর্তমান অবস্থা:* ⏳ Pending Approval (অপেক্ষমাণ)\n\n` +
-              `💡 _অনুগ্ৰহ করে HRMS পোর্টালে লগইন করে আবেদনটি যাচাই ও অনুমোদন করুন।_\n` +
+              `💡 _অনুগ্ৰহ করে SANVEE'S পোর্টালে লগইন করে আবেদনটি যাচাই ও অনুমোদন করুন।_\n` +
               `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `🏢 *HRMS Enterprise Management*`;
+              `🏢 *SANVEE'S HR Management*`;
       } else {
         // Sent to Employee (DECISION or STATUS UPDATE)
         targetRecipient = targetPhone;
@@ -5160,7 +5159,7 @@ ${messageText}
                 `▫️ *অনুমোদনের তারিখ:* ${nowStr}\n\n` +
                 `💵 _উক্ত অগ্রিম টাকা ${adv.month} মাসের মূল বেতন (Payroll) থেকে সমন্বয় করা হবে। একাউন্টস থেকে আপনার অগ্রিম গ্রহণ করুন।_\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `🏢 *HRMS Enterprise Management*`;
+                `🏢 *SANVEE'S HR Management*`;
         } else if (adv.status === 'Rejected') {
           msg = `⚠️ *অগ্রিম বেতনের আবেদন স্থিতি (ADVANCE REJECTED)* ⚠️\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -5173,7 +5172,7 @@ ${messageText}
                 `▫️ *সিদ্ধান্ত গ্রহণকারী:* ${approver}\n\n` +
                 `💡 _বিস্তারিত জানতে সরাসরি একাউন্টস বা ম্যানেজারের সাথে যোগাযোগ করুন।_\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `🏢 *HRMS Enterprise Management*`;
+                `🏢 *SANVEE'S HR Management*`;
         } else if (adv.status === 'Cleared') {
           msg = `🧾 *অগ্রিম বেতন সমন্বয় নিশ্চিতকরণ (ADVANCE CLEARED)* 🧾\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -5183,31 +5182,74 @@ ${messageText}
                 `▫️ *সমন্বয়কৃত পরিমাণ:* ৳ ${amount.toLocaleString()}\n` +
                 `▫️ *স্ট্যাটাস:* Cleared in Payroll ✓\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `🏢 *HRMS Enterprise Management*`;
+                `🏢 *SANVEE'S HR Management*`;
         } else {
           msg = `🔔 *অগ্রিম বেতনের আবেদন স্থিতি (ADVANCE PENDING)* 🔔\n` +
                 `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                 `প্রিয় *${empName}*,\n` +
-                `আপনার অগ্রিম বেতনের আবেদনটি পর্যালোচনার জন্য অপেক্ষমাণ রয়েছে।\n\n` +
-                `▫️ *পরিমাণ:* 💰 ৳ ${amount.toLocaleString()}\n` +
-                `▫️ *মাস:* 📅 ${adv.month}\n` +
-                `▫️ *বর্তমান অবস্থা:* ⏳ Pending Approval\n` +
-                `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `🏢 *HRMS Enterprise Management*`;
-        }
+                             `▫️ *তারিখ:* ${nowStr}\n\n` +
+                            `🌟 _SANVEE'S এর সাথে থাকার জন্য ধন্যবাদ। কোনো জিজ্ঞাসা থাকলে একাউন্টস শাখায় যোগাযোগ করুন।_\n` +
+                            `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                            `🏢 *SANVEE'S Payroll System*`;
+
+        Swal.fire({
+          icon: 'success',
+          title: 'পেমেন্ট সফল!',
+          html: `কর্মচারী <b>${empName}</b> এর <b>৳ ${netSalary.toLocaleString()}</b> বেতন সফলভাবে পরিশোধ ও ওটিপি ভেরিফাই হয়েছে।<br><br><span class="text-xs text-emerald-700 font-bold">কর্মচারীর হোয়াটসঅ্যাপে পেমেন্ট কনফার্মেশন পাঠানো হয়েছে।</span>`,
+          confirmButtonColor: '#10b981',
+          confirmButtonText: 'ঠিক আছে (OK)'
+        });
+
+        triggerWhatsAppNotification(
+          empPhone,
+          receiptMsg,
+          `Payment Receipt: ${empName}`,
+          `কর্মচারী "${empName}" এর হোয়াটসঅ্যাপে পেমেন্ট কনফার্মেশন ভাউচার:`
+        );
+
+      } catch (err) {
+        Swal.fire('Error', err.message, 'error');
       }
+    };
+
+    window.sendPayrollVoucherWhatsApp = function(payrollId) {
+      const p = payrollList.find(x => x.id === payrollId);
+      if (!p) return;
+
+      const emp = employeeList.find(e => e.id === p.employeeId || e.name === p.employeeName);
+      const targetPhone = (emp && emp.phone) ? emp.phone : '';
+      const empName = p.employeeName || (emp ? emp.name : 'Staff');
+      const empCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || 'N/A');
+      const branch = p.branch || (emp ? emp.branch : 'Head Office') || 'Head Office';
+      const nowStr = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      const receiptMsg = `🧾 *ডিজিটাল পে-স্লিপ ও বেতন রসিদ (PAYSLIP VOUCHER)* 🧾\n` +
+                         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                         `প্রিয় *${empName}* (ID: ${empCode}),\n` +
+                         `আপনার *${p.month}* মাসের পূর্ণাঙ্গ পে-স্লিপ বিবরণী:\n\n` +
+                         `📋 *বেতন বিবরণী:* \n` +
+                         `▫️ *মূল বেতন (Earned Basic):* ৳ ${(Number(p.basicSalary) || 0).toLocaleString()}\n` +
+                         `▫️ *বোনাস / ইনসেনটিভ:* +৳ ${(Number(p.bonus) || 0).toLocaleString()}\n` +
+                         `▫️ *অগ্রিম কর্তন (Advance):* -৳ ${(Number(p.advance) || 0).toLocaleString()}\n` +
+                         `▫️ *জরিমানা / কর্তন (Fine):* -৳ ${(Number(p.fine) || 0).toLocaleString()}\n` +
+                         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                         `💰 *নিট প্রদেয় বেতন (Net Salary):* 👉 *৳ ${(Number(p.netSalary) || 0).toLocaleString()}* 👈\n` +
+                         `▫️ *পেমেন্ট অবস্থা:* ${p.status === 'Paid' ? 'Paid (পরিশোধিত) ✅' : 'Pending (অপেক্ষমাণ) ⏳'}\n` +
+                         `▫️ *তারিখ:* ${nowStr}\n` +
+                         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                         `🏢 *SANVEE'S Payroll System*`;��ন্ট অবস্থা:* ${p.status === 'Paid' ? 'Paid (পরিশোধিত) ✅' : 'Pending (অপেক্ষমাণ) ⏳'}\n` +
+                         `▫️ *তারিখ:* ${nowStr}\n` +
+                         `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                         `🏢 *SANVEE'S Payroll System*`;
 
       triggerWhatsAppNotification(
-        targetRecipient,
-        msg,
-        `WhatsApp: Advance - ${empName}`,
-        `অগ্রিম বেতনের হোয়াটসঅ্যাপ বার্তা:`
+        targetPhone,
+        receiptMsg,
+        `Payroll Voucher: ${empName}`,
+        `কর্মচারী "${empName}" এর হোয়াটসঅ্যাপে পে-স্লিপ ভাউচার পাঠান:`
       );
     };
 
-    // ==========================================
-    // PAYROLL WHATSAPP OTP PAYMENT SYSTEM
-    // ==========================================
     let activePayrollOtpState = {
       payrollId: null,
       otp: null,
@@ -5333,7 +5375,7 @@ ${messageText}
       const cleanPhone = formatWhatsAppPhone(empPhone);
       const nowStr = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
 
-      const otpMsg = `🔐 *HRMS - বেতন গ্রহণের গোপন OTP কোড* 🔐\n` +
+      const otpMsg = `🔐 *SANVEE'S - বেতন গ্রহণের গোপন OTP কোড* 🔐\n` +
                      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
                      `প্রিয় *${empName}* (ID: ${empCode}),\n` +
                      `আপনার *${month}* মাসের বেতন পরিশোধ প্রক্রিয়া শুরু হয়েছে।\n\n` +
@@ -5342,7 +5384,7 @@ ${messageText}
                      `⏱️ *মেয়াদ:* ৫ মিনিট (সময়: ${nowStr})\n\n` +
                      `⚠️ _এই গোপন কোডটি অ্যাকাউন্টস/ক্যাশিয়ারকে জানিয়ে আপনার বেতন বুঝে নিন। কাউকে কোড শেয়ার করবেন না।_\n` +
                      `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                     `🏢 *HRMS Enterprise Payroll System*`;
+                     `🏢 *SANVEE'S Payroll System*`;
 
       const waUrl = cleanPhone 
         ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(otpMsg)}`
@@ -6792,7 +6834,7 @@ ${messageText}
       printWindow.document.write(`
         <html>
         <head>
-          <title>Payslip - ${p.employeeName} (${p.month})</title>
+          <title>Payslip - ${p.employeeName} (${p.month}) - SANVEE'S</title>
           <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; }
             .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 20px; }
@@ -6808,7 +6850,7 @@ ${messageText}
         </head>
         <body>
           <div class="header">
-            <h1>HRMS PRO ENTERPRISE</h1>
+            <h1>SANVEE'S</h1>
             <p>Official Salary Slip • 🏢 ${p.branch || 'Head Office'}</p>
           </div>
           <div class="info-grid">
@@ -6973,7 +7015,7 @@ ${messageText}
       const branchVal = document.getElementById('payroll-filter-branch')?.value || 'ALL';
       const monthVal = document.getElementById('payroll-filter-month')?.value || 'ALL';
       link.setAttribute('href', url);
-      link.setAttribute('download', `HRMS_Payroll_${branchVal}_${monthVal}_${new Date().toISOString().substring(0, 10)}.csv`);
+      link.setAttribute('download', `SANVEES_Payroll_${branchVal}_${monthVal}_${new Date().toISOString().substring(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -7009,7 +7051,7 @@ ${messageText}
           <div class="payslip-card ${!isLast ? 'page-break' : ''}">
             <div class="header">
               <div class="header-badge">OFFICIAL SALARY SLIP • SL #${index + 1}</div>
-              <h1>HRMS PRO ENTERPRISE</h1>
+              <h1>SANVEE'S</h1>
               <p>Branch: 🏢 <strong>${p.branch || 'Head Office'}</strong> | Salary Month: 📅 <strong>${p.month}</strong></p>
             </div>
             
@@ -7090,7 +7132,7 @@ ${messageText}
         <html>
         <head>
           <meta charset="UTF-8">
-          <title>Bulk Payslips (${filtered.length} Staff) - ${branchVal} - ${monthVal}</title>
+          <title>Bulk Payslips (${filtered.length} Staff) - SANVEE'S - ${branchVal} - ${monthVal}</title>
           <style>
             @page {
               size: A4 portrait;
@@ -7270,7 +7312,7 @@ ${messageText}
         <body>
           <div class="no-print-bar">
             <div>
-              <strong>HRMS Enterprise - Bulk Payslips</strong> (${filtered.length} Employees Selected)
+              <strong>SANVEE'S - Bulk Payslips</strong> (${filtered.length} Employees Selected)
             </div>
             <button onclick="window.print()">
               🖨️ Print / Save as PDF
@@ -7354,7 +7396,7 @@ ${messageText}
         <html>
         <head>
           <meta charset="UTF-8">
-          <title>Master Salary Sheet - ${branchVal} - ${monthVal}</title>
+          <title>Master Salary Sheet - SANVEE'S - ${branchVal} - ${monthVal}</title>
           <style>
             @page {
               size: A4 landscape;
@@ -7452,7 +7494,7 @@ ${messageText}
         <body>
           <div class="no-print-bar">
             <div>
-              <strong>HRMS Enterprise - Monthly Salary Disbursement Sheet</strong> (${filtered.length} Staff)
+              <strong>SANVEE'S - Monthly Salary Disbursement Sheet</strong> (${filtered.length} Staff)
             </div>
             <button onclick="window.print()">🖨️ Print / Save PDF</button>
           </div>
@@ -7460,7 +7502,7 @@ ${messageText}
             <table class="header-table">
               <tr>
                 <td>
-                  <h1 class="header-title">HRMS PRO ENTERPRISE</h1>
+                  <h1 class="header-title">SANVEE'S</h1>
                   <p class="header-sub">Monthly Master Salary Sheet & Disbursement Statement</p>
                 </td>
                 <td style="text-align: right; font-size: 12px; line-height: 1.5;">
@@ -8813,6 +8855,8 @@ ${messageText}
 
       if(secId === 'dashboard') {
         renderDashboardCharts();
+      } else if (secId === 'reports') {
+        if (typeof generateReport === 'function') generateReport();
       }
     };
 
@@ -8867,7 +8911,7 @@ ${messageText}
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-indigo-900/15 rounded-full blur-[150px] pointer-events-none z-0"></div>
 
     <!-- Classic Watermark -->
-    <div class="classic-watermark">HRMS ENTERPRISE</div>
+    <div class="classic-watermark">SANVEE'S</div>
 
     <!-- Surrounding Floating Executive Badges -->
     <div class="hidden md:flex items-center space-x-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/75 border border-slate-700/60 backdrop-blur-md shadow-2xl text-xs font-semibold text-slate-300 absolute top-12 left-12 floating-chip-1 z-10 pointer-events-none">
@@ -8918,10 +8962,10 @@ ${messageText}
 
         <div>
           <h1 class="text-2xl sm:text-3xl font-black tracking-tight classic-metallic-title">
-            HR SYSTEM
+            SANVEE'S
           </h1>
           <p class="text-[11px] font-bold tracking-widest text-slate-400 uppercase mt-0.5">
-            HRMS Enterprise Management Suite
+            Enterprise Management Suite
           </p>
         </div>
 
@@ -8940,7 +8984,7 @@ ${messageText}
           </label>
           <div class="relative">
             <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
-            <input type="email" id="login-email" required placeholder="admin@hrms.com" class="classic-input pl-9 pr-4 py-2.5">
+            <input type="email" id="login-email" required placeholder="admin@sanvees.com" class="classic-input pl-9 pr-4 py-2.5">
           </div>
         </div>
 
@@ -8983,7 +9027,7 @@ ${messageText}
           <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-shield-halved text-rose-400"></i><span>Enterprise Grade</span></span>
         </div>
         <div class="text-[11px] text-slate-500 font-medium">
-          HRMS Enterprise Pro • Real-Time Employee Cloud
+          SANVEE'S Enterprise Pro • Real-Time Employee Cloud
         </div>
       </div>
 
@@ -9018,7 +9062,7 @@ ${messageText}
             </svg>
           </div>
           <div class="min-w-0">
-            <h2 class="font-black text-sm text-white tracking-wide truncate">HRMS Pro</h2>
+            <h2 class="font-black text-sm text-white tracking-wide truncate">SANVEE'S</h2>
             <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
           </div>
         </div>

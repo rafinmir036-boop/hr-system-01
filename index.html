@@ -6710,7 +6710,11 @@ ${messageText}
           const pendingFines = fineList.filter(f => f.employeeId === emp.id && f.month === selectedMonth && f.status === 'Pending');
           const fineDeduct = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-          const netSalary = Math.max(0, (earnedBasic + 0) - (advanceDeduct + fineDeduct));
+          // Check if payroll already exists for this employee and month
+          const existingPayroll = payrollList.find(p => p.employeeId === emp.id && p.month === selectedMonth);
+          const currentBonus = existingPayroll ? (Number(existingPayroll.bonus) || 0) : 0;
+
+          const netSalary = Math.max(0, (earnedBasic + currentBonus) - (advanceDeduct + fineDeduct));
           grandTotalNet += netSalary;
 
           const payrollData = {
@@ -6721,7 +6725,7 @@ ${messageText}
             month: selectedMonth,
             baseSalary: baseSalary,
             basicSalary: earnedBasic,
-            bonus: 0,
+            bonus: currentBonus,
             advance: advanceDeduct,
             fine: fineDeduct,
             netSalary: netSalary,
@@ -6733,8 +6737,6 @@ ${messageText}
             updatedAt: new Date().toISOString()
           };
 
-          // Check if payroll already exists for this employee and month
-          const existingPayroll = payrollList.find(p => p.employeeId === emp.id && p.month === selectedMonth);
           if (existingPayroll) {
             await updateDoc(doc(db, "payrolls", existingPayroll.id), payrollData);
             updatedCount++;

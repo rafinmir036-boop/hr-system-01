@@ -6214,6 +6214,27 @@ ${messageText}
       }
     };
 
+    window.openAddPayrollModal = function() {
+      const form = document.getElementById('payroll-form');
+      if (form) form.reset();
+
+      const filterMonth = document.getElementById('payroll-filter-month') ? document.getElementById('payroll-filter-month').value : '';
+      const payMonth = document.getElementById('pay-month');
+      if (payMonth) {
+        payMonth.value = filterMonth || new Date().toISOString().substring(0, 7);
+      }
+
+      const searchBox = document.getElementById('pay-emp-search-box');
+      if (searchBox) searchBox.value = '';
+
+      filterPayrollEmpDropdown('');
+
+      const attBox = document.getElementById('pay-att-summary-box');
+      if (attBox) attBox.classList.add('hidden');
+
+      toggleModal('add-payroll-modal', true);
+    };
+
     window.openPayrollModalForEmployee = async function() {
       const empId = document.getElementById('pay-emp-id').value;
       const month = document.getElementById('pay-month').value;
@@ -8089,6 +8110,16 @@ ${messageText}
             if (leaveSelfBanner) leaveSelfBanner.classList.add('hidden');
           }
         }
+        if (id === 'add-payroll-modal') {
+          const payMonth = document.getElementById('pay-month');
+          const filterMonth = document.getElementById('payroll-filter-month') ? document.getElementById('payroll-filter-month').value : '';
+          if (payMonth && !payMonth.value) {
+            payMonth.value = filterMonth || new Date().toISOString().substring(0, 7);
+          }
+          if (typeof filterPayrollEmpDropdown === 'function') {
+            filterPayrollEmpDropdown('');
+          }
+        }
       } else {
         modal.classList.add('hidden');
       }
@@ -9073,7 +9104,7 @@ ${messageText}
               </button>
 
               <!-- Single Add Button -->
-              <button id="pay-add-btn" onclick="toggleModal('add-payroll-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+              <button id="pay-add-btn" onclick="openAddPayrollModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
                 <i class="fa-solid fa-plus"></i>
                 <span>Generate Single Payslip</span>
               </button>
@@ -10379,6 +10410,8 @@ ${messageText}
         </div>
       </form>
     </div>
+  </div>
+
   <!-- 3.2 BULK FULL MONTH ATTENDANCE CSV UPLOAD MODAL -->
   <div id="bulk-monthly-attendance-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
     <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl border border-slate-100 dark:border-slate-800 max-h-[92vh] flex flex-col my-auto">

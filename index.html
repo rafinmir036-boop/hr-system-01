@@ -252,160 +252,250 @@
       color: #fde68a !important;
     }
 
-    /* Login Page Animations & Colorful Effects */
-    @keyframes gradientShift {
+    /* ========================================================
+       CLASSIC EXECUTIVE LOGIN PAGE STYLES & FLUID ANIMATIONS
+       ======================================================== */
+    @keyframes classicGradientShift {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
 
-    @keyframes floatBlob1 {
-      0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
-      33% { transform: translate(60px, -80px) scale(1.18) rotate(45deg); }
-      66% { transform: translate(-40px, 50px) scale(0.88) rotate(-30deg); }
+    @keyframes cardEntrance3D {
+      0% {
+        opacity: 0;
+        transform: perspective(1200px) translateY(40px) scale(0.94) rotateX(8deg);
+      }
+      100% {
+        opacity: 1;
+        transform: perspective(1200px) translateY(0) scale(1) rotateX(0deg);
+      }
     }
 
-    @keyframes floatBlob2 {
-      0%, 100% { transform: translate(0px, 0px) scale(1) rotate(0deg); }
-      33% { transform: translate(-70px, 60px) scale(1.15) rotate(-45deg); }
-      66% { transform: translate(50px, -50px) scale(0.92) rotate(30deg); }
+    @keyframes orbitalSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
-    @keyframes floatBlob3 {
-      0%, 100% { transform: translate(0px, 0px) scale(0.9) rotate(0deg); }
-      50% { transform: translate(40px, 50px) scale(1.25) rotate(60deg); }
+    @keyframes orbitalSpinReverse {
+      0% { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
     }
 
-    @keyframes watermarkFloat {
-      0%, 100% { transform: translate(-50%, -50%) rotate(-12deg) scale(1); opacity: 0.055; }
-      50% { transform: translate(-50%, -53%) rotate(-9deg) scale(1.06); opacity: 0.095; }
+    @keyframes metallicShimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
     }
 
-    @keyframes watermarkFloatSecondary {
-      0%, 100% { transform: rotate(8deg) translateY(0); opacity: 0.04; }
-      50% { transform: rotate(11deg) translateY(-15px); opacity: 0.075; }
+    @keyframes luxuryLightBeam {
+      0% { left: -120%; opacity: 0; }
+      10% { opacity: 0.8; }
+      30% { left: 130%; opacity: 0.8; }
+      100% { left: 130%; opacity: 0; }
     }
 
-    @keyframes cardEntrance {
-      0% { opacity: 0; transform: translateY(30px) scale(0.95); }
-      100% { opacity: 1; transform: translateY(0) scale(1); }
+    @keyframes floatChip1 {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(1.5deg); }
     }
 
-    @keyframes buttonShine {
-      0% { left: -100%; }
-      20% { left: 120%; }
-      100% { left: 120%; }
+    @keyframes floatChip2 {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(12px) rotate(-1.5deg); }
     }
 
-    @keyframes iconPulseGlow {
-      0%, 100% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.5), 0 0 50px rgba(168, 85, 247, 0.3); transform: translateY(0) scale(1); }
-      50% { box-shadow: 0 0 45px rgba(236, 72, 153, 0.7), 0 0 70px rgba(99, 102, 241, 0.5); transform: translateY(-4px) scale(1.04); }
+    @keyframes auraPulse {
+      0%, 100% { transform: scale(1); opacity: 0.35; }
+      50% { transform: scale(1.15); opacity: 0.55; }
     }
 
-    .animated-colorful-title {
-      background: linear-gradient(135deg, #ff007f, #8b5cf6, #3b82f6, #06b6d4, #10b981, #ff007f);
-      background-size: 400% 400%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: gradientShift 6s ease-in-out infinite;
-      display: inline-block;
+    @keyframes watermarkDrift {
+      0%, 100% { transform: translate(-50%, -50%) rotate(-10deg) scale(1); opacity: 0.04; }
+      50% { transform: translate(-50%, -52%) rotate(-8deg) scale(1.04); opacity: 0.07; }
     }
 
-    .animated-colorful-badge {
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(236, 72, 153, 0.15), rgba(6, 182, 212, 0.12));
-      background-size: 200% 200%;
-      animation: gradientShift 4s ease infinite;
-      border: 1px solid rgba(168, 85, 247, 0.3);
+    /* Classic Glass Card with 3D Spotlight */
+    .classic-glass-card {
+      position: relative;
+      background: rgba(13, 19, 36, 0.82);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 1.75rem;
+      box-shadow: 
+        0 30px 80px -20px rgba(0, 0, 0, 0.85),
+        0 0 50px -10px rgba(99, 102, 241, 0.2),
+        inset 0 1px 1px 0 rgba(255, 255, 255, 0.25),
+        inset 0 -1px 1px 0 rgba(0, 0, 0, 0.4);
+      transform-style: preserve-3d;
+      transition: transform 0.2s cubic-bezier(0.2, 0, 0.2, 1), box-shadow 0.3s ease;
+      animation: cardEntrance3D 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      overflow: hidden;
     }
 
-    .watermark-text {
+    .classic-glass-card::before {
+      content: '';
       position: absolute;
-      user-select: none;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(
+        600px circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+        rgba(255, 255, 255, 0.08),
+        transparent 40%
+      );
       pointer-events: none;
-      font-weight: 900;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      white-space: nowrap;
       z-index: 1;
     }
 
-    .watermark-primary {
-      font-size: clamp(4rem, 16vw, 15rem);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-12deg);
-      animation: watermarkFloat 10s ease-in-out infinite;
-      -webkit-text-stroke: 1.8px rgba(255, 255, 255, 0.18);
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(236, 72, 153, 0.18), rgba(6, 182, 212, 0.22));
+    /* Metallic Shimmer Title */
+    .classic-metallic-title {
+      background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 25%, #cbd5e1 50%, #ffffff 75%, #94a3b8 100%);
+      background-size: 200% auto;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      animation: metallicShimmer 8s linear infinite;
+      letter-spacing: -0.02em;
     }
 
-    .watermark-secondary {
-      font-size: clamp(2.5rem, 8vw, 7rem);
-      bottom: 6%;
-      right: 3%;
-      animation: watermarkFloatSecondary 12s ease-in-out infinite;
-      -webkit-text-stroke: 1px rgba(99, 102, 241, 0.15);
-      color: rgba(255, 255, 255, 0.035);
+    /* Orbital Rings for Insignia */
+    .orbital-ring-outer {
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(129, 140, 248, 0.4);
+      animation: orbitalSpin 20s linear infinite;
     }
 
-    .watermark-top {
-      font-size: clamp(2rem, 7vw, 6rem);
-      top: 6%;
-      left: 3%;
-      animation: watermarkFloatSecondary 14s ease-in-out infinite reverse;
-      -webkit-text-stroke: 1px rgba(236, 72, 153, 0.12);
-      color: rgba(255, 255, 255, 0.03);
+    .orbital-ring-inner {
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 1px dotted rgba(56, 189, 248, 0.35);
+      animation: orbitalSpinReverse 25s linear infinite;
     }
 
-    .login-card-animated {
-      animation: cardEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(25px);
-      box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.7), 0 0 50px rgba(99, 102, 241, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+    /* Classic Form Controls */
+    .classic-input-group {
       position: relative;
-      z-index: 10;
+      transition: all 0.25s ease;
     }
 
-    .login-btn-animated {
+    .classic-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.875rem;
+      color: #f8fafc;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      outline: none;
+    }
+
+    .classic-input:focus {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22), 0 8px 25px -5px rgba(99, 102, 241, 0.25);
+    }
+
+    .classic-input-group:focus-within .input-icon {
+      color: #818cf8;
+      transform: scale(1.1);
+    }
+
+    .input-icon {
+      transition: all 0.25s ease;
+    }
+
+    /* Executive Shimmer Button */
+    .classic-exec-btn {
       position: relative;
       overflow: hidden;
-      background: linear-gradient(135deg, #4f46e5, #7c3aed, #ec4899, #4f46e5);
-      background-size: 300% 300%;
-      animation: gradientShift 5s ease infinite;
+      background: linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #0284c7 100%);
+      background-size: 200% 200%;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 12px 30px -5px rgba(79, 70, 229, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    .login-btn-animated::after {
+    .classic-exec-btn:hover {
+      background-position: 100% 100%;
+      box-shadow: 0 16px 40px -5px rgba(99, 102, 241, 0.6), 0 0 25px rgba(56, 189, 248, 0.35);
+      transform: translateY(-1.5px);
+    }
+
+    .classic-exec-btn:active {
+      transform: translateY(0.5px) scale(0.99);
+    }
+
+    .classic-exec-btn::after {
       content: '';
       position: absolute;
       top: -50%;
       bottom: -50%;
-      width: 45px;
+      width: 50px;
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
       transform: rotate(25deg);
-      animation: buttonShine 4s infinite ease-in-out;
+      animation: luxuryLightBeam 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
 
-    .login-icon-glow {
-      animation: iconPulseGlow 4s ease-in-out infinite;
+    /* Click Ripple Effect */
+    .ripple-wave {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
+      transform: scale(0);
+      animation: rippleAnim 0.6s linear;
+      pointer-events: none;
     }
 
-    .blob-1 {
-      animation: floatBlob1 16s ease-in-out infinite;
-    }
-    .blob-2 {
-      animation: floatBlob2 14s ease-in-out infinite;
-    }
-    .blob-3 {
-      animation: floatBlob3 18s ease-in-out infinite;
+    @keyframes rippleAnim {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
     }
 
-    .grid-pattern-overlay {
-      background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-      background-size: 32px 32px;
+    /* Floating Capsule Badges */
+    .floating-chip-1 {
+      animation: floatChip1 7s ease-in-out infinite;
+    }
+
+    .floating-chip-2 {
+      animation: floatChip2 8.5s ease-in-out infinite;
+    }
+
+    .floating-chip-3 {
+      animation: floatChip1 9s ease-in-out infinite reverse;
+    }
+
+    /* Classic Watermark */
+    .classic-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-10deg);
+      font-size: clamp(4rem, 14vw, 13rem);
+      font-weight: 900;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      white-space: nowrap;
+      user-select: none;
+      pointer-events: none;
+      -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.015);
+      animation: watermarkDrift 14s ease-in-out infinite;
+      z-index: 1;
+    }
+
+    .classic-grid-mesh {
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 80%);
     }
   </style>
 
@@ -7198,107 +7288,136 @@ ${messageText}
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
 
   <!-- 1. LOGIN SCREEN -->
-  <div id="login-screen" class="relative min-h-screen flex items-center justify-center bg-slate-950 p-4 overflow-hidden select-none">
+  <div id="login-screen" class="relative min-h-screen flex items-center justify-center bg-[#070b16] p-4 sm:p-6 overflow-hidden select-none">
     
-    <!-- Background Grid Pattern Overlay -->
-    <div class="absolute inset-0 grid-pattern-overlay pointer-events-none opacity-40 z-0"></div>
+    <!-- Dynamic Interactive Particle Constellation Canvas -->
+    <canvas id="login-particle-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-0"></canvas>
 
-    <!-- Animated Glowing Background Blobs -->
-    <div class="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl pointer-events-none blob-1 z-0"></div>
-    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-rose-600/30 rounded-full blur-3xl pointer-events-none blob-2 z-0"></div>
-    <div class="absolute top-1/3 -right-24 w-80 h-80 bg-cyan-500/25 rounded-full blur-3xl pointer-events-none blob-3 z-0"></div>
-    <div class="absolute -bottom-20 left-1/4 w-80 h-80 bg-violet-600/25 rounded-full blur-3xl pointer-events-none blob-1 z-0"></div>
+    <!-- Luxury Geometric Background Grid Overlay -->
+    <div class="absolute inset-0 classic-grid-mesh pointer-events-none opacity-40 z-0"></div>
 
-    <!-- Background Watermarks (জলছাপ) -->
-    <div class="watermark-text watermark-top">ENTERPRISE HR</div>
-    <div class="watermark-text watermark-primary">HR SYSTEM</div>
-    <div class="watermark-text watermark-secondary">SMART BIOMETRIC • SUITE</div>
+    <!-- Ambient Glowing Nebula Orbs -->
+    <div class="absolute -top-40 -left-40 w-[550px] h-[550px] bg-indigo-600/20 rounded-full blur-[130px] pointer-events-none auraPulse z-0"></div>
+    <div class="absolute -bottom-40 -right-40 w-[550px] h-[550px] bg-cyan-600/15 rounded-full blur-[130px] pointer-events-none auraPulse z-0" style="animation-delay: -3s;"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-indigo-900/15 rounded-full blur-[150px] pointer-events-none z-0"></div>
 
-    <!-- Main Glassmorphism Login Card -->
-    <div class="w-full max-w-md login-card-animated p-8 sm:p-9 rounded-3xl space-y-6">
+    <!-- Classic Watermark -->
+    <div class="classic-watermark">HRMS ENTERPRISE</div>
+
+    <!-- Surrounding Floating Executive Badges -->
+    <div class="hidden md:flex items-center space-x-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/75 border border-slate-700/60 backdrop-blur-md shadow-2xl text-xs font-semibold text-slate-300 absolute top-12 left-12 floating-chip-1 z-10 pointer-events-none">
+      <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+      <span>Bank-Grade 256-Bit SSL</span>
+    </div>
+    <div class="hidden md:flex items-center space-x-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/75 border border-slate-700/60 backdrop-blur-md shadow-2xl text-xs font-semibold text-slate-300 absolute bottom-12 right-12 floating-chip-2 z-10 pointer-events-none">
+      <i class="fa-solid fa-fingerprint text-emerald-400"></i>
+      <span>Multi-Branch Biometrics</span>
+    </div>
+    <div class="hidden lg:flex items-center space-x-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/75 border border-slate-700/60 backdrop-blur-md shadow-2xl text-xs font-semibold text-slate-300 absolute bottom-16 left-16 floating-chip-3 z-10 pointer-events-none">
+      <i class="fa-solid fa-cloud-arrow-up text-cyan-400"></i>
+      <span>Real-Time Cloud Sync</span>
+    </div>
+
+    <!-- Main Classic Glassmorphic Card Container -->
+    <div id="classic-login-card" class="w-full max-w-md classic-glass-card p-8 sm:p-9 space-y-6 z-10 relative">
       
-      <!-- Top Branding with Animated Colorful Title -->
-      <div class="text-center space-y-2.5">
-        <div class="relative inline-block">
-          <div class="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-xl login-icon-glow transition-transform hover:scale-105 overflow-hidden">
-            <svg class="w-16 h-16" viewBox="0 0 100 100">
+      <!-- Top Branding with Orbital Insignia & Metallic Title -->
+      <div class="text-center space-y-3">
+        <div class="relative w-18 h-18 mx-auto flex items-center justify-center">
+          <div class="orbital-ring-outer"></div>
+          <div class="orbital-ring-inner"></div>
+          <div class="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden relative z-10 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5">
+            <svg class="w-full h-full" viewBox="0 0 100 100">
               <defs>
-                <linearGradient id="loginGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="classicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stop-color="#4f46e5"/>
                   <stop offset="50%" stop-color="#7c3aed"/>
                   <stop offset="100%" stop-color="#06b6d4"/>
                 </linearGradient>
               </defs>
-              <rect width="100" height="100" rx="24" fill="url(#loginGrad)"/>
-              <rect x="4" y="4" width="92" height="92" rx="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+              <rect width="100" height="100" rx="22" fill="url(#classicGrad)"/>
+              <rect x="4" y="4" width="92" height="92" rx="18" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
               <circle cx="50" cy="30" r="8" fill="#ffffff"/>
               <circle cx="30" cy="62" r="7" fill="#ffffff"/>
               <circle cx="70" cy="62" r="7" fill="#ffffff"/>
-              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
               <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
               <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
             </svg>
           </div>
-          <span class="absolute -top-1.5 -right-2 flex h-4 w-4">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-4 w-4 bg-pink-500 border-2 border-white"></span>
+          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5 z-20">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
           </span>
         </div>
 
         <div>
-          <h1 class="text-2xl sm:text-3xl font-black tracking-tight animated-colorful-title">
+          <h1 class="text-2xl sm:text-3xl font-black tracking-tight classic-metallic-title">
             HR SYSTEM
           </h1>
-          <p class="text-[11px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">HRMS Enterprise Management Suite</p>
+          <p class="text-[11px] font-bold tracking-widest text-slate-400 uppercase mt-0.5">
+            HRMS Enterprise Management Suite
+          </p>
         </div>
 
-        <div class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-bold text-indigo-700 animated-colorful-badge shadow-2xs">
-          <i class="fa-solid fa-sparkles text-amber-500"></i>
-          <span>Multi-Branch Biometric & Cloud HR</span>
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[11px] font-semibold text-indigo-300 bg-indigo-950/70 border border-indigo-500/30 backdrop-blur-sm shadow-inner">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Enterprise Cloud Portal • Biometric Active</span>
         </div>
       </div>
 
       <!-- Login Form -->
       <form onsubmit="event.preventDefault(); loginUser();" class="space-y-4">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+        <div class="classic-input-group">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
             <span>User Email (ইউজার ইমেইল)</span>
-            <span class="text-[10px] text-indigo-500 font-semibold lowercase">authorized only</span>
+            <span class="text-[10px] text-indigo-400 font-semibold lowercase">authorized only</span>
           </label>
           <div class="relative">
-            <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
-            <input type="email" id="login-email" required placeholder="admin@hrms.com" class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white outline-none transition">
+            <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+            <input type="email" id="login-email" required placeholder="admin@hrms.com" class="classic-input pl-9 pr-4 py-2.5">
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+        <div class="classic-input-group">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
             <span>Password (পাসওয়ার্ড)</span>
             <span class="text-[10px] text-slate-400 font-medium">min 6 chars</span>
           </label>
           <div class="relative">
-            <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
-            <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white outline-none transition">
-            <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none p-1">
+            <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+            <input type="password" id="login-password" required placeholder="••••••••" class="classic-input pl-9 pr-10 py-2.5">
+            <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-400 focus:outline-none p-1 transition cursor-pointer">
               <i id="login-eye-icon" class="fa-solid fa-eye text-xs"></i>
             </button>
           </div>
         </div>
 
-        <button type="submit" id="login-btn" class="w-full login-btn-animated text-white py-3 rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-[0.99] transition duration-200 flex items-center justify-center space-x-2 cursor-pointer">
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+          <label class="flex items-center space-x-2 cursor-pointer select-none">
+            <input type="checkbox" id="login-remember" checked class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
+            <span class="text-slate-300 font-medium">Remember Session</span>
+          </label>
+          <span class="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold flex items-center space-x-1" onclick="showToast('info', 'পাসওয়ার্ড ভুলে গেলে আপনার কোম্পানি অ্যাডমিনের সাথে যোগাযোগ করুন।')">
+            <i class="fa-solid fa-circle-question text-[10px]"></i>
+            <span>Help / Support</span>
+          </span>
+        </div>
+
+        <button type="submit" id="login-btn" class="w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none">
           <span>Sign In to Dashboard</span>
           <i class="fa-solid fa-arrow-right text-xs"></i>
         </button>
       </form>
 
-      <!-- Feature Tags & Footer -->
-      <div class="pt-4 border-t border-slate-100 space-y-2.5 text-center">
-        <div class="flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-bold text-slate-500">
-          <span class="bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-building text-indigo-500"></i><span>Multi-Branch</span></span>
-          <span class="bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-fingerprint text-emerald-500"></i><span>Biometric Sync</span></span>
-          <span class="bg-slate-100/90 border border-slate-200 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-shield-halved text-rose-500"></i><span>Enterprise Grade</span></span>
+      <!-- Feature Tags & Security Footer -->
+      <div class="pt-4 border-t border-slate-800/80 space-y-2.5 text-center">
+        <div class="flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-bold text-slate-400">
+          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-building text-indigo-400"></i><span>Multi-Branch</span></span>
+          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-fingerprint text-emerald-400"></i><span>Biometric Sync</span></span>
+          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-shield-halved text-rose-400"></i><span>Enterprise Grade</span></span>
         </div>
-        <div class="text-[11px] text-slate-400 font-medium">
+        <div class="text-[11px] text-slate-500 font-medium">
           HRMS Enterprise Pro • Real-Time Employee Cloud
         </div>
       </div>
@@ -9949,6 +10068,184 @@ ${messageText}
 
     </div>
   </div>
+
+  <!-- ==========================================
+       CLASSIC LOGIN PAGE INTERACTION ENGINE
+       ========================================== -->
+  <script>
+    (function initClassicLoginEngine() {
+      const loginScreen = document.getElementById('login-screen');
+      const canvas = document.getElementById('login-particle-canvas');
+      const loginCard = document.getElementById('classic-login-card');
+      if (!loginScreen || !canvas || !loginCard) return;
+
+      const ctx = canvas.getContext('2d');
+      let width = (canvas.width = window.innerWidth);
+      let height = (canvas.height = window.innerHeight);
+
+      // Responsive Particle Count
+      const particleCount = Math.min(Math.floor((width * height) / 22000), 65);
+      const particles = [];
+      const mouse = { x: null, y: null, radius: 150 };
+
+      // Initialize Particles
+      class Particle {
+        constructor() {
+          this.x = Math.random() * width;
+          this.y = Math.random() * height;
+          this.vx = (Math.random() - 0.5) * 0.45;
+          this.vy = (Math.random() - 0.5) * 0.45;
+          this.radius = Math.random() * 1.8 + 0.8;
+          this.alpha = Math.random() * 0.5 + 0.25;
+          this.baseAlpha = this.alpha;
+          this.color = Math.random() > 0.4 ? '129, 140, 248' : '56, 189, 248'; // Indigo or Cyan
+        }
+
+        update() {
+          this.x += this.vx;
+          this.y += this.vy;
+
+          if (this.x < 0 || this.x > width) this.vx *= -1;
+          if (this.y < 0 || this.y > height) this.vy *= -1;
+
+          // Mouse Interactivity: soft repulsion/attraction
+          if (mouse.x !== null && mouse.y !== null) {
+            const dx = mouse.x - this.x;
+            const dy = mouse.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < mouse.radius) {
+              const force = (mouse.radius - dist) / mouse.radius;
+              this.x -= (dx / dist) * force * 1.2;
+              this.y -= (dy / dist) * force * 1.2;
+              this.alpha = Math.min(this.baseAlpha + 0.4, 0.9);
+            } else {
+              this.alpha = this.baseAlpha;
+            }
+          }
+        }
+
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${this.color}, ${this.alpha})`;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = `rgba(${this.color}, 0.5)`;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+
+      // Resize Handler
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      // Track Mouse Movement for Canvas & 3D Card
+      let currentX = 0, currentY = 0;
+      let targetX = 0, targetY = 0;
+
+      loginScreen.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+
+        // Calculate card relative position
+        const rect = loginCard.getBoundingClientRect();
+        const cardCenterX = rect.left + rect.width / 2;
+        const cardCenterY = rect.top + rect.height / 2;
+        
+        targetX = (e.clientX - cardCenterX) / 25; // max tilt degrees
+        targetY = -(e.clientY - cardCenterY) / 25;
+
+        // Update spotlight position
+        const spotX = e.clientX - rect.left;
+        const spotY = e.clientY - rect.top;
+        loginCard.style.setProperty('--spotlight-x', `${spotX}px`);
+        loginCard.style.setProperty('--spotlight-y', `${spotY}px`);
+      });
+
+      loginScreen.addEventListener('mouseleave', () => {
+        mouse.x = null;
+        mouse.y = null;
+        targetX = 0;
+        targetY = 0;
+      });
+
+      // Smooth Animation Loop
+      function animate() {
+        if (!loginScreen.classList.contains('hidden')) {
+          ctx.clearRect(0, 0, width, height);
+
+          // Connect Particles with Glowing Lines
+          for (let i = 0; i < particles.length; i++) {
+            particles[i].update();
+            particles[i].draw();
+
+            for (let j = i + 1; j < particles.length; j++) {
+              const dx = particles[i].x - particles[j].x;
+              const dy = particles[i].y - particles[j].y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < 115) {
+                const lineAlpha = (1 - dist / 115) * 0.18;
+                ctx.beginPath();
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.strokeStyle = `rgba(129, 140, 248, ${lineAlpha})`;
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+              }
+            }
+
+            // Connect to mouse if close
+            if (mouse.x !== null && mouse.y !== null) {
+              const mdx = particles[i].x - mouse.x;
+              const mdy = particles[i].y - mouse.y;
+              const mDist = Math.sqrt(mdx * mdx + mdy * mdy);
+              if (mDist < 120) {
+                const mLineAlpha = (1 - mDist / 120) * 0.28;
+                ctx.beginPath();
+                ctx.moveTo(particles[i].x, particles[i].y);
+                ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = `rgba(56, 189, 248, ${mLineAlpha})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+              }
+            }
+          }
+
+          // Smooth Lerp for 3D Tilt
+          currentX += (targetX - currentX) * 0.1;
+          currentY += (targetY - currentY) * 0.1;
+          loginCard.style.transform = `perspective(1200px) rotateX(${currentY}deg) rotateY(${currentX}deg)`;
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      animate();
+
+      // Button Ripple Wave Effect
+      const loginBtn = document.getElementById('login-btn');
+      if (loginBtn) {
+        loginBtn.addEventListener('click', function(e) {
+          const rect = this.getBoundingClientRect();
+          const ripple = document.createElement('span');
+          ripple.classList.add('ripple-wave');
+          const size = Math.max(rect.width, rect.height);
+          ripple.style.width = ripple.style.height = `${size}px`;
+          ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+          ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+          this.appendChild(ripple);
+          setTimeout(() => ripple.remove(), 650);
+        });
+      }
+    })();
+  </script>
 
 </body>
 </html>

@@ -6866,6 +6866,672 @@ ${messageText}
       setTimeout(() => { printWindow.print(); }, 500);
     };
 
+    // Helper to get currently filtered payroll records based on branch, month, search, and user role
+    window.getFilteredPayrollList = function() {
+      const filterBranch = document.getElementById('payroll-filter-branch') ? document.getElementById('payroll-filter-branch').value : 'ALL';
+      const filterMonth = document.getElementById('payroll-filter-month') ? document.getElementById('payroll-filter-month').value : '';
+      const searchTxt = document.getElementById('payroll-search-input') ? document.getElementById('payroll-search-input').value.toLowerCase().trim() : '';
+
+      const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
+        ? payrollList.filter(p => p.employeeId === myEmployeeProfile.id)
+        : payrollList;
+
+      return listToRender.filter((p) => {
+        if (!isItemInActiveBranch(p.branch)) return false;
+        if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) return false;
+        if (filterMonth && p.month !== filterMonth) return false;
+        if (searchTxt) {
+          const emp = employeeList.find(e => e.id === p.employeeId);
+          const empCode = ((emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || '')).toLowerCase();
+          const name = (p.employeeName || '').toLowerCase();
+          const branch = (p.branch || '').toLowerCase();
+          const month = (p.month || '').toLowerCase();
+          const pEmpId = (p.employeeId || '').toLowerCase();
+          const pStatus = (p.status || '').toLowerCase();
+          if (!name.includes(searchTxt) && !empCode.includes(searchTxt) && !pEmpId.includes(searchTxt) && !branch.includes(searchTxt) && !month.includes(searchTxt) && !pStatus.includes(searchTxt)) return false;
+        }
+        return true;
+      });
+    };
+
+    // Export Payroll records to Excel / CSV format with full details
+    window.exportPayrollCSV = function() {
+      const filtered = getFilteredPayrollList();
+      if (!filtered || filtered.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'কোনো পে-রোল ডাটা নেই',
+          text: 'ডাউনলোড করার মতো কোনো পে-রোল রেকর্ড পাওয়া যায়নি।'
+        });
+        return;
+      }
+
+      const headers = [
+        'SL',
+        'Employee ID',
+        'Employee Name',
+        'Designation',
+        'Branch',
+        'Salary Month',
+        'Present (Days)',
+        'Day Off (Days)',
+        'Leave (Days)',
+        'Absent (Days)',
+        'Base Salary (BDT)',
+        'Earned Basic (BDT)',
+        'Bonus (BDT)',
+        'Advance Deducted (BDT)',
+        'Fine Deducted (BDT)',
+        'Net Payable Salary (BDT)',
+        'Status',
+        'Created Date'
+      ];
+
+      const csvRows = [headers.join(',')];
+
+      filtered.forEach((p, idx) => {
+        const emp = employeeList.find(e => e.id === p.employeeId);
+        const customCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || 'N/A');
+        const desig = emp ? emp.designation : 'Staff';
+        const branch = p.branch || 'Head Office';
+        const baseSal = Number(p.baseSalary || p.basicSalary) || 0;
+        const basicSal = Number(p.basicSalary) || 0;
+        const bonus = Number(p.bonus) || 0;
+        const advance = Number(p.advance) || 0;
+        const fine = Number(p.fine) || 0;
+        const netSal = Number(p.netSalary) || 0;
+        const status = p.status || 'Paid';
+        const created = p.createdDate ? new Date(p.createdDate).toLocaleDateString() : '';
+
+        const row = [
+          idx + 1,
+          `"${customCode.replace(/"/g, '""')}"`,
+          `"${(p.employeeName || '').replace(/"/g, '""')}"`,
+          `"${desig.replace(/"/g, '""')}"`,
+          `"${branch.replace(/"/g, '""')}"`,
+          `"${p.month || ''}"`,
+          p.presentDays || 0,
+          p.dayOffDays || 0,
+          p.leaveDays || 0,
+          p.absentDays || 0,
+          baseSal,
+          basicSal,
+          bonus,
+          advance,
+          fine,
+          netSal,
+          `"${status}"`,
+          `"${created}"`
+        ];
+        csvRows.push(row.join(','));
+      });
+
+      const csvString = '\uFEFF' + csvRows.join('\r\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const branchVal = document.getElementById('payroll-filter-branch')?.value || 'ALL';
+      const monthVal = document.getElementById('payroll-filter-month')?.value || 'ALL';
+      link.setAttribute('href', url);
+      link.setAttribute('download', `HRMS_Payroll_${branchVal}_${monthVal}_${new Date().toISOString().substring(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('success', `${filtered.length} জন কর্মচারীর পে-রোল CSV সফলভাবে এক্সপোর্ট হয়েছে!`);
+    };
+
+    // Bulk All Payslips (Multi-page PDF / Print)
+    window.exportBulkPayslipsPDF = function() {
+      const filtered = getFilteredPayrollList();
+      if (!filtered || filtered.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'কোনো পে-রোল পাওয়া যায়নি',
+          text: 'প্রিন্ট বা PDF করার জন্য কোনো কর্মচারীর পে-রোল ডাটা নেই।'
+        });
+        return;
+      }
+
+      const branchVal = document.getElementById('payroll-filter-branch')?.value || 'ALL';
+      const monthVal = document.getElementById('payroll-filter-month')?.value || 'Selected Month';
+
+      const printWindow = window.open('', '_blank');
+      let payslipsHtml = '';
+
+      filtered.forEach((p, index) => {
+        const emp = employeeList.find(e => e.id === p.employeeId);
+        const customCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || 'N/A');
+        const desig = emp ? emp.designation : 'Staff';
+        const isLast = index === filtered.length - 1;
+
+        payslipsHtml += `
+          <div class="payslip-card ${!isLast ? 'page-break' : ''}">
+            <div class="header">
+              <div class="header-badge">OFFICIAL SALARY SLIP • SL #${index + 1}</div>
+              <h1>HRMS PRO ENTERPRISE</h1>
+              <p>Branch: 🏢 <strong>${p.branch || 'Head Office'}</strong> | Salary Month: 📅 <strong>${p.month}</strong></p>
+            </div>
+            
+            <div class="info-grid">
+              <div class="info-col">
+                <div><span class="label">Employee Name:</span> <strong>${p.employeeName}</strong></div>
+                <div><span class="label">Employee ID:</span> <strong>${customCode}</strong></div>
+                <div><span class="label">Designation:</span> <strong>${desig}</strong></div>
+                <div><span class="label">Branch / Outlet:</span> <strong>${p.branch || 'Head Office'}</strong></div>
+              </div>
+              <div class="info-col right-align">
+                <div><span class="label">Payment Status:</span> <strong style="color: #059669;">${p.status || 'Paid'}</strong></div>
+                <div><span class="label">Issue Date:</span> <strong>${p.createdDate ? new Date(p.createdDate).toLocaleDateString() : new Date().toLocaleDateString()}</strong></div>
+                <div><span class="label">Salary Month:</span> <strong>${p.month}</strong></div>
+                <div><span class="label">Currency:</span> <strong>BDT (৳)</strong></div>
+              </div>
+            </div>
+
+            <div class="att-summary-box">
+              <span class="badge badge-green">🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
+              <span class="badge badge-blue">🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
+              <span class="badge badge-purple">🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
+              <span class="badge badge-red">🔴 Absent: <strong>${p.absentDays || 0} Days</strong></span>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 50%;">Earnings & Additions</th>
+                  <th style="width: 15%; text-align: right;">Amount</th>
+                  <th style="width: 20%;">Deductions</th>
+                  <th style="width: 15%; text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Earned Basic Salary</strong>
+                    ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full Base: ৳${Number(p.baseSalary).toLocaleString()})</small>` : ''}
+                  </td>
+                  <td style="text-align: right; font-weight: bold;">৳ ${(Number(p.basicSalary) || 0).toLocaleString()}</td>
+                  <td>Advance Salary Deducted</td>
+                  <td style="text-align: right; color: #b45309;">৳ ${(Number(p.advance) || 0).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td>Performance Bonus / Allowance</td>
+                  <td style="text-align: right; color: #047857; font-weight: bold;">+ ৳ ${(Number(p.bonus) || 0).toLocaleString()}</td>
+                  <td>Fines & Penalties</td>
+                  <td style="text-align: right; color: #b91c1c;">৳ ${(Number(p.fine) || 0).toLocaleString()}</td>
+                </tr>
+                <tr class="net-row">
+                  <td colspan="2" style="font-size: 15px;"><strong>NET PAYABLE SALARY (পরিশোধযোগ্য সর্বমোট বেতন)</strong></td>
+                  <td colspan="2" style="text-align: right; font-size: 17px; font-weight: 900; color: #3730a3;">৳ ${(Number(p.netSalary) || 0).toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="footer">
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Prepared By (HR Dept)</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Authorized Accounts Signature</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Employee Signature & Date</div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Bulk Payslips (${filtered.length} Staff) - ${branchVal} - ${monthVal}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm 15mm;
+            }
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 0;
+              background: #f1f5f9;
+            }
+            .no-print-bar {
+              background: #1e1b4b;
+              color: #ffffff;
+              padding: 12px 24px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              position: sticky;
+              top: 0;
+              z-index: 1000;
+            }
+            .no-print-bar button {
+              background: #4f46e5;
+              color: white;
+              border: none;
+              padding: 8px 20px;
+              border-radius: 8px;
+              font-weight: bold;
+              font-size: 14px;
+              cursor: pointer;
+              transition: 0.2s;
+            }
+            .no-print-bar button:hover {
+              background: #4338ca;
+            }
+            .payslip-container {
+              max-width: 800px;
+              margin: 20px auto;
+            }
+            .payslip-card {
+              background: #ffffff;
+              border: 1px solid #cbd5e1;
+              border-radius: 12px;
+              padding: 30px 35px;
+              margin-bottom: 25px;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #4f46e5;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+            .header-badge {
+              display: inline-block;
+              font-size: 10px;
+              letter-spacing: 1px;
+              font-weight: 800;
+              background: #e0e7ff;
+              color: #4338ca;
+              padding: 3px 10px;
+              border-radius: 12px;
+              margin-bottom: 6px;
+            }
+            .header h1 {
+              margin: 4px 0;
+              color: #312e81;
+              font-size: 22px;
+              letter-spacing: 0.5px;
+            }
+            .header p {
+              margin: 4px 0 0;
+              font-size: 13px;
+              color: #64748b;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              font-size: 13px;
+              line-height: 1.8;
+              margin-bottom: 16px;
+            }
+            .info-col .label {
+              color: #64748b;
+              font-size: 12px;
+            }
+            .right-align {
+              text-align: right;
+            }
+            .att-summary-box {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 10px 14px;
+              margin-bottom: 18px;
+              display: flex;
+              justify-content: space-between;
+              flex-wrap: wrap;
+              gap: 8px;
+            }
+            .badge {
+              font-size: 12px;
+              padding: 4px 8px;
+              border-radius: 6px;
+            }
+            .badge-green { background: #dcfce7; color: #15803d; }
+            .badge-blue { background: #e0f2fe; color: #0369a1; }
+            .badge-purple { background: #f3e8ff; color: #7e22ce; }
+            .badge-red { background: #ffe4e6; color: #be123c; }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+              font-size: 13px;
+            }
+            th, td {
+              border: 1px solid #cbd5e1;
+              padding: 10px 12px;
+              text-align: left;
+            }
+            th {
+              background: #f1f5f9;
+              font-weight: 700;
+              color: #334155;
+            }
+            .net-row {
+              background: #eef2ff !important;
+              color: #312e81;
+            }
+            .footer {
+              margin-top: 40px;
+              display: flex;
+              justify-content: space-between;
+              gap: 20px;
+              padding-top: 10px;
+            }
+            .sig-box {
+              text-align: center;
+              font-size: 11px;
+              color: #475569;
+              flex: 1;
+            }
+            .sig-line {
+              border-top: 1px dashed #94a3b8;
+              margin-bottom: 8px;
+              height: 1px;
+            }
+            @media print {
+              body {
+                background: #ffffff;
+              }
+              .no-print-bar {
+                display: none !important;
+              }
+              .payslip-container {
+                max-width: 100%;
+                margin: 0;
+              }
+              .payslip-card {
+                border: 1px solid #cbd5e1;
+                border-radius: 0;
+                box-shadow: none;
+                margin-bottom: 0;
+                padding: 20px 24px;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-bar">
+            <div>
+              <strong>HRMS Enterprise - Bulk Payslips</strong> (${filtered.length} Employees Selected)
+            </div>
+            <button onclick="window.print()">
+              🖨️ Print / Save as PDF
+            </button>
+          </div>
+          <div class="payslip-container">
+            ${payslipsHtml}
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 600);
+    };
+
+    // Master Salary Sheet (Landscape A4 Table View)
+    window.exportSalarySheetPDF = function() {
+      const filtered = getFilteredPayrollList();
+      if (!filtered || filtered.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'কোনো পে-রোল পাওয়া যায়নি',
+          text: 'স্যালারি শীট প্রিন্ট করার জন্য কোনো ডাটা নেই।'
+        });
+        return;
+      }
+
+      const branchVal = document.getElementById('payroll-filter-branch')?.value || 'ALL';
+      const monthVal = document.getElementById('payroll-filter-month')?.value || 'Selected Month';
+
+      let totalBase = 0;
+      let totalEarned = 0;
+      let totalBonus = 0;
+      let totalAdvance = 0;
+      let totalFine = 0;
+      let totalNet = 0;
+
+      let tableRows = '';
+      filtered.forEach((p, idx) => {
+        const emp = employeeList.find(e => e.id === p.employeeId);
+        const customCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (p.customEmpCode || 'N/A');
+        const desig = emp ? emp.designation : 'Staff';
+        const base = Number(p.baseSalary || p.basicSalary) || 0;
+        const earned = Number(p.basicSalary) || 0;
+        const bonus = Number(p.bonus) || 0;
+        const adv = Number(p.advance) || 0;
+        const fine = Number(p.fine) || 0;
+        const net = Number(p.netSalary) || 0;
+
+        totalBase += base;
+        totalEarned += earned;
+        totalBonus += bonus;
+        totalAdvance += adv;
+        totalFine += fine;
+        totalNet += net;
+
+        tableRows += `
+          <tr>
+            <td style="text-align: center;">${idx + 1}</td>
+            <td style="font-weight: bold; font-family: monospace;">${customCode}</td>
+            <td><strong>${p.employeeName}</strong></td>
+            <td>${desig}</td>
+            <td>${p.branch || 'Head Office'}</td>
+            <td style="text-align: center; font-size: 11px;">${p.presentDays || 0}P / ${p.dayOffDays || 0}O / ${p.leaveDays || 0}L / <span style="color:#e11d48;font-weight:bold;">${p.absentDays || 0}A</span></td>
+            <td style="text-align: right;">৳ ${base.toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 600;">৳ ${earned.toLocaleString()}</td>
+            <td style="text-align: right; color: #047857;">+৳ ${bonus.toLocaleString()}</td>
+            <td style="text-align: right; color: #b45309;">-৳ ${adv.toLocaleString()}</td>
+            <td style="text-align: right; color: #b91c1c;">-৳ ${fine.toLocaleString()}</td>
+            <td style="text-align: right; font-weight: 800; font-size: 13px; color: #1e1b4b; background: #eef2ff;">৳ ${net.toLocaleString()}</td>
+            <td style="text-align: center; font-size: 11px; font-weight: bold; color: #15803d;">${p.status || 'Paid'}</td>
+            <td style="width: 100px; border-bottom: 1px dashed #cbd5e1;"></td>
+          </tr>
+        `;
+      });
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Master Salary Sheet - ${branchVal} - ${monthVal}</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 10mm 12mm;
+            }
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 0;
+              background: #f8fafc;
+            }
+            .no-print-bar {
+              background: #0f172a;
+              color: #ffffff;
+              padding: 12px 24px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              position: sticky;
+              top: 0;
+              z-index: 1000;
+            }
+            .no-print-bar button {
+              background: #0284c7;
+              color: white;
+              border: none;
+              padding: 8px 20px;
+              border-radius: 8px;
+              font-weight: bold;
+              cursor: pointer;
+            }
+            .sheet-container {
+              padding: 20px 30px;
+              background: #ffffff;
+              min-height: 100vh;
+            }
+            .header-table {
+              width: 100%;
+              margin-bottom: 15px;
+              border-bottom: 2px solid #0284c7;
+              padding-bottom: 10px;
+            }
+            .header-title {
+              font-size: 20px;
+              font-weight: 800;
+              color: #0369a1;
+              margin: 0;
+            }
+            .header-sub {
+              font-size: 12px;
+              color: #64748b;
+              margin: 4px 0 0;
+            }
+            table.data-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11.5px;
+            }
+            table.data-table th, table.data-table td {
+              border: 1px solid #cbd5e1;
+              padding: 6px 8px;
+            }
+            table.data-table th {
+              background: #f1f5f9;
+              font-weight: 700;
+              color: #1e293b;
+            }
+            .grand-total-row {
+              background: #e2e8f0;
+              font-weight: 800;
+            }
+            .footer-signatures {
+              margin-top: 45px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              color: #475569;
+            }
+            .sig-box {
+              text-align: center;
+              width: 180px;
+            }
+            .sig-line {
+              border-top: 1px dashed #64748b;
+              margin-bottom: 6px;
+            }
+            @media print {
+              body { background: #ffffff; }
+              .no-print-bar { display: none !important; }
+              .sheet-container { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-bar">
+            <div>
+              <strong>HRMS Enterprise - Monthly Salary Disbursement Sheet</strong> (${filtered.length} Staff)
+            </div>
+            <button onclick="window.print()">🖨️ Print / Save PDF</button>
+          </div>
+          <div class="sheet-container">
+            <table class="header-table">
+              <tr>
+                <td>
+                  <h1 class="header-title">HRMS PRO ENTERPRISE</h1>
+                  <p class="header-sub">Monthly Master Salary Sheet & Disbursement Statement</p>
+                </td>
+                <td style="text-align: right; font-size: 12px; line-height: 1.5;">
+                  <strong>Branch:</strong> 🏢 ${branchVal === 'ALL' ? 'All Branches (Global)' : branchVal}<br>
+                  <strong>Salary Month:</strong> 📅 ${monthVal}<br>
+                  <strong>Total Employees:</strong> 👥 ${filtered.length} জন | <strong>Grand Total Payout:</strong> ৳ ${totalNet.toLocaleString()}
+                </td>
+              </tr>
+            </table>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 30px;">#</th>
+                  <th>ID</th>
+                  <th>Employee Name</th>
+                  <th>Designation</th>
+                  <th>Branch</th>
+                  <th>Attendance (P/O/L/A)</th>
+                  <th>Base Salary</th>
+                  <th>Earned Basic</th>
+                  <th>Bonus</th>
+                  <th>Advance</th>
+                  <th>Fine</th>
+                  <th>Net Payable</th>
+                  <th>Status</th>
+                  <th>Receiver Signature</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+                <tr class="grand-total-row">
+                  <td colspan="6" style="text-align: right; font-size: 12px;">GRAND TOTAL (সর্বমোট) :</td>
+                  <td style="text-align: right;">৳ ${totalBase.toLocaleString()}</td>
+                  <td style="text-align: right;">৳ ${totalEarned.toLocaleString()}</td>
+                  <td style="text-align: right; color:#047857;">+৳ ${totalBonus.toLocaleString()}</td>
+                  <td style="text-align: right; color:#b45309;">-৳ ${totalAdvance.toLocaleString()}</td>
+                  <td style="text-align: right; color:#b91c1c;">-৳ ${totalFine.toLocaleString()}</td>
+                  <td style="text-align: right; font-size: 14px; font-weight: 900; color: #1e1b4b; background: #c7d2fe;">৳ ${totalNet.toLocaleString()}</td>
+                  <td colspan="2" style="text-align: center;">${filtered.length} Employees</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="footer-signatures">
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Prepared By (HR Executive)</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Checked By (Accounts Manager)</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Approved By (Branch Incharge)</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>Managing Director / CEO</div>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 600);
+    };
+
     // Employee Increment Logic
     function checkIncrementDues() {
       const tbody = document.getElementById('increment-table-body');
@@ -9098,6 +9764,24 @@ ${messageText}
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
                 <input type="text" id="payroll-search-input" oninput="renderPayrollTable()" placeholder="আইডি (e.g. 16) বা নাম খুঁজুন..." class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:ring-1 focus:ring-teal-500 transition font-medium">
               </div>
+
+              <!-- Export CSV / Excel Button -->
+              <button id="pay-export-csv-btn" onclick="exportPayrollCSV()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="বর্তমান তালিকার পে-রোল ডাটা CSV/Excel ফাইল হিসেবে ডাউনলোড করুন">
+                <i class="fa-solid fa-file-excel text-emerald-400"></i>
+                <span>Export CSV</span>
+              </button>
+
+              <!-- All Payslips (Bulk PDF) Button -->
+              <button id="pay-export-bulk-pdf-btn" onclick="exportBulkPayslipsPDF()" class="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="সকল কর্মচারীর পে-স্লিপ একসাথে মাল্টি-পেজ PDF আকারে প্রিন্ট বা সেভ করুন">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>All Payslips (PDF)</span>
+              </button>
+
+              <!-- Master Salary Sheet (PDF) Button -->
+              <button id="pay-export-sheet-btn" onclick="exportSalarySheetPDF()" class="bg-cyan-700 hover:bg-cyan-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="সার্বিক বেতন বণ্টন তালিকা (Salary Sheet) PDF/প্রিন্ট করুন">
+                <i class="fa-solid fa-table-list"></i>
+                <span>Salary Sheet</span>
+              </button>
 
               <!-- Batch Generate Button -->
               <button id="pay-batch-btn" onclick="batchGenerateSelectedBranchPayroll()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="নির্বাচিত ব্রাঞ্চের সকল কর্মচারীর পে-রোল একসাথে স্বয়ংক্রিয়ভাবে তৈরি করুন">

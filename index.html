@@ -3575,6 +3575,10 @@
         : (document.getElementById('bulk-default-branch') ? document.getElementById('bulk-default-branch').value : 'Head Office');
 
       parsedBulkEmployees = [];
+      let skippedDuplicatesCount = 0;
+      const seenNamesInFile = new Set();
+      const seenCodesInFile = new Set();
+
       const headerLine = lines[0].toLowerCase();
       const headers = headerLine.split(/[,;\t]/).map(h => h.trim().replace(/^["']|["']$/g, ''));
 
@@ -3602,6 +3606,29 @@
         const joiningDate = (joinIdx !== -1 && row[joinIdx]) ? row[joinIdx] : new Date().toISOString().split('T')[0];
         const salary = (salaryIdx !== -1 && row[salaryIdx]) ? (Number(row[salaryIdx].replace(/[^0-9.]/g, '')) || 25000) : 25000;
 
+        const normName = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
+        const normCode = String(customEmpCode).trim().toLowerCase();
+
+        // ১. চেক করা হচ্ছে এই নামের অথবা মেশিন আইডির কর্মচারী ডাটাবেজে আগে থেকেই আছে কি না
+        const existsInDb = employeeList.some(e => {
+          const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const eCode = String(e.customEmpCode || '').trim().toLowerCase();
+          const isNameMatch = normName && eName && normName === eName;
+          const isCodeMatch = normCode && eCode && (normCode === eCode || (!isNaN(normCode) && !isNaN(eCode) && parseInt(normCode, 10) === parseInt(eCode, 10)));
+          return isNameMatch || isCodeMatch;
+        });
+
+        // ২. একই ফাইলে নাম বা কোড একাধিকবার রিপিট হয়েছে কি না
+        const existsInCurrentBatch = (normName && seenNamesInFile.has(normName)) || (normCode && seenCodesInFile.has(normCode));
+
+        if (existsInDb || existsInCurrentBatch) {
+          skippedDuplicatesCount++;
+          continue; // পূর্ববর্তী নাম পাওয়া গেলে তা স্বয়ংক্রিয়ভাবে বাদ দেওয়া হবে
+        }
+
+        if (normName) seenNamesInFile.add(normName);
+        if (normCode) seenCodesInFile.add(normCode);
+
         parsedBulkEmployees.push({
           customEmpCode,
           name,
@@ -3617,10 +3644,10 @@
         });
       }
 
-      renderBulkPreviewTable();
+      renderBulkPreviewTable(skippedDuplicatesCount);
     }
 
-    function renderBulkPreviewTable() {
+    function renderBulkPreviewTable(skippedCount = 0) {
       const tbody = document.getElementById('bulk-preview-tbody');
       const countLabel = document.getElementById('bulk-parsed-count');
       const commitBtn = document.getElementById('bulk-commit-btn');
@@ -3630,27 +3657,35 @@
       tbody.innerHTML = '';
 
       if (parsedBulkEmployees.length === 0) {
-        if (previewBox) previewBox.classList.add('hidden');
+        if (previewBox) previewBox.classList.remove('hidden');
         if (commitBtn) commitBtn.disabled = true;
+        if (countLabel) {
+          countLabel.innerHTML = `<span class="text-rose-600 font-bold">০ জন নতুন কর্মচারী পাওয়া গেছে</span>` + 
+            (skippedCount > 0 ? ` <span class="text-slate-500 font-normal">(${skippedCount} জন কর্মচারী পূর্বে থেকেই থাকায় বাদ দেওয়া হয়েছে)</span>` : '');
+        }
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-medium">কোনো নতুন কর্মচারী পাওয়া যায়নি (পূর্ববর্তী কর্মচারীরা স্বয়ংক্রিয়ভাবে স্কিপ হয়েছে)</td></tr>';
         return;
       }
 
       if (previewBox) previewBox.classList.remove('hidden');
       if (commitBtn) commitBtn.disabled = false;
-      if (countLabel) countLabel.innerText = `মোট ${parsedBulkEmployees.length} জন কর্মচারী প্রস্তুত`;
+      if (countLabel) {
+        countLabel.innerHTML = `<span class="text-emerald-700 font-bold">মোট ${parsedBulkEmployees.length} জন নতুন কর্মচারী যুক্ত হবে</span>` +
+          (skippedCount > 0 ? ` <span class="text-slate-500 font-normal">(${skippedCount} জন পূর্ববর্তী কর্মচারী বাদ দেওয়া হয়েছে)</span>` : '');
+      }
 
       let rowsHtml = '';
       parsedBulkEmployees.forEach((emp, index) => {
         rowsHtml += `
-          <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
+          <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
             <td class="px-4 py-2.5 font-bold text-indigo-700">${emp.customEmpCode}</td>
-            <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name} <span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-bold ml-1">NEW</span></td>
             <td class="px-4 py-2.5 text-slate-600">${emp.designation}</td>
             <td class="px-4 py-2.5 text-slate-600">${emp.department}</td>
             <td class="px-4 py-2.5 font-semibold text-emerald-700">🏢 ${emp.branch}</td>
             <td class="px-4 py-2.5 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right">
-              <button onclick="removeBulkParsedItem(${index})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
+              <button onclick="removeBulkParsedItem(${index})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash-can"></i></button>
             </td>
           </tr>
         `;
@@ -3665,59 +3700,81 @@
 
     window.commitBulkEmployeeUpload = async function() {
       if (parsedBulkEmployees.length === 0) {
-        showToast('warning', 'আপলোড করার জন্য কোনো কর্মচারী পাওয়া যায়নি');
+        showToast('warning', 'যুক্ত করার জন্য কোনো নতুন কর্মচারী পাওয়া যায়নি');
         return;
       }
 
       Swal.fire({
         title: 'ডাটাবেজে যুক্ত হচ্ছে...',
-        html: `মোট <strong>${parsedBulkEmployees.length}</strong> জন কর্মচারীকে যুক্ত করা হচ্ছে। অপেক্ষা করুন...`,
+        html: `মোট <strong>${parsedBulkEmployees.length}</strong> জন নতুন কর্মচারীকে যুক্ত করা হচ্ছে। অপেক্ষা করুন...`,
         allowOutsideClick: false,
         didOpen: () => { Swal.showLoading(); }
       });
 
       let addedCount = 0;
-      let updatedCount = 0;
+      let skippedCount = 0;
 
       try {
         for (let emp of parsedBulkEmployees) {
-          const existing = employeeList.find(e => e.customEmpCode == emp.customEmpCode);
+          const normName = String(emp.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const normCode = String(emp.customEmpCode || '').trim().toLowerCase();
+
+          // চূড়ান্ত সেফটি চেক: আগের কোনো নামের বা আইডির সাথে মিলে গেলে তা বাদ দেওয়া হবে
+          const existing = employeeList.find(e => {
+            const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const eCode = String(e.customEmpCode || '').trim().toLowerCase();
+            return (normName && eName === normName) || (normCode && eCode && (normCode === eCode || (!isNaN(normCode) && !isNaN(eCode) && parseInt(normCode, 10) === parseInt(eCode, 10))));
+          });
 
           if (existing) {
-            await updateDoc(doc(db, "employees", existing.id), {
-              name: emp.name,
-              email: emp.email,
-              phone: emp.phone,
-              designation: emp.designation,
-              department: emp.department,
-              branch: emp.branch || 'Head Office',
-              joiningDate: emp.joiningDate,
-              salary: Number(emp.salary)
-            });
-            updatedCount++;
-          } else {
-            await addDoc(collection(db, "employees"), {
-              customEmpCode: emp.customEmpCode,
-              name: emp.name,
-              email: emp.email,
-              phone: emp.phone,
-              photoUrl: emp.photoUrl,
-              designation: emp.designation,
-              department: emp.department,
-              branch: emp.branch || 'Head Office',
-              joiningDate: emp.joiningDate,
-              lastIncrementDate: emp.joiningDate,
-              salary: Number(emp.salary),
-              docUrl: '#',
-              createdAt: new Date().toISOString()
-            });
-            addedCount++;
+            skippedCount++;
+            continue; // কোনো অবস্থাতেই আগের নামের ডাটা পুনরায় যুক্ত হবে না
           }
+
+          await addDoc(collection(db, "employees"), {
+            customEmpCode: emp.customEmpCode,
+            name: emp.name,
+            email: emp.email,
+            phone: emp.phone,
+            photoUrl: emp.photoUrl,
+            designation: emp.designation,
+            department: emp.department,
+            branch: emp.branch || 'Head Office',
+            joiningDate: emp.joiningDate,
+            lastIncrementDate: emp.joiningDate,
+            salary: Number(emp.salary),
+            docUrl: '#',
+            createdAt: new Date().toISOString()
+          });
+          addedCount++;
         }
+
+        await logSystemActivity(
+          'BULK_CREATE',
+          'Employee',
+          `${currentUserEmail} bulk added ${addedCount} new employees (skipped ${skippedCount} existing)`,
+          { addedCount, skippedCount }
+        );
 
         parsedBulkEmployees = [];
         toggleModal('bulk-emp-modal', false);
-        Swal.fire('সফল!', `🎉 মোট ${addedCount} জন নতুন কর্মচারী যুক্ত হয়েছে এবং ${updatedCount} জনের তথ্য আপডেট করা হয়েছে!`, 'success');
+
+        if (addedCount > 0) {
+          Swal.fire({
+            icon: 'success',
+            title: 'সফলভাবে যুক্ত হয়েছে! 🎉',
+            html: `মোট <b>${addedCount}</b> জন নতুন কর্মচারী যুক্ত হয়েছে।` +
+              (skippedCount > 0 ? `<br><small class="text-slate-500">(${skippedCount} জন পূর্ববর্তী কর্মচারী থাকায় বাদ দেওয়া হয়েছে)</small>` : ''),
+            confirmButtonColor: '#4f46e5'
+          });
+        } else {
+          Swal.fire({
+            icon: 'info',
+            title: 'কোনো নতুন কর্মচারী যুক্ত হয়নি',
+            text: 'ফাইলের সব কর্মচারীর নাম/আইডি ইতোমধ্যে সিস্টেমে থাকায় কাউকে ডুপ্লিকেট হিসেবে এন্ট্রি করা হয়নি।',
+            confirmButtonColor: '#4f46e5'
+          });
+        }
       } catch (err) {
         Swal.fire('ব্যর্থ!', err.message, 'error');
       }

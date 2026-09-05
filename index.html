@@ -1500,6 +1500,12 @@
         else empBulkBtn.classList.add('hidden');
       }
 
+      const attBulkBtn = document.getElementById('att-bulk-btn');
+      if (attBulkBtn) {
+        if (hasPermission('can_attendance')) attBulkBtn.classList.remove('hidden');
+        else attBulkBtn.classList.add('hidden');
+      }
+
       if (payAddBtn) {
         if (hasPermission('can_payroll')) payAddBtn.classList.remove('hidden');
         else payAddBtn.classList.add('hidden');
@@ -3714,6 +3720,629 @@
         Swal.fire('সফল!', `🎉 মোট ${addedCount} জন নতুন কর্মচারী যুক্ত হয়েছে এবং ${updatedCount} জনের তথ্য আপডেট করা হয়েছে!`, 'success');
       } catch (err) {
         Swal.fire('ব্যর্থ!', err.message, 'error');
+      }
+    };
+
+    // ========================================================
+    // BULK FULL-MONTH ATTENDANCE CSV UPLOAD & SYNC SYSTEM
+    // ========================================================
+    let parsedBulkMonthlyAttendance = [];
+    let detectedBulkAttendanceFormat = 'Summary';
+
+    window.openBulkMonthlyAttendanceModal = function() {
+      const monthInput = document.getElementById('bulk-att-month');
+      if (monthInput) {
+        const curDate = document.getElementById('att-date')?.value || new Date().toISOString().substring(0, 10);
+        monthInput.value = curDate.substring(0, 7) || '2026-08';
+      }
+
+      const branchSelect = document.getElementById('bulk-att-branch');
+      if (branchSelect) {
+        let bOpts = '<option value="ALL">All Branches (সকল শাখা)</option>';
+        const uniqueBranches = Array.from(new Set(employeeList.map(e => e.branch || 'Head Office'))).filter(Boolean);
+        uniqueBranches.forEach(b => {
+          bOpts += `<option value="${b}">${b}</option>`;
+        });
+        branchSelect.innerHTML = bOpts;
+      }
+
+      parsedBulkMonthlyAttendance = [];
+      const fileInput = document.getElementById('bulk-att-file-input');
+      if (fileInput) fileInput.value = '';
+
+      renderBulkMonthlyAttendancePreview();
+      toggleModal('bulk-monthly-attendance-modal', true);
+    };
+
+    window.downloadSampleMonthlyAttendanceCSV = function(type) {
+      let csvContent = '';
+      let fileName = '';
+
+      const activeEmployees = employeeList.filter(e => isItemInActiveBranch(e.branch)).slice(0, 8);
+      const targetMonth = document.getElementById('bulk-att-month')?.value || '2026-08';
+      const [yStr, mStr] = targetMonth.split('-');
+      const daysInMonth = new Date(parseInt(yStr), parseInt(mStr), 0).getDate();
+
+      if (type === 'summary') {
+        fileName = `Monthly_Attendance_Summary_Template_${targetMonth}.csv`;
+        csvContent = "Machine_ID,Employee_Name,Month,Present_Days,DayOff_Days,Leave_Days,Absent_Days\n";
+        activeEmployees.forEach(e => {
+          csvContent += `"${e.customEmpCode || '101'}","${e.name || 'Employee'}","${targetMonth}",26,4,1,0\n`;
+        });
+        if (activeEmployees.length === 0) {
+          csvContent += `"16","Sanim Ahmed","${targetMonth}",26,4,1,0\n"58","Mariom","${targetMonth}",25,4,0,2\n`;
+        }
+      } else if (type === 'matrix') {
+        fileName = `Monthly_Attendance_Matrix_Template_${targetMonth}.csv`;
+        let dayHeaders = [];
+        for (let d = 1; d <= daysInMonth; d++) dayHeaders.push(d);
+        csvContent = `Machine_ID,Employee_Name,${dayHeaders.join(',')}\n`;
+        activeEmployees.forEach(e => {
+          let dayVals = [];
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dayOfWeek = new Date(parseInt(yStr), parseInt(mStr) - 1, d).getDay();
+            // 5 is Friday
+            dayVals.push(dayOfWeek === 5 ? 'DO' : 'P');
+          }
+          csvContent += `"${e.customEmpCode || '101'}","${e.name || 'Employee'}",${dayVals.join(',')}\n`;
+        });
+        if (activeEmployees.length === 0) {
+          let dayVals = Array(daysInMonth).fill('P').map((v, i) => (i % 7 === 5 ? 'DO' : 'P'));
+          csvContent += `"16","Sanim Ahmed",${dayVals.join(',')}\n"58","Mariom",${dayVals.join(',')}\n`;
+        }
+      } else if (type === 'punch') {
+        fileName = `Biometric_Punch_Logs_Template_${targetMonth}.csv`;
+        csvContent = "Machine_ID,Date,Time,Status\n";
+        activeEmployees.forEach(e => {
+          csvContent += `"${e.customEmpCode || '101'}","${targetMonth}-01","09:15:00","Present"\n`;
+          csvContent += `"${e.customEmpCode || '101'}","${targetMonth}-02","09:22:15","Present"\n`;
+        });
+        if (activeEmployees.length === 0) {
+          csvContent += `"16","${targetMonth}-01","09:15:00","Present"\n"58","${targetMonth}-01","09:20:00","Present"\n`;
+        }
+      }
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+    };
+
+    window.handleBulkMonthlyAttendanceFileSelect = function(e) {
+      const file = e.target.files ? e.target.files[0] : null;
+      if (!file) return;
+
+      const targetMonth = document.getElementById('bulk-att-month')?.value || '2026-08';
+      const targetBranch = document.getElementById('bulk-att-branch')?.value || 'ALL';
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const text = event.target.result;
+        parseMonthlyAttendanceCSV(text, targetMonth, targetBranch);
+      };
+      reader.readAsText(file);
+    };
+
+    function parseMonthlyAttendanceCSV(csvText, targetMonth, targetBranch) {
+      const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) {
+        showToast('warning', 'CSV ফাইলে কোনো পর্যাপ্ত ডাটা পাওয়া যায়নি');
+        return;
+      }
+
+      const [yearStr, mStr] = targetMonth.split('-');
+      const y = parseInt(yearStr, 10);
+      const m = parseInt(mStr, 10);
+      const daysInMonth = new Date(y, m, 0).getDate();
+
+      const headerLine = lines[0].toLowerCase();
+      const separator = headerLine.includes('\t') ? '\t' : (headerLine.includes(';') ? ';' : ',');
+      const headers = headerLine.split(separator).map(h => h.trim().replace(/^["']|["']$/g, ''));
+
+      const numericDayIndices = [];
+      headers.forEach((h, idx) => {
+        const num = parseInt(h, 10);
+        if (!isNaN(num) && num >= 1 && num <= 31) {
+          numericDayIndices.push({ day: num, colIndex: idx });
+        } else if (h.includes('-') || h.includes('/')) {
+          const dMatch = h.match(/\b(\d{1,2})\b/);
+          if (dMatch) {
+            const dVal = parseInt(dMatch[1], 10);
+            if (dVal >= 1 && dVal <= 31) {
+              numericDayIndices.push({ day: dVal, colIndex: idx });
+            }
+          }
+        }
+      });
+
+      const isMatrix = numericDayIndices.length >= 7;
+      const isSummary = headers.some(h => h.includes('present') || h.includes('absent') || h.includes('leave') || h.includes('dayoff') || h.includes('off'));
+
+      parsedBulkMonthlyAttendance = [];
+
+      function matchEmployee(identifier, nameGuess = '') {
+        const idStr = String(identifier || '').trim().toLowerCase();
+        const nStr = String(nameGuess || '').trim().toLowerCase();
+
+        return employeeList.find(e => {
+          if (targetBranch !== 'ALL' && (e.branch || 'Head Office') !== targetBranch) return false;
+
+          const cCode = String(e.customEmpCode || '').trim().toLowerCase();
+          const eId = String(e.id || '').trim().toLowerCase();
+          const eName = String(e.name || '').trim().toLowerCase();
+
+          if (idStr && (cCode === idStr || eId === idStr)) return true;
+          if (!isNaN(idStr) && !isNaN(cCode) && parseInt(idStr, 10) === parseInt(cCode, 10)) return true;
+          if (nStr && eName === nStr) return true;
+          if (idStr && idStr.length > 2 && (eName === idStr || eName.includes(idStr))) return true;
+          return false;
+        });
+      }
+
+      if (isMatrix) {
+        detectedBulkAttendanceFormat = `Calendar Matrix (১-${daysInMonth} তারিখের ছক)`;
+        const idCol = headers.findIndex(h => h.includes('id') || h.includes('code') || h.includes('pin') || h.includes('machine') || h.includes('badge'));
+        const nameCol = headers.findIndex(h => h.includes('name') || h.includes('employee'));
+
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(separator).map(col => col.trim().replace(/^["']|["']$/g, ''));
+          if (row.length === 0 || !row[0]) continue;
+
+          const rawId = (idCol !== -1 ? row[idCol] : row[0]) || '';
+          const rawName = (nameCol !== -1 ? row[nameCol] : row[1]) || '';
+          const emp = matchEmployee(rawId, rawName);
+
+          if (!emp) continue;
+
+          let presentCount = 0;
+          let dayOffCount = 0;
+          let leaveCount = 0;
+          let absentCount = 0;
+          let lateCount = 0;
+          const dailyMap = {};
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dayEntry = numericDayIndices.find(x => x.day === d);
+            const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+            const cellVal = dayEntry && row[dayEntry.colIndex] ? row[dayEntry.colIndex].toUpperCase() : '';
+
+            let st = 'Present';
+            let punchTime = '09:00:00 AM';
+
+            if (['P', 'PRESENT', '1', 'PR', 'YES', 'Y'].includes(cellVal)) {
+              st = 'Present';
+              punchTime = '09:00:00 AM';
+              presentCount++;
+            } else if (['L', 'LATE', 'LT'].includes(cellVal)) {
+              st = 'Late';
+              punchTime = '10:35:00 AM';
+              lateCount++;
+              presentCount++;
+            } else if (['DO', 'O', 'OFF', 'DAY OFF', 'DAYOFF', 'W', 'WEEKEND', 'HOLIDAY', 'H'].includes(cellVal)) {
+              st = 'Day Off';
+              punchTime = '--:--';
+              dayOffCount++;
+            } else if (['LV', 'LEAVE', 'CL', 'PL', 'SL', 'ML', 'ON LEAVE'].includes(cellVal)) {
+              st = 'On Leave';
+              punchTime = '--:--';
+              leaveCount++;
+            } else if (['A', 'ABSENT', '0', 'AB', 'NO', 'N'].includes(cellVal)) {
+              st = 'Absent';
+              punchTime = '--:--';
+              absentCount++;
+            } else {
+              const dayOfWeek = new Date(y, m - 1, d).getDay();
+              if (dayOfWeek === 5) {
+                st = 'Day Off';
+                punchTime = '--:--';
+                dayOffCount++;
+              } else {
+                st = 'Present';
+                punchTime = '09:00:00 AM';
+                presentCount++;
+              }
+            }
+
+            dailyMap[dStr] = {
+              status: st,
+              punchTime: punchTime,
+              method: 'Monthly Matrix CSV'
+            };
+          }
+
+          parsedBulkMonthlyAttendance.push({
+            employeeId: emp.id,
+            customEmpCode: emp.customEmpCode || rawId,
+            employeeName: emp.name,
+            branch: emp.branch || 'Head Office',
+            totalDays: daysInMonth,
+            presentDays: presentCount,
+            dayOffDays: dayOffCount,
+            leaveDays: leaveCount,
+            absentDays: absentCount,
+            lateDays: lateCount,
+            dailyMap: dailyMap
+          });
+        }
+      } else if (isSummary) {
+        detectedBulkAttendanceFormat = 'Monthly In-Total Summary (মোট হাজিরা সামারি)';
+        const idCol = headers.findIndex(h => h.includes('id') || h.includes('code') || h.includes('pin') || h.includes('machine'));
+        const nameCol = headers.findIndex(h => h.includes('name') || h.includes('employee'));
+        const presCol = headers.findIndex(h => h.includes('present') || h.includes('present_days') || h.includes('pres'));
+        const dayOffCol = headers.findIndex(h => h.includes('dayoff') || h.includes('off') || h.includes('day_off') || h.includes('weekend'));
+        const leaveCol = headers.findIndex(h => h.includes('leave') || h.includes('leave_days') || h.includes('cl'));
+        const absentCol = headers.findIndex(h => h.includes('absent') || h.includes('absent_days') || h.includes('abs'));
+
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(separator).map(col => col.trim().replace(/^["']|["']$/g, ''));
+          if (row.length === 0 || !row[0]) continue;
+
+          const rawId = (idCol !== -1 ? row[idCol] : row[0]) || '';
+          const rawName = (nameCol !== -1 ? row[nameCol] : row[1]) || '';
+          const emp = matchEmployee(rawId, rawName);
+
+          if (!emp) continue;
+
+          let pres = presCol !== -1 ? (parseInt(row[presCol], 10) || 0) : 26;
+          let dayoff = dayOffCol !== -1 ? (parseInt(row[dayOffCol], 10) || 0) : 4;
+          let leave = leaveCol !== -1 ? (parseInt(row[leaveCol], 10) || 0) : 0;
+          let absent = absentCol !== -1 ? (parseInt(row[absentCol], 10) || 0) : Math.max(0, daysInMonth - (pres + dayoff + leave));
+
+          const totalAssigned = pres + dayoff + leave + absent;
+          if (totalAssigned < daysInMonth) {
+            pres += (daysInMonth - totalAssigned);
+          }
+
+          const dailyMap = {};
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+            let st = 'Absent';
+            let punchTime = '--:--';
+
+            if (d <= pres) {
+              st = 'Present';
+              punchTime = '09:00:00 AM';
+            } else if (d <= pres + dayoff) {
+              st = 'Day Off';
+              punchTime = '--:--';
+            } else if (d <= pres + dayoff + leave) {
+              st = 'On Leave';
+              punchTime = '--:--';
+            } else {
+              st = 'Absent';
+              punchTime = '--:--';
+            }
+
+            dailyMap[dStr] = {
+              status: st,
+              punchTime: punchTime,
+              method: 'Monthly Summary CSV Sync'
+            };
+          }
+
+          parsedBulkMonthlyAttendance.push({
+            employeeId: emp.id,
+            customEmpCode: emp.customEmpCode || rawId,
+            employeeName: emp.name,
+            branch: emp.branch || 'Head Office',
+            totalDays: daysInMonth,
+            presentDays: pres,
+            dayOffDays: dayoff,
+            leaveDays: leave,
+            absentDays: absent,
+            dailyMap: dailyMap
+          });
+        }
+      } else {
+        detectedBulkAttendanceFormat = 'Biometric Punch Logs / Timesheet (দৈনিক পাঞ্চ লগ)';
+        const idCol = headers.findIndex(h => h.includes('id') || h.includes('pin') || h.includes('code') || h.includes('machine'));
+        const dateCol = headers.findIndex(h => h.includes('date') || h.includes('time'));
+        const timeCol = headers.findIndex(h => h.includes('time') || h.includes('punch') || h.includes('clock'));
+        const statusCol = headers.findIndex(h => h.includes('status') || h.includes('state'));
+
+        const punchesByEmp = {};
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          const row = line.split(separator).map(col => col.trim().replace(/^["']|["']$/g, ''));
+          if (row.length === 0) continue;
+
+          let rawId = (idCol !== -1 ? row[idCol] : '') || '';
+          let dateStr = '';
+          let timeStr = '09:00:00';
+          let stCandidate = '';
+
+          const dateMatch = line.match(/\b(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})\b/) || line.match(/\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{4})\b/);
+          if (dateMatch) {
+            let dy, dm, dd;
+            if (dateMatch[1].length === 4) {
+              dy = parseInt(dateMatch[1], 10);
+              dm = parseInt(dateMatch[2], 10);
+              dd = parseInt(dateMatch[3], 10);
+            } else {
+              dd = parseInt(dateMatch[1], 10);
+              dm = parseInt(dateMatch[2], 10);
+              dy = parseInt(dateMatch[3], 10);
+            }
+            dateStr = `${dy}-${String(dm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+          } else if (dateCol !== -1 && row[dateCol]) {
+            dateStr = row[dateCol].substring(0, 10);
+          }
+
+          const timeMatch = line.match(/\b([01]?\d|2[0-3]):([0-5]\d)(:([0-5]\d))?\b/);
+          if (timeMatch) {
+            timeStr = timeMatch[0];
+            if (timeStr.length === 5) timeStr += ':00';
+            if (timeStr.length === 7) timeStr = '0' + timeStr;
+          } else if (timeCol !== -1 && row[timeCol]) {
+            timeStr = row[timeCol];
+          }
+
+          if (statusCol !== -1 && row[statusCol]) {
+            stCandidate = row[statusCol];
+          }
+
+          if (!rawId) {
+            const tokens = line.split(/[\t,; ]+/).map(t => t.replace(/['"]/g, '').trim()).filter(Boolean);
+            if (tokens.length > 0) rawId = tokens[0];
+          }
+
+          const emp = matchEmployee(rawId);
+          if (!emp) continue;
+
+          if (!punchesByEmp[emp.id]) {
+            punchesByEmp[emp.id] = { emp: emp, punches: {} };
+          }
+
+          if (dateStr && dateStr.startsWith(targetMonth)) {
+            const isLate = timeStr > '10:20:00';
+            const status = stCandidate ? (stCandidate.toLowerCase().includes('late') ? 'Late' : (stCandidate.toLowerCase().includes('absent') ? 'Absent' : 'Present')) : (isLate ? 'Late' : 'Present');
+            punchesByEmp[emp.id].punches[dateStr] = { status, timeStr };
+          }
+        }
+
+        Object.keys(punchesByEmp).forEach(empId => {
+          const { emp, punches } = punchesByEmp[empId];
+          let pres = 0;
+          let dayoff = 0;
+          let leave = 0;
+          let absent = 0;
+          let late = 0;
+          const dailyMap = {};
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+            if (punches[dStr]) {
+              const p = punches[dStr];
+              dailyMap[dStr] = {
+                status: p.status,
+                punchTime: p.timeStr,
+                method: 'Biometric CSV Punch'
+              };
+              pres++;
+              if (p.status === 'Late') late++;
+            } else {
+              const dayOfWeek = new Date(y, m - 1, d).getDay();
+              if (dayOfWeek === 5) {
+                dailyMap[dStr] = { status: 'Day Off', punchTime: '--:--', method: 'Auto Weekend' };
+                dayoff++;
+              } else {
+                dailyMap[dStr] = { status: 'Absent', punchTime: '--:--', method: 'No Punch Log' };
+                absent++;
+              }
+            }
+          }
+
+          parsedBulkMonthlyAttendance.push({
+            employeeId: emp.id,
+            customEmpCode: emp.customEmpCode || '',
+            employeeName: emp.name,
+            branch: emp.branch || 'Head Office',
+            totalDays: daysInMonth,
+            presentDays: pres,
+            dayOffDays: dayoff,
+            leaveDays: leave,
+            absentDays: absent,
+            lateDays: late,
+            dailyMap: dailyMap
+          });
+        });
+      }
+
+      renderBulkMonthlyAttendancePreview();
+    }
+
+    function renderBulkMonthlyAttendancePreview() {
+      const tbody = document.getElementById('bulk-att-preview-tbody');
+      const countLabel = document.getElementById('bulk-att-parsed-count');
+      const formatBadge = document.getElementById('bulk-att-format-badge');
+      const commitBtn = document.getElementById('bulk-att-commit-btn');
+      const previewBox = document.getElementById('bulk-att-preview-box');
+
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (parsedBulkMonthlyAttendance.length === 0) {
+        if (previewBox) previewBox.classList.add('hidden');
+        if (commitBtn) commitBtn.disabled = true;
+        if (countLabel) countLabel.innerText = '০ জন কর্মচারী প্রস্তুত';
+        return;
+      }
+
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (commitBtn) commitBtn.disabled = false;
+      if (countLabel) countLabel.innerText = `মোট ${parsedBulkMonthlyAttendance.length} জন কর্মচারীর হাজিরা প্রস্তুত`;
+      if (formatBadge) formatBadge.innerText = detectedBulkAttendanceFormat;
+
+      let rowsHtml = '';
+      parsedBulkMonthlyAttendance.forEach((item, index) => {
+        rowsHtml += `
+          <tr class="border-b border-slate-100 dark:border-slate-800 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+            <td class="px-4 py-2.5 font-bold text-indigo-700 dark:text-indigo-400">${item.customEmpCode || 'N/A'}</td>
+            <td class="px-4 py-2.5 font-bold text-slate-800 dark:text-slate-200">${item.employeeName}</td>
+            <td class="px-4 py-2.5 font-semibold text-emerald-700 dark:text-emerald-400">🏢 ${item.branch}</td>
+            <td class="px-4 py-2.5 font-mono text-slate-600 dark:text-slate-400">${item.totalDays} দিন</td>
+            <td class="px-4 py-2.5 font-bold text-emerald-700 dark:text-emerald-400"><span class="bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800">${item.presentDays} দিন</span></td>
+            <td class="px-4 py-2.5 font-bold text-sky-700 dark:text-sky-400"><span class="bg-sky-50 dark:bg-sky-950/50 px-2 py-0.5 rounded-lg border border-sky-200 dark:border-sky-800">${item.dayOffDays} দিন</span></td>
+            <td class="px-4 py-2.5 font-bold text-purple-700 dark:text-purple-400"><span class="bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded-lg border border-purple-200 dark:border-purple-800">${item.leaveDays} দিন</span></td>
+            <td class="px-4 py-2.5 font-bold text-rose-700 dark:text-rose-400"><span class="bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-lg border border-rose-200 dark:border-rose-800">${item.absentDays} দিন</span></td>
+            <td class="px-4 py-2.5 text-right">
+              <button onclick="removeBulkMonthlyAttItem(${index})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = rowsHtml;
+    }
+
+    window.removeBulkMonthlyAttItem = function(index) {
+      parsedBulkMonthlyAttendance.splice(index, 1);
+      renderBulkMonthlyAttendancePreview();
+    };
+
+    window.commitBulkMonthlyAttendanceUpload = async function() {
+      if (parsedBulkMonthlyAttendance.length === 0) {
+        showToast('warning', 'আপলোড করার জন্য কোনো হাজিরা ডাটা পাওয়া যায়নি');
+        return;
+      }
+
+      const targetMonth = document.getElementById('bulk-att-month')?.value || '2026-08';
+      const syncDaily = document.getElementById('bulk-att-sync-daily')?.checked ?? true;
+      const syncSummary = document.getElementById('bulk-att-sync-summary')?.checked ?? true;
+
+      const totalEmployees = parsedBulkMonthlyAttendance.length;
+
+      const confirmRes = await Swal.fire({
+        title: 'মাসিক হাজিরা আপলোড নিশ্চিতকরণ',
+        html: `
+          <div class="text-left space-y-2.5 pt-2 text-xs">
+            <div class="p-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-xl text-indigo-900 dark:text-indigo-200">
+              <div class="font-bold text-sm">📅 নির্বাচিত মাস: <span class="font-mono text-indigo-700 dark:text-indigo-300 font-extrabold">${targetMonth}</span></div>
+              <div class="mt-1">মোট <strong>${totalEmployees}</strong> জন কর্মচারীর হাজিরা ডাটাবেজে সিঙ্ক করা হবে।</div>
+            </div>
+            <div class="space-y-1 text-slate-600 dark:text-slate-300">
+              <div>✅ <b>মাসিক সামারি সিঙ্ক:</b> ${syncSummary ? 'হ্যাঁ (Payroll এর জন্য রেডি হবে)' : 'না'}</div>
+              <div>✅ <b>দৈনিক ক্যালেন্ডার সিঙ্ক:</b> ${syncDaily ? 'হ্যাঁ (১-৩১ তারিখের ডেইলি লগে আপডেট হবে)' : 'না'}</div>
+            </div>
+          </div>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: `<i class="fa-solid fa-cloud-arrow-up mr-1.5"></i>হ্যাঁ, আপলোড ও আপডেট করুন`,
+        cancelButtonText: 'বাতিল'
+      });
+
+      if (!confirmRes.isConfirmed) return;
+
+      Swal.fire({
+        title: 'হাজিরা ডাটা সিঙ্ক হচ্ছে...',
+        html: `মোট <b>${totalEmployees}</b> জন কর্মচারীর পুরো মাসের ডাটাবেজ আপডেট হচ্ছে। দয়া করে অপেক্ষা করুন...`,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      try {
+        const operations = [];
+
+        for (const item of parsedBulkMonthlyAttendance) {
+          if (syncSummary) {
+            operations.push({
+              type: 'set',
+              ref: doc(db, "attendance_summaries", `${item.employeeId}_${targetMonth}`),
+              data: {
+                employeeId: item.employeeId,
+                customEmpCode: item.customEmpCode || '',
+                employeeName: item.employeeName,
+                branch: item.branch || 'Head Office',
+                month: targetMonth,
+                totalDays: item.totalDays,
+                presentDays: item.presentDays,
+                dayOffDays: item.dayOffDays,
+                leaveDays: item.leaveDays,
+                absentDays: item.absentDays,
+                updatedAt: new Date().toISOString(),
+                updatedBy: currentUserEmail,
+                uploadMethod: 'Bulk Monthly CSV'
+              }
+            });
+          }
+
+          if (syncDaily && item.dailyMap) {
+            Object.keys(item.dailyMap).forEach(dStr => {
+              const dayData = item.dailyMap[dStr];
+              operations.push({
+                type: 'set',
+                ref: doc(db, `attendance_${dStr}`, item.employeeId),
+                data: {
+                  employeeId: item.employeeId,
+                  customEmpCode: item.customEmpCode || '',
+                  branch: item.branch || 'Head Office',
+                  status: dayData.status,
+                  punchTime: dayData.punchTime || '--:--',
+                  method: dayData.method || 'Bulk Monthly CSV',
+                  updatedAt: new Date().toISOString()
+                }
+              });
+            });
+          }
+        }
+
+        const batchSize = 450;
+        for (let i = 0; i < operations.length; i += batchSize) {
+          const chunk = operations.slice(i, i + batchSize);
+          const batch = writeBatch(db);
+          chunk.forEach(op => {
+            batch.set(op.ref, op.data);
+          });
+          await batch.commit();
+        }
+
+        await logSystemActivity(
+          'BULK_ATTENDANCE_UPLOAD',
+          'Attendance',
+          `${currentUserEmail} uploaded full month attendance for ${targetMonth} (${totalEmployees} employees, ${operations.length} records)`,
+          { month: targetMonth, employeeCount: totalEmployees, totalRecords: operations.length }
+        );
+
+        Swal.close();
+
+        toggleModal('bulk-monthly-attendance-modal', false);
+        parsedBulkMonthlyAttendance = [];
+
+        Swal.fire({
+          icon: 'success',
+          title: 'সফলভাবে আপলোড সম্পন্ন হয়েছে! 🎉',
+          html: `
+            <div class="text-left space-y-2 text-xs pt-1">
+              <p class="font-bold text-slate-800 text-sm">📅 মাস: <span class="text-indigo-700 font-mono">${targetMonth}</span></p>
+              <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-emerald-800 space-y-1">
+                <div>• <b>${totalEmployees}</b> জন কর্মচারীর মাসিক সামারি সংরক্ষিত হয়েছে।</div>
+                <div>• মোট <b>${operations.length}</b> টি ডাটাবেজ রেকর্ড আপডেট হয়েছে।</div>
+                <div>• পেরোল (Payroll) এবং হাজিরা রিপোর্টে তথ্য অটো-সিঙ্ক হয়েছে।</div>
+              </div>
+            </div>
+          `,
+          confirmButtonColor: '#4f46e5'
+        });
+
+        const curDate = document.getElementById('att-date')?.value;
+        if (curDate && curDate.startsWith(targetMonth)) {
+          listenTodayAttendance(curDate);
+        }
+        updateAttendanceDashboardMetrics();
+        renderAttendanceTable();
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'আপলোড ব্যর্থ হয়েছে',
+          text: err.message || 'হাজিরা সেভ করার সময় ত্রুটি ঘটেছে',
+          confirmButtonColor: '#4f46e5'
+        });
       }
     };
 
@@ -8084,6 +8713,12 @@ ${messageText}
                 <input type="text" id="att-search-input" oninput="renderAttendanceTable()" placeholder="আইডি বা নাম দিয়ে খুঁজুন... (e.g. 16, 58)" class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 transition w-44 sm:w-56">
               </div>
 
+              <!-- Full Month Bulk Attendance CSV Upload Button -->
+              <button id="att-bulk-btn" onclick="openBulkMonthlyAttendanceModal()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="পুরো মাসের (যেমন আগস্ট মাস) হাজিরা CSV ফাইল এক ক্লিকে আপলোড ও সিঙ্ক করুন">
+                <i class="fa-solid fa-file-csv text-sm"></i>
+                <span>মাসিক হাজিরা CSV আপলোড (Full Month)</span>
+              </button>
+
               <!-- Monthly / In-Total Attendance Modal Button -->
               <button onclick="openMonthlyTotalAttendanceModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="কর্মচারীর পুরো মাসের মোট হাজিরা (Present, Absent, Day Off) একবারে নির্ধারণ করুন">
                 <i class="fa-solid fa-calendar-check"></i>
@@ -9686,6 +10321,120 @@ ${messageText}
           </button>
         </div>
       </form>
+    </div>
+  <!-- 3.2 BULK FULL MONTH ATTENDANCE CSV UPLOAD MODAL -->
+  <div id="bulk-monthly-attendance-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl border border-slate-100 dark:border-slate-800 max-h-[92vh] flex flex-col my-auto">
+      <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+            <i class="fa-solid fa-file-csv"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span>Full Month Attendance CSV Upload</span>
+              <span class="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">Auto-Sync</span>
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">পুরো মাসের (যেমন আগস্ট) হাজিরা CSV ফাইল একবারে আপলোড করে ডাটাবেজ আপডেট করুন</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('bulk-monthly-attendance-modal', false)" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-base"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+        <!-- Sample Templates Download Card -->
+        <div class="bg-gradient-to-r from-emerald-50/80 via-teal-50/50 to-indigo-50/80 dark:from-slate-800 dark:to-slate-800/80 border border-emerald-100 dark:border-slate-700 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-1.5">
+              <i class="fa-solid fa-download text-emerald-600 dark:text-emerald-400 text-xs"></i>
+              <h4 class="text-xs font-bold text-slate-800 dark:text-slate-200">নমুনা CSV ফাইল ডাউনলোড করুন (Sample Templates)</h4>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">আপনার সুবিধার জন্য ৩টি জনপ্রিয় ফরম্যাটের যেকোনো একটি ব্যবহার করতে পারেন:</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5 shrink-0">
+            <button onclick="downloadSampleMonthlyAttendanceCSV('summary')" class="bg-white dark:bg-slate-700 hover:bg-emerald-50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 shadow-2xs">
+              <i class="fa-solid fa-file-lines"></i>
+              <span>১. মোট সামারি CSV</span>
+            </button>
+            <button onclick="downloadSampleMonthlyAttendanceCSV('matrix')" class="bg-white dark:bg-slate-700 hover:bg-indigo-50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 shadow-2xs">
+              <i class="fa-solid fa-table-cells"></i>
+              <span>২. ১-৩১ তারিখ ছক CSV</span>
+            </button>
+            <button onclick="downloadSampleMonthlyAttendanceCSV('punch')" class="bg-white dark:bg-slate-700 hover:bg-teal-50 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center space-x-1 shadow-2xs">
+              <i class="fa-solid fa-fingerprint"></i>
+              <span>৩. পাঞ্চ লগ CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Settings: Month, Branch & File Input -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">১. মাস নির্বাচন করুন *</label>
+            <input type="month" id="bulk-att-month" value="2026-08" onchange="if(document.getElementById('bulk-att-file-input').files[0]) handleBulkMonthlyAttendanceFileSelect({target: document.getElementById('bulk-att-file-input')})" class="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-slate-800 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">২. ব্রাঞ্চ ফিল্টার</label>
+            <select id="bulk-att-branch" onchange="if(document.getElementById('bulk-att-file-input').files[0]) handleBulkMonthlyAttendanceFileSelect({target: document.getElementById('bulk-att-file-input')})" class="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 outline-none">
+              <option value="ALL">All Branches (সকল শাখা)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">৩. CSV / Excel ফাইল সিলেক্ট করুন *</label>
+            <input type="file" id="bulk-att-file-input" onchange="handleBulkMonthlyAttendanceFileSelect(event)" accept=".csv,.txt,.tsv,.dat,.log,.xlsx" class="w-full p-1.5 border border-slate-200 dark:border-slate-700 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 font-medium">
+          </div>
+        </div>
+
+        <!-- Sync Options -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="bulk-att-sync-summary" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600">
+            <span class="font-bold text-slate-700 dark:text-slate-200">মাসিক সামারিতে যুক্ত করুন (Payroll Salary Slips এর জন্য অটো-হিসাব হবে)</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="checkbox" id="bulk-att-sync-daily" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 accent-indigo-600">
+            <span class="font-bold text-slate-700 dark:text-slate-200">প্রতিদিনের ক্যালেন্ডার লগেও সিঙ্ক করুন (Daily Attendance Log Sync)</span>
+          </label>
+        </div>
+
+        <!-- Preview Table Card -->
+        <div id="bulk-att-preview-box" class="hidden space-y-2.5">
+          <div class="flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-2">
+              <span id="bulk-att-parsed-count" class="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg">০ জন কর্মচারী প্রস্তুত</span>
+              <span id="bulk-att-format-badge" class="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1 rounded-lg">Summary</span>
+            </div>
+            <span class="text-[11px] text-slate-400">আপলোড করার পূর্বে প্রিভিউ হিসাব চেক করে নিন</span>
+          </div>
+
+          <div class="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-4 py-2.5">Machine ID</th>
+                  <th class="px-4 py-2.5">Employee Name</th>
+                  <th class="px-4 py-2.5">Branch</th>
+                  <th class="px-4 py-2.5">Total Days</th>
+                  <th class="px-4 py-2.5">Present</th>
+                  <th class="px-4 py-2.5">Day Off</th>
+                  <th class="px-4 py-2.5">Leave</th>
+                  <th class="px-4 py-2.5">Absent</th>
+                  <th class="px-4 py-2.5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="bulk-att-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end space-x-2">
+        <button onclick="toggleModal('bulk-monthly-attendance-modal', false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition">Cancel</button>
+        <button id="bulk-att-commit-btn" onclick="commitBulkMonthlyAttendanceUpload()" disabled class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>আপলোড ও সব ডাটাবেজ আপডেট করুন</span>
+        </button>
+      </div>
     </div>
   </div>
 

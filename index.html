@@ -5,8 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HRMS Enterprise - Human Resource Management Suite</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Professional Corporate HRMS SVG Favicon & Web App Icons -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='50%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23grad1)'/%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2'/%3E%3Cpath d='M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/%3E%3Ccircle cx='50' cy='30' r='8' fill='%23ffffff'/%3E%3Ccircle cx='30' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='70' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='50' cy='51' r='5' fill='%2338bdf8' stroke='%23ffffff' stroke-width='2.5'/%3E%3Cpath d='M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z' fill='%23fef08a'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad1' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='50%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='26' fill='url(%23grad1)'/%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='none' stroke='rgba(255,255,255,0.25)' stroke-width='2'/%3E%3Cpath d='M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' opacity='0.9'/%3E%3Ccircle cx='50' cy='30' r='8' fill='%23ffffff'/%3E%3Ccircle cx='30' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='70' cy='62' r='7' fill='%23ffffff'/%3E%3Ccircle cx='50' cy='51' r='5' fill='%2338bdf8' stroke='%23ffffff' stroke-width='2.5'/%3E%3Cpath d='M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z' fill='%23fef08a'/%3E%3C/svg%3E">
+  
+  <!-- Tailwind CSS & Dark Mode Config -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    }
+  </script>
+
+  <!-- Instant Theme & URL Cleanup Initializer -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('hrms_theme');
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      if (window.location.hash) {
+        try {
+          history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        } catch(e) {}
+      }
+    })();
+  </script>
   
   <!-- Google Fonts: Plus Jakarta Sans & Hind Siliguri -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,6 +68,188 @@
       background: #1e1b4b !important;
       color: #818cf8 !important;
       border-left: 3.5px solid #6366f1;
+    }
+
+    /* ========================================================
+       ENTERPRISE DARK THEME SYSTEM
+       ======================================================== */
+    html.dark {
+      color-scheme: dark;
+    }
+    html.dark body {
+      background-color: #0b0f19 !important;
+      color: #f1f5f9 !important;
+    }
+    html.dark header {
+      background-color: #0f172a !important;
+      border-color: #1e293b !important;
+      color: #f8fafc !important;
+    }
+    html.dark #page-title {
+      color: #f8fafc !important;
+    }
+    html.dark #page-subtitle {
+      color: #94a3b8 !important;
+    }
+    html.dark aside {
+      background-color: #080c14 !important;
+      border-color: #1e293b !important;
+    }
+    html.dark .bg-white {
+      background-color: #111827 !important;
+      color: #f1f5f9 !important;
+      border-color: #1f2937 !important;
+    }
+    html.dark .bg-slate-50 {
+      background-color: #0b0f19 !important;
+      color: #f1f5f9 !important;
+    }
+    html.dark .bg-slate-100 {
+      background-color: #1f2937 !important;
+      color: #e2e8f0 !important;
+      border-color: #374151 !important;
+    }
+    html.dark .bg-slate-100\/90 {
+      background-color: rgba(31, 41, 55, 0.9) !important;
+      color: #e2e8f0 !important;
+      border-color: #374151 !important;
+    }
+    html.dark .border-slate-100,
+    html.dark .border-slate-200,
+    html.dark .border-slate-200\/80,
+    html.dark .border-slate-300 {
+      border-color: #1f2937 !important;
+    }
+    html.dark .text-slate-900,
+    html.dark .text-slate-800 {
+      color: #f8fafc !important;
+    }
+    html.dark .text-slate-700,
+    html.dark .text-slate-600 {
+      color: #cbd5e1 !important;
+    }
+    html.dark .text-slate-500,
+    html.dark .text-slate-400 {
+      color: #94a3b8 !important;
+    }
+    html.dark input,
+    html.dark select,
+    html.dark textarea {
+      background-color: #0f172a !important;
+      border-color: #334155 !important;
+      color: #f8fafc !important;
+    }
+    html.dark input:focus,
+    html.dark select:focus,
+    html.dark textarea:focus {
+      background-color: #1e293b !important;
+      border-color: #6366f1 !important;
+    }
+    html.dark input::placeholder,
+    html.dark textarea::placeholder {
+      color: #64748b !important;
+    }
+    html.dark thead,
+    html.dark thead tr,
+    html.dark th {
+      background-color: #0f172a !important;
+      color: #94a3b8 !important;
+      border-color: #1f2937 !important;
+    }
+    html.dark tbody tr {
+      border-color: #1f2937 !important;
+    }
+    html.dark tbody tr:hover {
+      background-color: rgba(30, 41, 59, 0.6) !important;
+    }
+    html.dark .modal-content,
+    html.dark .swal2-popup {
+      background-color: #111827 !important;
+      color: #f8fafc !important;
+      border: 1px solid #1f2937 !important;
+    }
+    html.dark .swal2-title {
+      color: #f8fafc !important;
+    }
+    html.dark .swal2-html-container {
+      color: #cbd5e1 !important;
+    }
+    html.dark ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    html.dark ::-webkit-scrollbar-thumb {
+      background: #1f2937;
+    }
+    html.dark ::-webkit-scrollbar-thumb:hover {
+      background: #374151;
+    }
+    html.dark #header-branch-switcher-box {
+      background-color: rgba(30, 27, 75, 0.5) !important;
+      border-color: #4338ca !important;
+    }
+    html.dark #header-branch-select {
+      background-color: #0f172a !important;
+      color: #c7d2fe !important;
+      border-color: #4338ca !important;
+    }
+    html.dark #theme-toggle-btn {
+      background-color: #1f2937 !important;
+      border-color: #374151 !important;
+      color: #fbbf24 !important;
+    }
+    html.dark #theme-toggle-btn:hover {
+      background-color: #374151 !important;
+    }
+    html.dark .bg-indigo-50,
+    html.dark .bg-indigo-50\/70 {
+      background-color: rgba(99, 102, 241, 0.15) !important;
+    }
+    html.dark .bg-emerald-50 {
+      background-color: rgba(16, 185, 129, 0.15) !important;
+    }
+    html.dark .bg-rose-50 {
+      background-color: rgba(244, 63, 94, 0.15) !important;
+    }
+    html.dark .bg-amber-50 {
+      background-color: rgba(245, 158, 11, 0.15) !important;
+    }
+    html.dark .bg-sky-50 {
+      background-color: rgba(14, 165, 233, 0.15) !important;
+    }
+    html.dark .bg-purple-50 {
+      background-color: rgba(168, 85, 247, 0.15) !important;
+    }
+    html.dark .bg-teal-50 {
+      background-color: rgba(20, 184, 166, 0.15) !important;
+    }
+    html.dark .border-indigo-100,
+    html.dark .border-indigo-200 {
+      border-color: rgba(99, 102, 241, 0.3) !important;
+    }
+    html.dark .border-emerald-100,
+    html.dark .border-emerald-200 {
+      border-color: rgba(16, 185, 129, 0.3) !important;
+    }
+    html.dark .border-rose-100,
+    html.dark .border-rose-200 {
+      border-color: rgba(244, 63, 94, 0.3) !important;
+    }
+    html.dark .border-amber-100,
+    html.dark .border-amber-200 {
+      border-color: rgba(245, 158, 11, 0.3) !important;
+    }
+    html.dark .border-purple-100,
+    html.dark .border-purple-200 {
+      border-color: rgba(168, 85, 247, 0.3) !important;
+    }
+    html.dark .text-indigo-900,
+    html.dark .text-indigo-800 {
+      color: #a5b4fc !important;
+    }
+    html.dark .text-amber-950,
+    html.dark .text-amber-900,
+    html.dark .text-amber-800 {
+      color: #fde68a !important;
     }
 
     /* Login Page Animations & Colorful Effects */
@@ -6299,6 +6507,10 @@ ${messageText}
         deptCounts[clean] = (deptCounts[clean] || 0) + 1;
       });
 
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      const chartBorderColor = isDarkMode ? '#111827' : '#ffffff';
+      const chartLegendTextColor = isDarkMode ? '#cbd5e1' : '#334155';
+
       const deptCtx = document.getElementById('deptChart');
       if(deptCtx) {
         if(deptChartInstance) deptChartInstance.destroy();
@@ -6311,7 +6523,7 @@ ${messageText}
               data: Object.values(deptCounts),
               backgroundColor: colors.slice(0, Object.keys(deptCounts).length),
               borderWidth: 2,
-              borderColor: '#ffffff'
+              borderColor: chartBorderColor
             }]
           },
           options: {
@@ -6324,6 +6536,7 @@ ${messageText}
                 labels: {
                   boxWidth: 12,
                   padding: 14,
+                  color: chartLegendTextColor,
                   font: { size: 11, weight: 'bold' }
                 }
               }
@@ -6369,7 +6582,7 @@ ${messageText}
               data: [present, late, onLeave, dayOff, absent],
               backgroundColor: ['#10b981', '#f59e0b', '#a855f7', '#0ea5e9', '#f43f5e'],
               borderWidth: 2,
-              borderColor: '#ffffff'
+              borderColor: chartBorderColor
             }]
           },
           options: {
@@ -6382,6 +6595,7 @@ ${messageText}
                 labels: {
                   boxWidth: 12,
                   padding: 14,
+                  color: chartLegendTextColor,
                   font: { size: 11, weight: 'bold' }
                 }
               }
@@ -6947,6 +7161,37 @@ ${messageText}
       }
     };
 
+    // ==========================================
+    // THEME ENGINE (DARK / LIGHT MODE)
+    // ==========================================
+    window.toggleDarkMode = function() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('hrms_theme', isDark ? 'dark' : 'light');
+      window.updateThemeIcon(isDark);
+      if (typeof renderDashboardCharts === 'function' && currentUserRole !== 'Employee') {
+        renderDashboardCharts();
+      }
+      showToast('info', isDark ? 'ডার্ক মোড সক্রিয় করা হয়েছে (Dark Mode Enabled)' : 'লাইট মোড সক্রিয় করা হয়েছে (Light Mode Enabled)');
+    };
+
+    window.updateThemeIcon = function(isDark) {
+      if (isDark === undefined) {
+        isDark = document.documentElement.classList.contains('dark');
+      }
+      const icon = document.getElementById('theme-toggle-icon');
+      if (icon) {
+        if (isDark) {
+          icon.className = 'fa-solid fa-sun text-sm text-amber-400';
+        } else {
+          icon.className = 'fa-solid fa-moon text-sm text-slate-600';
+        }
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      window.updateThemeIcon();
+    });
+
   </script>
 </head>
 
@@ -6975,8 +7220,24 @@ ${messageText}
       <!-- Top Branding with Animated Colorful Title -->
       <div class="text-center space-y-2.5">
         <div class="relative inline-block">
-          <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl shadow-xl login-icon-glow transition-transform hover:scale-105">
-            <i class="fa-solid fa-shapes"></i>
+          <div class="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-xl login-icon-glow transition-transform hover:scale-105 overflow-hidden">
+            <svg class="w-16 h-16" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="loginGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#4f46e5"/>
+                  <stop offset="50%" stop-color="#7c3aed"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+              </defs>
+              <rect width="100" height="100" rx="24" fill="url(#loginGrad)"/>
+              <rect x="4" y="4" width="92" height="92" rx="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+              <circle cx="50" cy="30" r="8" fill="#ffffff"/>
+              <circle cx="30" cy="62" r="7" fill="#ffffff"/>
+              <circle cx="70" cy="62" r="7" fill="#ffffff"/>
+              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+              <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
+              <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
+            </svg>
           </div>
           <span class="absolute -top-1.5 -right-2 flex h-4 w-4">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
@@ -7052,13 +7313,29 @@ ${messageText}
     <aside class="w-full md:w-64 bg-slate-950 text-slate-300 flex flex-col justify-between border-r border-slate-800 shrink-0">
       <div>
         <!-- Logo & Header -->
-        <div class="p-6 flex items-center space-x-3 border-b border-slate-800/80">
-          <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-lg shadow-md shadow-indigo-600/30">
-            <i class="fa-solid fa-cubes-stacked"></i>
+        <div class="p-5 flex items-center space-x-3 border-b border-slate-800/80">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/30 overflow-hidden shrink-0">
+            <svg class="w-10 h-10" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#4f46e5"/>
+                  <stop offset="50%" stop-color="#7c3aed"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+              </defs>
+              <rect width="100" height="100" rx="24" fill="url(#sbGrad)"/>
+              <rect x="4" y="4" width="92" height="92" rx="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+              <circle cx="50" cy="30" r="8" fill="#ffffff"/>
+              <circle cx="30" cy="62" r="7" fill="#ffffff"/>
+              <circle cx="70" cy="62" r="7" fill="#ffffff"/>
+              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+              <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
+              <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
+            </svg>
           </div>
-          <div>
-            <h2 class="font-extrabold text-sm text-white tracking-wide">HRMS Pro</h2>
-            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">MANAGEMENT SUITE</p>
+          <div class="min-w-0">
+            <h2 class="font-black text-sm text-white tracking-wide truncate">HRMS Pro</h2>
+            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
           </div>
         </div>
 
@@ -7129,7 +7406,12 @@ ${messageText}
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2.5">
+          <!-- Dark / Light Mode Switcher Toggle Button -->
+          <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle Dark/Light Mode (ডার্ক/লাইট মোড)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition shadow-xs flex items-center justify-center cursor-pointer shrink-0">
+            <i id="theme-toggle-icon" class="fa-solid fa-moon text-sm"></i>
+          </button>
+
           <!-- Super Admin Branch Switcher Dropdown -->
           <div id="header-branch-switcher-box" class="flex items-center space-x-2 bg-indigo-50/70 border border-indigo-200 px-3 py-1.5 rounded-xl">
             <span class="text-[11px] font-bold text-indigo-900"><i class="fa-solid fa-building mr-1"></i>Branch:</span>

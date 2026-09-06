@@ -6239,41 +6239,51 @@ ${messageText}
       if (!item || !emp) return false;
 
       const itemEmpId = (item.employeeId || '').toString().trim();
-      const itemCode = (item.customEmpCode || '').toString().trim().toLowerCase();
-      const itemName = (item.employeeName || '').toString().trim().toLowerCase();
-      const itemEmail = (item.employeeEmail || '').toString().trim().toLowerCase();
-
       const empId = (emp.id || '').toString().trim();
+
+      // 1. Direct Employee Doc ID match (Highest Priority)
+      if (itemEmpId && empId) {
+        if (itemEmpId === empId) return true;
+        // If itemEmpId belongs to another known employee, it CANNOT match this employee
+        const isAnotherKnownEmp = employeeList.some(e => e.id === itemEmpId && e.id !== empId);
+        if (isAnotherKnownEmp) return false;
+      }
+
+      const itemCode = (item.customEmpCode || '').toString().trim().toLowerCase();
       const empCode = (emp.customEmpCode || '').toString().trim().toLowerCase();
-      const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
-      const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
 
-      // 1. Direct Employee Doc ID match
-      if (itemEmpId && empId && itemEmpId === empId) {
+      // 2. Direct Custom / Biometric Code match (only if valid, not generic)
+      if (itemCode && empCode && itemCode !== 'n/a' && itemCode === empCode) {
+        if (itemEmpId && itemEmpId !== empId) {
+          const isAnotherKnownEmp = employeeList.some(e => e.id === itemEmpId && e.id !== empId);
+          if (isAnotherKnownEmp) return false;
+        }
         return true;
       }
 
-      // 2. Direct Custom / Biometric Code match (e.g. '01', '04', '05', '09')
-      if (empCode && (itemCode === empCode || itemEmpId.toLowerCase() === empCode)) {
-        return true;
-      }
-      if (itemCode && empId && itemCode === empId.toLowerCase()) {
-        return true;
+      // If item.employeeId was stored as customEmpCode (e.g. '05')
+      if (itemEmpId && empCode && empCode !== 'n/a' && itemEmpId.toLowerCase() === empCode) {
+        const isAnotherKnownEmp = employeeList.some(e => e.id === itemEmpId && e.id !== empId);
+        if (!isAnotherKnownEmp) return true;
       }
 
       // 3. Direct Email match
+      const itemEmail = (item.employeeEmail || '').toString().trim().toLowerCase();
+      const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
       if (itemEmail && empEmail && itemEmail === empEmail) {
         return true;
       }
 
-      // 4. Exact Full Name match (STRICT EQUALITY ONLY - NEVER USE PARTIAL / SUBSTRING)
+      // 4. Exact Full Name match (STRICT EQUALITY ONLY)
+      const itemName = (item.employeeName || '').toString().trim().toLowerCase();
+      const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
       if (itemName && empName) {
         const normItem = itemName.replace(/\s+/g, ' ').trim();
         const normEmp = empName.replace(/\s+/g, ' ').trim();
         if (normItem === normEmp) {
           if (itemEmpId && itemEmpId !== empId) {
-            const otherEmp = employeeList.find(e => e.id === itemEmpId);
-            if (otherEmp && otherEmp.id !== empId) return false;
+            const isAnotherKnownEmp = employeeList.some(e => e.id === itemEmpId && e.id !== empId);
+            if (isAnotherKnownEmp) return false;
           }
           return true;
         }
@@ -6857,7 +6867,7 @@ ${messageText}
           const fineDeduct = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
           // Check if payroll already exists for this employee and month
-          const existingPayroll = payrollList.find(p => isItemForEmployee(p, emp) && p.month === selectedMonth);
+          const existingPayroll = payrollList.find(p => (p.employeeId === emp.id || (!p.employeeId && isItemForEmployee(p, emp))) && p.month === selectedMonth);
           const currentBonus = existingPayroll ? (Number(existingPayroll.bonus) || 0) : 0;
 
           const netSalary = Math.max(0, (earnedBasic + currentBonus) - (advanceDeduct + fineDeduct));

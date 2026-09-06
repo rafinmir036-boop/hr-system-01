@@ -6235,74 +6235,101 @@ ${messageText}
       toggleModal('add-payroll-modal', true);
     };
 
-    window.getEmployeeFinesForMonth = function(emp, month) {
-      if (!emp || !month) return [];
+    window.isItemForEmployee = function(item, emp) {
+      if (!item || !emp) return false;
+
+      const itemEmpId = (item.employeeId || '').toString().trim();
+      const itemCode = (item.customEmpCode || '').toString().trim().toLowerCase();
+      const itemName = (item.employeeName || '').toString().trim().toLowerCase();
+      const itemEmail = (item.employeeEmail || '').toString().trim().toLowerCase();
+
       const empId = (emp.id || '').toString().trim();
       const empCode = (emp.customEmpCode || '').toString().trim().toLowerCase();
       const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
       const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
 
+      // 1. Direct Employee Doc ID match
+      if (itemEmpId && empId && itemEmpId === empId) {
+        return true;
+      }
+
+      // 2. Direct Custom / Biometric Code match (e.g. '01', '04', '05', '09')
+      if (empCode && (itemCode === empCode || itemEmpId.toLowerCase() === empCode)) {
+        return true;
+      }
+      if (itemCode && empId && itemCode === empId.toLowerCase()) {
+        return true;
+      }
+
+      // 3. Direct Email match
+      if (itemEmail && empEmail && itemEmail === empEmail) {
+        return true;
+      }
+
+      // 4. Exact Full Name match (STRICT EQUALITY ONLY - NEVER USE PARTIAL / SUBSTRING)
+      if (itemName && empName) {
+        const normItem = itemName.replace(/\s+/g, ' ').trim();
+        const normEmp = empName.replace(/\s+/g, ' ').trim();
+        if (normItem === normEmp) {
+          if (itemEmpId && itemEmpId !== empId) {
+            const otherEmp = employeeList.find(e => e.id === itemEmpId);
+            if (otherEmp && otherEmp.id !== empId) return false;
+          }
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    window.isItemForMonth = function(item, targetMonth) {
+      if (!item || !targetMonth) return false;
+      const target = targetMonth.toString().trim();
+
+      const itemMonth = (item.month || '').toString().trim();
+      if (itemMonth) {
+        return itemMonth === target;
+      }
+
+      const itemDate = (item.date || '').toString().trim();
+      if (itemDate && itemDate.length >= 7) {
+        return itemDate.substring(0, 7) === target;
+      }
+
+      return false;
+    };
+
+    window.isItemForBranch = function(item, emp) {
+      if (!item || !emp) return true;
+      const empBranch = (emp.branch || '').toString().trim().toLowerCase();
+      const itemBranch = (item.branch || '').toString().trim().toLowerCase();
+
+      if (!itemBranch || itemBranch === 'all' || itemBranch === 'head office') return true;
+      if (!empBranch || empBranch === 'all' || empBranch === 'head office') return true;
+
+      return itemBranch === empBranch;
+    };
+
+    window.getEmployeeFinesForMonth = function(emp, month) {
+      if (!emp || !month) return [];
+
       return fineList.filter(f => {
-        const fId = (f.employeeId || '').toString().trim();
-        const fCode = (f.customEmpCode || '').toString().trim().toLowerCase();
-        const fName = (f.employeeName || '').toString().trim().toLowerCase();
-        const fEmail = (f.employeeEmail || '').toString().trim().toLowerCase();
-
-        const isEmpMatch = (empId && fId && fId === empId) ||
-                           (empCode && fCode && fCode === empCode) ||
-                           (empName && fName && (fName === empName || fName.includes(empName) || empName.includes(fName))) ||
-                           (empEmail && fEmail && fEmail === empEmail);
-
-        if (!isEmpMatch) return false;
-
-        const fMonth = (f.month || '').toString().trim();
-        const fDateMonth = (f.date || '').toString().substring(0, 7);
-        const fClearedMonth = (f.clearedInPayrollMonth || '').toString().trim();
-
-        const isMonthMatch = (fMonth === month) || 
-                             (fDateMonth === month) || 
-                             (fClearedMonth === month);
-
-        if (!isMonthMatch) return false;
-
+        if (!isItemForEmployee(f, emp)) return false;
+        if (!isItemForBranch(f, emp)) return false;
+        if (!isItemForMonth(f, month)) return false;
         if (f.status === 'Waived' || f.status === 'Cancelled') return false;
-
         return true;
       });
     };
 
     window.getEmployeeAdvancesForMonth = function(emp, month) {
       if (!emp || !month) return [];
-      const empId = (emp.id || '').toString().trim();
-      const empCode = (emp.customEmpCode || '').toString().trim().toLowerCase();
-      const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
-      const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
 
       return advanceList.filter(a => {
-        const aId = (a.employeeId || '').toString().trim();
-        const aCode = (a.customEmpCode || '').toString().trim().toLowerCase();
-        const aName = (a.employeeName || '').toString().trim().toLowerCase();
-        const aEmail = (a.employeeEmail || '').toString().trim().toLowerCase();
-
-        const isEmpMatch = (empId && aId && aId === empId) ||
-                           (empCode && aCode && aCode === empCode) ||
-                           (empName && aName && (aName === empName || aName.includes(empName) || empName.includes(aName))) ||
-                           (empEmail && aEmail && aEmail === empEmail);
-
-        if (!isEmpMatch) return false;
-
-        const aMonth = (a.month || '').toString().trim();
-        const aDateMonth = (a.date || '').toString().substring(0, 7);
-        const aClearedMonth = (a.clearedInPayrollMonth || '').toString().trim();
-
-        const isMonthMatch = (aMonth === month) || 
-                             (aDateMonth === month) || 
-                             (aClearedMonth === month);
-
-        if (!isMonthMatch) return false;
-
+        if (!isItemForEmployee(a, emp)) return false;
+        if (!isItemForBranch(a, emp)) return false;
+        if (!isItemForMonth(a, month)) return false;
         if (a.status === 'Rejected' || a.status === 'Cancelled') return false;
-
         return true;
       });
     };
@@ -6546,22 +6573,17 @@ ${messageText}
         return;
       }
 
-      const emp = employeeList.find(e => e.id === p.employeeId || (p.customEmpCode && e.customEmpCode === p.customEmpCode) || (p.employeeName && e.name === p.employeeName));
+      const emp = employeeList.find(e => isItemForEmployee(p, e)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
 
-      // Auto-detect fines and advances if current value is 0
+      // Auto-detect fines and advances
       let curAdvance = Number(p.advance) || 0;
       let curFine = Number(p.fine) || 0;
       if (emp && p.month) {
-        if (curAdvance === 0) {
-          const empAdvances = getEmployeeAdvancesForMonth(emp, p.month);
-          const totalAdv = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-          if (totalAdv > 0) curAdvance = totalAdv;
-        }
-        if (curFine === 0) {
-          const empFines = getEmployeeFinesForMonth(emp, p.month);
-          const totalFine = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-          if (totalFine > 0) curFine = totalFine;
-        }
+        const empAdvances = getEmployeeAdvancesForMonth(emp, p.month);
+        curAdvance = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+        const empFines = getEmployeeFinesForMonth(emp, p.month);
+        curFine = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       }
 
       const basic = Number(p.basicSalary) || 0;
@@ -6581,7 +6603,7 @@ ${messageText}
       document.getElementById('edit-pay-advance').value = curAdvance;
       document.getElementById('edit-pay-fine').value = curFine;
       document.getElementById('edit-pay-status').value = p.status || 'Paid';
-      document.getElementById('edit-pay-net').value = (p.netSalary && p.fine == curFine && p.advance == curAdvance) ? p.netSalary : calculatedNet;
+      document.getElementById('edit-pay-net').value = calculatedNet;
 
       toggleModal('edit-payroll-modal', true);
     };
@@ -6622,7 +6644,7 @@ ${messageText}
         });
 
         if (p && p.month) {
-          const emp = employeeList.find(e => e.id === p.employeeId || (p.customEmpCode && e.customEmpCode === p.customEmpCode) || (p.employeeName && e.name === p.employeeName)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName };
+          const emp = employeeList.find(e => isItemForEmployee(p, e)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
           if (fine > 0) {
             const empFines = getEmployeeFinesForMonth(emp, p.month);
             for (let fn of empFines) {
@@ -6835,7 +6857,7 @@ ${messageText}
           const fineDeduct = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
           // Check if payroll already exists for this employee and month
-          const existingPayroll = payrollList.find(p => (p.employeeId === emp.id || (p.customEmpCode && emp.customEmpCode && p.customEmpCode === emp.customEmpCode) || (p.employeeName && emp.name && p.employeeName === emp.name)) && p.month === selectedMonth);
+          const existingPayroll = payrollList.find(p => isItemForEmployee(p, emp) && p.month === selectedMonth);
           const currentBonus = existingPayroll ? (Number(existingPayroll.bonus) || 0) : 0;
 
           const netSalary = Math.max(0, (earnedBasic + currentBonus) - (advanceDeduct + fineDeduct));
@@ -6934,11 +6956,7 @@ ${messageText}
           if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) continue;
           if (filterMonth && p.month !== filterMonth) continue;
 
-          const emp = employeeList.find(e => 
-            (p.employeeId && e.id === p.employeeId) ||
-            (p.customEmpCode && e.customEmpCode && e.customEmpCode === p.customEmpCode) ||
-            (p.employeeName && e.name && e.name.toLowerCase() === p.employeeName.toLowerCase())
-          ) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
+          const emp = employeeList.find(e => isItemForEmployee(p, e)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
 
           const month = p.month;
           const empAdvances = getEmployeeAdvancesForMonth(emp, month);

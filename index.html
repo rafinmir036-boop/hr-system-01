@@ -6235,6 +6235,78 @@ ${messageText}
       toggleModal('add-payroll-modal', true);
     };
 
+    window.getEmployeeFinesForMonth = function(emp, month) {
+      if (!emp || !month) return [];
+      const empId = (emp.id || '').toString().trim();
+      const empCode = (emp.customEmpCode || '').toString().trim().toLowerCase();
+      const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
+      const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
+
+      return fineList.filter(f => {
+        const fId = (f.employeeId || '').toString().trim();
+        const fCode = (f.customEmpCode || '').toString().trim().toLowerCase();
+        const fName = (f.employeeName || '').toString().trim().toLowerCase();
+        const fEmail = (f.employeeEmail || '').toString().trim().toLowerCase();
+
+        const isEmpMatch = (empId && fId && fId === empId) ||
+                           (empCode && fCode && fCode === empCode) ||
+                           (empName && fName && (fName === empName || fName.includes(empName) || empName.includes(fName))) ||
+                           (empEmail && fEmail && fEmail === empEmail);
+
+        if (!isEmpMatch) return false;
+
+        const fMonth = (f.month || '').toString().trim();
+        const fDateMonth = (f.date || '').toString().substring(0, 7);
+        const fClearedMonth = (f.clearedInPayrollMonth || '').toString().trim();
+
+        const isMonthMatch = (fMonth === month) || 
+                             (fDateMonth === month) || 
+                             (fClearedMonth === month);
+
+        if (!isMonthMatch) return false;
+
+        if (f.status === 'Waived' || f.status === 'Cancelled') return false;
+
+        return true;
+      });
+    };
+
+    window.getEmployeeAdvancesForMonth = function(emp, month) {
+      if (!emp || !month) return [];
+      const empId = (emp.id || '').toString().trim();
+      const empCode = (emp.customEmpCode || '').toString().trim().toLowerCase();
+      const empName = (emp.name || emp.employeeName || '').toString().trim().toLowerCase();
+      const empEmail = (emp.email || emp.employeeEmail || '').toString().trim().toLowerCase();
+
+      return advanceList.filter(a => {
+        const aId = (a.employeeId || '').toString().trim();
+        const aCode = (a.customEmpCode || '').toString().trim().toLowerCase();
+        const aName = (a.employeeName || '').toString().trim().toLowerCase();
+        const aEmail = (a.employeeEmail || '').toString().trim().toLowerCase();
+
+        const isEmpMatch = (empId && aId && aId === empId) ||
+                           (empCode && aCode && aCode === empCode) ||
+                           (empName && aName && (aName === empName || aName.includes(empName) || empName.includes(aName))) ||
+                           (empEmail && aEmail && aEmail === empEmail);
+
+        if (!isEmpMatch) return false;
+
+        const aMonth = (a.month || '').toString().trim();
+        const aDateMonth = (a.date || '').toString().substring(0, 7);
+        const aClearedMonth = (a.clearedInPayrollMonth || '').toString().trim();
+
+        const isMonthMatch = (aMonth === month) || 
+                             (aDateMonth === month) || 
+                             (aClearedMonth === month);
+
+        if (!isMonthMatch) return false;
+
+        if (a.status === 'Rejected' || a.status === 'Cancelled') return false;
+
+        return true;
+      });
+    };
+
     window.openPayrollModalForEmployee = async function() {
       const empId = document.getElementById('pay-emp-id').value;
       const month = document.getElementById('pay-month').value;
@@ -6247,16 +6319,16 @@ ${messageText}
 
       // 1. Calculate Advance & Fine for that month
       let autoAdvance = 0;
-      if (month) {
-        const pendingAdvances = advanceList.filter(a => a.employeeId === empId && a.month === month && (a.status === 'Pending' || a.status === 'Approved'));
-        autoAdvance = pendingAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      if (month && emp) {
+        const empAdvances = getEmployeeAdvancesForMonth(emp, month);
+        autoAdvance = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       }
       document.getElementById('pay-advance').value = autoAdvance;
 
       let autoFine = 0;
-      if (month) {
-        const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
-        autoFine = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      if (month && emp) {
+        const empFines = getEmployeeFinesForMonth(emp, month);
+        autoFine = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       }
       document.getElementById('pay-fine').value = autoFine;
 
@@ -6438,25 +6510,27 @@ ${messageText}
         { employeeName: emp ? emp.name : '', month, basicSalary: basic, netSalary: net }
       );
 
-      if (advance > 0 && month) {
-        const pendingAdvances = advanceList.filter(a => a.employeeId === empId && a.month === month && (a.status === 'Pending' || a.status === 'Approved'));
-        for (let adv of pendingAdvances) {
-          await updateDoc(doc(db, "advances", adv.id), {
-            status: 'Cleared',
-            clearedInPayrollMonth: month,
-            clearedAt: new Date().toISOString()
-          });
+      if (month && emp) {
+        const empAdvances = getEmployeeAdvancesForMonth(emp, month);
+        for (let adv of empAdvances) {
+          if (adv.status !== 'Cleared') {
+            await updateDoc(doc(db, "advances", adv.id), {
+              status: 'Cleared',
+              clearedInPayrollMonth: month,
+              clearedAt: new Date().toISOString()
+            });
+          }
         }
-      }
 
-      if (fine > 0 && month) {
-        const pendingFines = fineList.filter(f => f.employeeId === empId && f.month === month && f.status === 'Pending');
-        for (let fn of pendingFines) {
-          await updateDoc(doc(db, "fines", fn.id), {
-            status: 'Deducted',
-            clearedInPayrollMonth: month,
-            clearedAt: new Date().toISOString()
-          });
+        const empFines = getEmployeeFinesForMonth(emp, month);
+        for (let fn of empFines) {
+          if (fn.status !== 'Deducted') {
+            await updateDoc(doc(db, "fines", fn.id), {
+              status: 'Deducted',
+              clearedInPayrollMonth: month,
+              clearedAt: new Date().toISOString()
+            });
+          }
         }
       }
 
@@ -6472,6 +6546,28 @@ ${messageText}
         return;
       }
 
+      const emp = employeeList.find(e => e.id === p.employeeId || (p.customEmpCode && e.customEmpCode === p.customEmpCode) || (p.employeeName && e.name === p.employeeName));
+
+      // Auto-detect fines and advances if current value is 0
+      let curAdvance = Number(p.advance) || 0;
+      let curFine = Number(p.fine) || 0;
+      if (emp && p.month) {
+        if (curAdvance === 0) {
+          const empAdvances = getEmployeeAdvancesForMonth(emp, p.month);
+          const totalAdv = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+          if (totalAdv > 0) curAdvance = totalAdv;
+        }
+        if (curFine === 0) {
+          const empFines = getEmployeeFinesForMonth(emp, p.month);
+          const totalFine = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+          if (totalFine > 0) curFine = totalFine;
+        }
+      }
+
+      const basic = Number(p.basicSalary) || 0;
+      const bonus = Number(p.bonus) || 0;
+      const calculatedNet = Math.max(0, (basic + bonus) - (curAdvance + curFine));
+
       document.getElementById('edit-pay-id').value = p.id;
       document.getElementById('edit-pay-emp-name').innerText = p.employeeName || 'Staff';
       document.getElementById('edit-pay-branch').innerText = `🏢 ${p.branch || 'Head Office'}`;
@@ -6480,12 +6576,12 @@ ${messageText}
       const avatarElem = document.getElementById('edit-pay-avatar');
       if (avatarElem) avatarElem.innerText = (p.employeeName || 'E').charAt(0).toUpperCase();
 
-      document.getElementById('edit-pay-basic').value = p.basicSalary || 0;
-      document.getElementById('edit-pay-bonus').value = p.bonus || 0;
-      document.getElementById('edit-pay-advance').value = p.advance || 0;
-      document.getElementById('edit-pay-fine').value = p.fine || 0;
+      document.getElementById('edit-pay-basic').value = basic;
+      document.getElementById('edit-pay-bonus').value = bonus;
+      document.getElementById('edit-pay-advance').value = curAdvance;
+      document.getElementById('edit-pay-fine').value = curFine;
       document.getElementById('edit-pay-status').value = p.status || 'Paid';
-      document.getElementById('edit-pay-net').value = p.netSalary || 0;
+      document.getElementById('edit-pay-net').value = (p.netSalary && p.fine == curFine && p.advance == curAdvance) ? p.netSalary : calculatedNet;
 
       toggleModal('edit-payroll-modal', true);
     };
@@ -6524,6 +6620,34 @@ ${messageText}
           updatedAt: new Date().toISOString(),
           updatedBy: currentUserEmail || 'Admin'
         });
+
+        if (p && p.month) {
+          const emp = employeeList.find(e => e.id === p.employeeId || (p.customEmpCode && e.customEmpCode === p.customEmpCode) || (p.employeeName && e.name === p.employeeName)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName };
+          if (fine > 0) {
+            const empFines = getEmployeeFinesForMonth(emp, p.month);
+            for (let fn of empFines) {
+              if (fn.status !== 'Deducted') {
+                await updateDoc(doc(db, "fines", fn.id), {
+                  status: 'Deducted',
+                  clearedInPayrollMonth: p.month,
+                  clearedAt: new Date().toISOString()
+                });
+              }
+            }
+          }
+          if (advance > 0) {
+            const empAdvances = getEmployeeAdvancesForMonth(emp, p.month);
+            for (let adv of empAdvances) {
+              if (adv.status !== 'Cleared') {
+                await updateDoc(doc(db, "advances", adv.id), {
+                  status: 'Cleared',
+                  clearedInPayrollMonth: p.month,
+                  clearedAt: new Date().toISOString()
+                });
+              }
+            }
+          }
+        }
 
         await logSystemActivity(
           'UPDATE',
@@ -6703,15 +6827,15 @@ ${messageText}
           const earnedBasic = Math.max(0, Math.round(baseSalary - absentDeduction));
 
           // Calculate Advances
-          const pendingAdvances = advanceList.filter(a => a.employeeId === emp.id && a.month === selectedMonth && (a.status === 'Pending' || a.status === 'Approved'));
-          const advanceDeduct = pendingAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+          const empAdvances = getEmployeeAdvancesForMonth(emp, selectedMonth);
+          const advanceDeduct = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
           // Calculate Fines
-          const pendingFines = fineList.filter(f => f.employeeId === emp.id && f.month === selectedMonth && f.status === 'Pending');
-          const fineDeduct = pendingFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+          const empFines = getEmployeeFinesForMonth(emp, selectedMonth);
+          const fineDeduct = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
           // Check if payroll already exists for this employee and month
-          const existingPayroll = payrollList.find(p => p.employeeId === emp.id && p.month === selectedMonth);
+          const existingPayroll = payrollList.find(p => (p.employeeId === emp.id || (p.customEmpCode && emp.customEmpCode && p.customEmpCode === emp.customEmpCode) || (p.employeeName && emp.name && p.employeeName === emp.name)) && p.month === selectedMonth);
           const currentBonus = existingPayroll ? (Number(existingPayroll.bonus) || 0) : 0;
 
           const netSalary = Math.max(0, (earnedBasic + currentBonus) - (advanceDeduct + fineDeduct));
@@ -6733,7 +6857,7 @@ ${messageText}
             dayOffDays: dayOffDays,
             leaveDays: leaveDays,
             absentDays: absentDays,
-            status: 'Paid',
+            status: existingPayroll && existingPayroll.status ? existingPayroll.status : 'Paid',
             updatedAt: new Date().toISOString()
           };
 
@@ -6747,21 +6871,25 @@ ${messageText}
           }
 
           // Clear Advances
-          for (let adv of pendingAdvances) {
-            await updateDoc(doc(db, "advances", adv.id), {
-              status: 'Cleared',
-              clearedInPayrollMonth: selectedMonth,
-              clearedAt: new Date().toISOString()
-            });
+          for (let adv of empAdvances) {
+            if (adv.status !== 'Cleared') {
+              await updateDoc(doc(db, "advances", adv.id), {
+                status: 'Cleared',
+                clearedInPayrollMonth: selectedMonth,
+                clearedAt: new Date().toISOString()
+              });
+            }
           }
 
           // Deduct Fines
-          for (let fn of pendingFines) {
-            await updateDoc(doc(db, "fines", fn.id), {
-              status: 'Deducted',
-              clearedInPayrollMonth: selectedMonth,
-              clearedAt: new Date().toISOString()
-            });
+          for (let fn of empFines) {
+            if (fn.status !== 'Deducted') {
+              await updateDoc(doc(db, "fines", fn.id), {
+                status: 'Deducted',
+                clearedInPayrollMonth: selectedMonth,
+                clearedAt: new Date().toISOString()
+              });
+            }
           }
         }
 
@@ -6775,12 +6903,104 @@ ${messageText}
         Swal.fire({
           icon: 'success',
           title: 'ব্যাচ পে-রোল সম্পন্ন! 🎉',
-          html: `ব্রাঞ্চ: <b>${branchDisplay}</b><br>মাস: <b>${selectedMonth}</b><br>নতুন পে-রোল: <b>${createdCount} জন</b> | আপডেট: <b>${updatedCount} জন</b><br>মোট পরিশোধযোগ্য বেতন: <b>৳${grandTotalNet.toLocaleString()}</b><br><br><small class="text-slate-500">সকলের বেতন তালিকায় চলে এসেছে এবং আপনি আলাদা আলাদাভাবে প্রিন্ট ও এডিট করতে পারবেন।</small>`,
+          html: `ব্রাঞ্চ: <b>${branchDisplay}</b><br>মাস: <b>${selectedMonth}</b><br>নতুন পে-রোল: <b>${createdCount} জন</b> | আপডেট: <b>${updatedCount} জন</b><br>মোট পরিশোধযোগ্য বেতন: <b>৳${grandTotalNet.toLocaleString()}</b><br><br><small class="text-slate-500">সকলের বেতন তালিকায় চলে এসেছে এবং জরিমানা ও অগ্রিম সঠিকভাবে সমন্বয় হয়েছে।</small>`,
           confirmButtonColor: '#4f46e5'
         });
 
       } catch (err) {
         Swal.fire('ত্রুটি!', err.message, 'error');
+      }
+    };
+
+    window.syncAllPayrollFinesAndAdvances = async function(silent = false) {
+      const filterBranch = document.getElementById('payroll-filter-branch') ? document.getElementById('payroll-filter-branch').value : 'ALL';
+      const filterMonth = document.getElementById('payroll-filter-month') ? document.getElementById('payroll-filter-month').value : '';
+
+      if (!silent) {
+        Swal.fire({
+          title: 'জরিমানা ও অগ্রিম সিঙ্ক হচ্ছে...',
+          html: `<i class="fa-solid fa-spinner fa-spin text-3xl text-indigo-600 my-3"></i><br>সকল কর্মচারীর ফাইন ও অ্যাডভান্স পে-রোলের সাথে সমন্বয় করা হচ্ছে...`,
+          showConfirmButton: false,
+          allowOutsideClick: false
+        });
+      }
+
+      let updatedCount = 0;
+      let totalFineFixed = 0;
+      let totalAdvFixed = 0;
+
+      try {
+        for (const p of payrollList) {
+          if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) continue;
+          if (filterMonth && p.month !== filterMonth) continue;
+
+          const emp = employeeList.find(e => 
+            (p.employeeId && e.id === p.employeeId) ||
+            (p.customEmpCode && e.customEmpCode && e.customEmpCode === p.customEmpCode) ||
+            (p.employeeName && e.name && e.name.toLowerCase() === p.employeeName.toLowerCase())
+          ) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
+
+          const month = p.month;
+          const empAdvances = getEmployeeAdvancesForMonth(emp, month);
+          const autoAdvance = empAdvances.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+          const empFines = getEmployeeFinesForMonth(emp, month);
+          const autoFine = empFines.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+          const basic = Number(p.basicSalary) || 0;
+          const bonus = Number(p.bonus) || 0;
+          const calculatedNet = Math.max(0, (basic + bonus) - (autoAdvance + autoFine));
+
+          const curFine = Number(p.fine) || 0;
+          const curAdv = Number(p.advance) || 0;
+          const curNet = Number(p.netSalary) || 0;
+
+          if (curFine !== autoFine || curAdv !== autoAdvance || curNet !== calculatedNet) {
+            await updateDoc(doc(db, "payrolls", p.id), {
+              advance: autoAdvance,
+              fine: autoFine,
+              netSalary: calculatedNet,
+              updatedAt: new Date().toISOString(),
+              updatedBy: currentUserEmail || 'Auto Sync'
+            });
+            updatedCount++;
+            totalFineFixed += autoFine;
+            totalAdvFixed += autoAdvance;
+          }
+
+          // Mark fines as Deducted and advances as Cleared
+          for (let fn of empFines) {
+            if (fn.status !== 'Deducted') {
+              await updateDoc(doc(db, "fines", fn.id), {
+                status: 'Deducted',
+                clearedInPayrollMonth: month,
+                clearedAt: new Date().toISOString()
+              });
+            }
+          }
+          for (let adv of empAdvances) {
+            if (adv.status !== 'Cleared') {
+              await updateDoc(doc(db, "advances", adv.id), {
+                status: 'Cleared',
+                clearedInPayrollMonth: month,
+                clearedAt: new Date().toISOString()
+              });
+            }
+          }
+        }
+
+        if (!silent) {
+          Swal.fire({
+            icon: 'success',
+            title: 'জরিমানা ও অগ্রিম সিঙ্ক সম্পন্ন! ✅',
+            html: `মোট <b>${updatedCount}</b> জন কর্মচারীর পে-রোলে জরিমানা ও অগ্রিম সঠিকভাবে আপডেট এবং নিট বেতন রিক্যালকুলেট হয়েছে।`,
+            confirmButtonColor: '#4f46e5'
+          });
+        }
+      } catch (err) {
+        if (!silent) {
+          Swal.fire('Error', err.message, 'error');
+        }
       }
     };
 
@@ -9787,6 +10007,12 @@ ${messageText}
               <button id="pay-batch-btn" onclick="batchGenerateSelectedBranchPayroll()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="নির্বাচিত ব্রাঞ্চের সকল কর্মচারীর পে-রোল একসাথে স্বয়ংক্রিয়ভাবে তৈরি করুন">
                 <i class="fa-solid fa-bolt"></i>
                 <span>Batch Generate (এক ক্লিকে সবার পে-রোল)</span>
+              </button>
+
+              <!-- Sync Fines & Advance Button -->
+              <button id="pay-sync-fines-btn" onclick="syncAllPayrollFinesAndAdvances()" class="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="সকল পেন্ডিং বা পূর্বে ডিডাক্টেড জরিমানা ও অগ্রিম পে-রোলের সাথে স্বয়ংক্রিয়ভাবে সিঙ্ক করুন">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Sync Fines & Advance (জরিমানা সিঙ্ক)</span>
               </button>
 
               <!-- Single Add Button -->

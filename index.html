@@ -676,6 +676,9 @@
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
+        if (typeof window.resumeLoginAnimation === 'function') {
+          window.resumeLoginAnimation();
+        }
       }
     });
 
@@ -6813,6 +6816,7 @@ ${messageText}
         let createdCount = 0;
         let updatedCount = 0;
         let grandTotalNet = 0;
+        const batchOps = [];
 
         for (const emp of targetEmployees) {
           const baseSalary = Number(emp.salary) || 0;
@@ -6894,36 +6898,39 @@ ${messageText}
           };
 
           if (existingPayroll) {
-            await updateDoc(doc(db, "payrolls", existingPayroll.id), payrollData);
+            batchOps.push(updateDoc(doc(db, "payrolls", existingPayroll.id), payrollData));
             updatedCount++;
           } else {
             payrollData.createdDate = new Date().toISOString();
-            await addDoc(collection(db, "payrolls"), payrollData);
+            batchOps.push(addDoc(collection(db, "payrolls"), payrollData));
             createdCount++;
           }
 
           // Clear Advances
           for (let adv of empAdvances) {
             if (adv.status !== 'Cleared') {
-              await updateDoc(doc(db, "advances", adv.id), {
+              batchOps.push(updateDoc(doc(db, "advances", adv.id), {
                 status: 'Cleared',
                 clearedInPayrollMonth: selectedMonth,
                 clearedAt: new Date().toISOString()
-              });
+              }));
             }
           }
 
           // Deduct Fines
           for (let fn of empFines) {
             if (fn.status !== 'Deducted') {
-              await updateDoc(doc(db, "fines", fn.id), {
+              batchOps.push(updateDoc(doc(db, "fines", fn.id), {
                 status: 'Deducted',
                 clearedInPayrollMonth: selectedMonth,
                 clearedAt: new Date().toISOString()
-              });
+              }));
             }
           }
         }
+
+        // Execute all updates simultaneously in parallel
+        await Promise.all(batchOps);
 
         await logSystemActivity(
           'CREATE',
@@ -6960,6 +6967,7 @@ ${messageText}
       let updatedCount = 0;
       let totalFineFixed = 0;
       let totalAdvFixed = 0;
+      const syncOps = [];
 
       try {
         for (const p of payrollList) {
@@ -6984,13 +6992,13 @@ ${messageText}
           const curNet = Number(p.netSalary) || 0;
 
           if (curFine !== autoFine || curAdv !== autoAdvance || curNet !== calculatedNet) {
-            await updateDoc(doc(db, "payrolls", p.id), {
+            syncOps.push(updateDoc(doc(db, "payrolls", p.id), {
               advance: autoAdvance,
               fine: autoFine,
               netSalary: calculatedNet,
               updatedAt: new Date().toISOString(),
               updatedBy: currentUserEmail || 'Auto Sync'
-            });
+            }));
             updatedCount++;
             totalFineFixed += autoFine;
             totalAdvFixed += autoAdvance;
@@ -6999,23 +7007,26 @@ ${messageText}
           // Mark fines as Deducted and advances as Cleared
           for (let fn of empFines) {
             if (fn.status !== 'Deducted') {
-              await updateDoc(doc(db, "fines", fn.id), {
+              syncOps.push(updateDoc(doc(db, "fines", fn.id), {
                 status: 'Deducted',
                 clearedInPayrollMonth: month,
                 clearedAt: new Date().toISOString()
-              });
+              }));
             }
           }
           for (let adv of empAdvances) {
             if (adv.status !== 'Cleared') {
-              await updateDoc(doc(db, "advances", adv.id), {
+              syncOps.push(updateDoc(doc(db, "advances", adv.id), {
                 status: 'Cleared',
                 clearedInPayrollMonth: month,
                 clearedAt: new Date().toISOString()
-              });
+              }));
             }
           }
         }
+
+        // Execute all sync writes in parallel
+        await Promise.all(syncOps);
 
         if (!silent) {
           Swal.fire({
@@ -12141,7 +12152,8 @@ ${messageText}
         targetY = 0;
       });
 
-      // Smooth Animation Loop
+      // Smooth Animation Loop (Optimized: pauses when logged in)
+      let animId = null;
       function animate() {
         if (!loginScreen.classList.contains('hidden')) {
           ctx.clearRect(0, 0, width, height);
@@ -12188,12 +12200,20 @@ ${messageText}
           currentX += (targetX - currentX) * 0.1;
           currentY += (targetY - currentY) * 0.1;
           loginCard.style.transform = `perspective(1200px) rotateX(${currentY}deg) rotateY(${currentX}deg)`;
-        }
 
-        requestAnimationFrame(animate);
+          animId = requestAnimationFrame(animate);
+        } else {
+          animId = null;
+        }
       }
 
       animate();
+
+      window.resumeLoginAnimation = function() {
+        if (!animId && !loginScreen.classList.contains('hidden')) {
+          animate();
+        }
+      };
 
       // Button Ripple Wave Effect
       const loginBtn = document.getElementById('login-btn');

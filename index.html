@@ -34,10 +34,10 @@
     })();
   </script>
   
-  <!-- Google Fonts: Plus Jakarta Sans & Hind Siliguri -->
+  <!-- Google Fonts: Cinzel, Plus Jakarta Sans & Hind Siliguri -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Hind+Siliguri:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -474,24 +474,77 @@
       animation: floatChip1 9s ease-in-out infinite reverse;
     }
 
-    /* Classic Watermark */
-    .classic-watermark {
+    /* ========================================================
+       SANVEE'S LUXURY WATERMARK SYSTEM (সকল পেজ ও প্রিন্ট জলছাপ)
+       ======================================================== */
+    .sanvees-watermark-container {
+      position: fixed;
+      top: 50%;
+      left: calc(50% + 128px);
+      transform: translate(-50%, -50%);
+      width: min(560px, 68vw);
+      height: min(560px, 68vw);
+      max-width: 600px;
+      max-height: 600px;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.3s ease, filter 0.3s ease;
+    }
+
+    @media (max-width: 768px) {
+      .sanvees-watermark-container {
+        left: 50%;
+        width: min(340px, 80vw);
+        height: min(340px, 80vw);
+      }
+    }
+
+    html.dark .sanvees-watermark-container {
+      opacity: 0.095;
+      filter: drop-shadow(0 0 35px rgba(212, 175, 55, 0.25));
+    }
+
+    /* Login Screen Luxury Watermark */
+    .login-watermark {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-10deg);
-      font-size: clamp(4rem, 14vw, 13rem);
-      font-weight: 900;
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      white-space: nowrap;
-      user-select: none;
+      transform: translate(-50%, -50%);
+      width: min(650px, 85vw);
+      height: min(650px, 85vw);
+      max-width: 700px;
+      max-height: 700px;
       pointer-events: none;
-      -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.015);
-      animation: watermarkDrift 14s ease-in-out infinite;
-      z-index: 1;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.12;
+      animation: watermarkDrift 16s ease-in-out infinite;
+      filter: drop-shadow(0 0 45px rgba(212, 175, 55, 0.28));
+    }
+
+    /* Print & Voucher Document Watermark */
+    .print-doc-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 340px;
+      height: 340px;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0.08 !important;
+      z-index: 0;
+    }
+
+    .sanvees-watermark-svg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
 
     .classic-grid-mesh {
@@ -1985,25 +2038,41 @@
         <head>
           <title>${title}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; }
-            h2 { margin-bottom: 4px; }
+            body { font-family: Arial, sans-serif; padding: 25px; color: #1e293b; position: relative; min-height: 90vh; }
+            .print-doc-watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 360px;
+              height: 360px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.08 !important;
+              z-index: 0;
+            }
+            .content-wrapper { position: relative; z-index: 1; }
+            h2 { margin-bottom: 4px; font-family: 'Cinzel', Arial, sans-serif; color: #312e81; }
             p { margin-top: 0; color: #64748b; font-size: 13px; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; background: rgba(255,255,255,0.88); }
             th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
             th { background: #f1f5f9; font-weight: bold; }
           </style>
         </head>
         <body>
-          <h2>${title}</h2>
-          <p>${subtitle}</p>
-          <table>
-            <thead>
-              <tr><th>Employee</th><th>Branch & Role</th><th>Status</th><th>Details</th><th>Contact</th></tr>
-            </thead>
-            <tbody>
-              ${modalContent.innerHTML}
-            </tbody>
-          </table>
+          <div class="print-doc-watermark">${getSanveesWatermarkSVG()}</div>
+          <div class="content-wrapper">
+            <h2>${title}</h2>
+            <p>${subtitle}</p>
+            <table>
+              <thead>
+                <tr><th>Employee</th><th>Branch & Role</th><th>Status</th><th>Details</th><th>Contact</th></tr>
+              </thead>
+              <tbody>
+                ${modalContent.innerHTML}
+              </tbody>
+            </table>
+          </div>
         </body>
         </html>
       `);
@@ -7070,12 +7139,25 @@ ${messageText}
         <head>
           <title>Payslip - ${p.employeeName} (${p.month})</title>
           <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; position: relative; min-height: 90vh; }
+            .print-doc-watermark {
+              position: absolute;
+              top: 52%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 380px;
+              height: 380px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.08 !important;
+              z-index: 0;
+            }
+            .content-wrapper { position: relative; z-index: 1; }
             .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 20px; }
-            .header h1 { margin: 0; color: #4f46e5; font-size: 24px; }
+            .header h1 { margin: 0; color: #4f46e5; font-size: 24px; font-family: 'Cinzel', 'Segoe UI', serif; }
             .info-grid { display: grid; grid-template-columns: 1fr 1fr; margin: 25px 0 15px 0; font-size: 14px; line-height: 1.8; }
             .att-summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; background: rgba(255,255,255,0.85); }
             th, td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
             th { background: #f8fafc; font-weight: bold; }
             .net-row { font-weight: bold; background: #e0e7ff; color: #3730a3; font-size: 16px; }
@@ -7083,56 +7165,59 @@ ${messageText}
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>SANVEE'S MANAGEMENT SUITE</h1>
-            <p>Official Salary Slip • 🏢 ${p.branch || 'Head Office'}</p>
-          </div>
-          <div class="info-grid">
-            <div>
-              <strong>Employee Name:</strong> ${p.employeeName}<br>
-              <strong>Branch:</strong> ${p.branch || 'Head Office'}<br>
-              <strong>Salary Month:</strong> ${p.month}
+          <div class="print-doc-watermark">${getSanveesWatermarkSVG()}</div>
+          <div class="content-wrapper">
+            <div class="header">
+              <h1>SANVEE'S MANAGEMENT SUITE</h1>
+              <p>Official Salary Slip • 🏢 ${p.branch || 'Head Office'}</p>
             </div>
-            <div style="text-align: right;">
-              <strong>Payment Status:</strong> ${p.status}<br>
-              <strong>Issue Date:</strong> ${new Date(p.createdDate).toLocaleDateString()}<br>
-              <strong>Currency:</strong> BDT (৳)
+            <div class="info-grid">
+              <div>
+                <strong>Employee Name:</strong> ${p.employeeName}<br>
+                <strong>Branch:</strong> ${p.branch || 'Head Office'}<br>
+                <strong>Salary Month:</strong> ${p.month}
+              </div>
+              <div style="text-align: right;">
+                <strong>Payment Status:</strong> ${p.status}<br>
+                <strong>Issue Date:</strong> ${new Date(p.createdDate).toLocaleDateString()}<br>
+                <strong>Currency:</strong> BDT (৳)
+              </div>
             </div>
-          </div>
 
-          <div class="att-summary-box">
-            <span>🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
-            <span>🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
-            <span>🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
-            <span>🔴 Absent: <strong style="color: #e11d48;">${p.absentDays || 0} Days</strong></span>
-          </div>
+            <div class="att-summary-box">
+              <span>🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
+              <span>🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
+              <span>🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
+              <span>🔴 Absent: <strong style="color: #e11d48;">${p.absentDays || 0} Days</strong></span>
+            </div>
 
-          <table>
-            <thead>
-              <tr><th>Earnings & Additions</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Earned Basic Salary ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full: ৳${p.baseSalary.toLocaleString()})</small>` : ''}</td>
-                <td>৳ ${p.basicSalary.toLocaleString()}</td>
-                <td>Advance Salary Deducted</td>
-                <td>৳ ${(p.advance || 0).toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Performance Bonus</td>
-                <td>৳ ${(p.bonus || 0).toLocaleString()}</td>
-                <td>Fines / Late Penalties</td>
-                <td>৳ ${(p.fine || 0).toLocaleString()}</td>
-              </tr>
-              <tr class="net-row">
-                <td colspan="2">Net Payable Salary</td>
-                <td colspan="2">৳ ${p.netSalary.toLocaleString()}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="footer">
-            <div>HR & Accounts Authority Signature</div>
-            <div>Employee Signature</div>
+            <table>
+              <thead>
+                <tr><th>Earnings & Additions</th><th>Amount</th><th>Deductions</th><th>Amount</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Earned Basic Salary ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full: ৳${p.baseSalary.toLocaleString()})</small>` : ''}</td>
+                  <td>৳ ${p.basicSalary.toLocaleString()}</td>
+                  <td>Advance Salary Deducted</td>
+                  <td>৳ ${(p.advance || 0).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td>Performance Bonus</td>
+                  <td>৳ ${(p.bonus || 0).toLocaleString()}</td>
+                  <td>Fines / Late Penalties</td>
+                  <td>৳ ${(p.fine || 0).toLocaleString()}</td>
+                </tr>
+                <tr class="net-row">
+                  <td colspan="2">Net Payable Salary</td>
+                  <td colspan="2">৳ ${p.netSalary.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="footer">
+              <div>HR & Accounts Authority Signature</div>
+              <div>Employee Signature</div>
+            </div>
           </div>
         </body>
         </html>
@@ -7283,78 +7368,81 @@ ${messageText}
 
         payslipsHtml += `
           <div class="payslip-card ${!isLast ? 'page-break' : ''}">
-            <div class="header">
-              <div class="header-badge">OFFICIAL SALARY SLIP • SL #${index + 1}</div>
-              <h1>SANVEE'S MANAGEMENT SUITE</h1>
-              <p>Branch: 🏢 <strong>${p.branch || 'Head Office'}</strong> | Salary Month: 📅 <strong>${p.month}</strong></p>
-            </div>
-            
-            <div class="info-grid">
-              <div class="info-col">
-                <div><span class="label">Employee Name:</span> <strong>${p.employeeName}</strong></div>
-                <div><span class="label">Employee ID:</span> <strong>${customCode}</strong></div>
-                <div><span class="label">Designation:</span> <strong>${desig}</strong></div>
-                <div><span class="label">Branch / Outlet:</span> <strong>${p.branch || 'Head Office'}</strong></div>
+            <div class="payslip-watermark">${getSanveesWatermarkSVG()}</div>
+            <div class="payslip-card-content">
+              <div class="header">
+                <div class="header-badge">OFFICIAL SALARY SLIP • SL #${index + 1}</div>
+                <h1>SANVEE'S MANAGEMENT SUITE</h1>
+                <p>Branch: 🏢 <strong>${p.branch || 'Head Office'}</strong> | Salary Month: 📅 <strong>${p.month}</strong></p>
               </div>
-              <div class="info-col right-align">
-                <div><span class="label">Payment Status:</span> <strong style="color: #059669;">${p.status || 'Paid'}</strong></div>
-                <div><span class="label">Issue Date:</span> <strong>${p.createdDate ? new Date(p.createdDate).toLocaleDateString() : new Date().toLocaleDateString()}</strong></div>
-                <div><span class="label">Salary Month:</span> <strong>${p.month}</strong></div>
-                <div><span class="label">Currency:</span> <strong>BDT (৳)</strong></div>
+              
+              <div class="info-grid">
+                <div class="info-col">
+                  <div><span class="label">Employee Name:</span> <strong>${p.employeeName}</strong></div>
+                  <div><span class="label">Employee ID:</span> <strong>${customCode}</strong></div>
+                  <div><span class="label">Designation:</span> <strong>${desig}</strong></div>
+                  <div><span class="label">Branch / Outlet:</span> <strong>${p.branch || 'Head Office'}</strong></div>
+                </div>
+                <div class="info-col right-align">
+                  <div><span class="label">Payment Status:</span> <strong style="color: #059669;">${p.status || 'Paid'}</strong></div>
+                  <div><span class="label">Issue Date:</span> <strong>${p.createdDate ? new Date(p.createdDate).toLocaleDateString() : new Date().toLocaleDateString()}</strong></div>
+                  <div><span class="label">Salary Month:</span> <strong>${p.month}</strong></div>
+                  <div><span class="label">Currency:</span> <strong>BDT (৳)</strong></div>
+                </div>
               </div>
-            </div>
 
-            <div class="att-summary-box">
-              <span class="badge badge-green">🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
-              <span class="badge badge-blue">🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
-              <span class="badge badge-purple">🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
-              <span class="badge badge-red">🔴 Absent: <strong>${p.absentDays || 0} Days</strong></span>
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 50%;">Earnings & Additions</th>
-                  <th style="width: 15%; text-align: right;">Amount</th>
-                  <th style="width: 20%;">Deductions</th>
-                  <th style="width: 15%; text-align: right;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <strong>Earned Basic Salary</strong>
-                    ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full Base: ৳${Number(p.baseSalary).toLocaleString()})</small>` : ''}
-                  </td>
-                  <td style="text-align: right; font-weight: bold;">৳ ${(Number(p.basicSalary) || 0).toLocaleString()}</td>
-                  <td>Advance Salary Deducted</td>
-                  <td style="text-align: right; color: #b45309;">৳ ${(Number(p.advance) || 0).toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td>Performance Bonus / Allowance</td>
-                  <td style="text-align: right; color: #047857; font-weight: bold;">+ ৳ ${(Number(p.bonus) || 0).toLocaleString()}</td>
-                  <td>Fines & Penalties</td>
-                  <td style="text-align: right; color: #b91c1c;">৳ ${(Number(p.fine) || 0).toLocaleString()}</td>
-                </tr>
-                <tr class="net-row">
-                  <td colspan="2" style="font-size: 15px;"><strong>NET PAYABLE SALARY (পরিশোধযোগ্য সর্বমোট বেতন)</strong></td>
-                  <td colspan="2" style="text-align: right; font-size: 17px; font-weight: 900; color: #3730a3;">৳ ${(Number(p.netSalary) || 0).toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div class="footer">
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Prepared By (HR Dept)</div>
+              <div class="att-summary-box">
+                <span class="badge badge-green">🟢 Present: <strong>${p.presentDays || 0} Days</strong></span>
+                <span class="badge badge-blue">🔵 Day Off: <strong>${p.dayOffDays || 0} Days</strong></span>
+                <span class="badge badge-purple">🟣 Approved Leave: <strong>${p.leaveDays || 0} Days</strong></span>
+                <span class="badge badge-red">🔴 Absent: <strong>${p.absentDays || 0} Days</strong></span>
               </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Authorized Accounts Signature</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Employee Signature & Date</div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 50%;">Earnings & Additions</th>
+                    <th style="width: 15%; text-align: right;">Amount</th>
+                    <th style="width: 20%;">Deductions</th>
+                    <th style="width: 15%; text-align: right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <strong>Earned Basic Salary</strong>
+                      ${p.baseSalary && p.baseSalary !== p.basicSalary ? `<br><small style="color:#64748b;">(Full Base: ৳${Number(p.baseSalary).toLocaleString()})</small>` : ''}
+                    </td>
+                    <td style="text-align: right; font-weight: bold;">৳ ${(Number(p.basicSalary) || 0).toLocaleString()}</td>
+                    <td>Advance Salary Deducted</td>
+                    <td style="text-align: right; color: #b45309;">৳ ${(Number(p.advance) || 0).toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td>Performance Bonus / Allowance</td>
+                    <td style="text-align: right; color: #047857; font-weight: bold;">+ ৳ ${(Number(p.bonus) || 0).toLocaleString()}</td>
+                    <td>Fines & Penalties</td>
+                    <td style="text-align: right; color: #b91c1c;">৳ ${(Number(p.fine) || 0).toLocaleString()}</td>
+                  </tr>
+                  <tr class="net-row">
+                    <td colspan="2" style="font-size: 15px;"><strong>NET PAYABLE SALARY (পরিশোধযোগ্য সর্বমোট বেতন)</strong></td>
+                    <td colspan="2" style="text-align: right; font-size: 17px; font-weight: 900; color: #3730a3;">৳ ${(Number(p.netSalary) || 0).toLocaleString()}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="footer">
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Prepared By (HR Dept)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Authorized Accounts Signature</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Employee Signature & Date</div>
+                </div>
               </div>
             </div>
           </div>
@@ -7416,6 +7504,24 @@ ${messageText}
               padding: 30px 35px;
               margin-bottom: 25px;
               box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+              position: relative;
+              overflow: hidden;
+            }
+            .payslip-watermark {
+              position: absolute;
+              top: 52%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 320px;
+              height: 320px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.08 !important;
+              z-index: 0;
+            }
+            .payslip-card-content {
+              position: relative;
+              z-index: 1;
             }
             .header {
               text-align: center;
@@ -7667,6 +7773,23 @@ ${messageText}
               padding: 20px 30px;
               background: #ffffff;
               min-height: 100vh;
+              position: relative;
+            }
+            .sheet-watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 480px;
+              height: 480px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.07 !important;
+              z-index: 0;
+            }
+            .sheet-content {
+              position: relative;
+              z-index: 1;
             }
             .header-table {
               width: 100%;
@@ -7679,6 +7802,7 @@ ${messageText}
               font-weight: 800;
               color: #0369a1;
               margin: 0;
+              font-family: 'Cinzel', 'Segoe UI', serif;
             }
             .header-sub {
               font-size: 12px;
@@ -7689,6 +7813,7 @@ ${messageText}
               width: 100%;
               border-collapse: collapse;
               font-size: 11.5px;
+              background: rgba(255, 255, 255, 0.88);
             }
             table.data-table th, table.data-table td {
               border: 1px solid #cbd5e1;
@@ -7733,70 +7858,73 @@ ${messageText}
             <button onclick="window.print()">🖨️ Print / Save PDF</button>
           </div>
           <div class="sheet-container">
-            <table class="header-table">
-              <tr>
-                <td>
-                  <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
-                  <p class="header-sub">Monthly Master Salary Sheet & Disbursement Statement</p>
-                </td>
-                <td style="text-align: right; font-size: 12px; line-height: 1.5;">
-                  <strong>Branch:</strong> 🏢 ${branchVal === 'ALL' ? 'All Branches (Global)' : branchVal}<br>
-                  <strong>Salary Month:</strong> 📅 ${monthVal}<br>
-                  <strong>Total Employees:</strong> 👥 ${filtered.length} জন | <strong>Grand Total Payout:</strong> ৳ ${totalNet.toLocaleString()}
-                </td>
-              </tr>
-            </table>
-
-            <table class="data-table">
-              <thead>
+            <div class="sheet-watermark">${getSanveesWatermarkSVG()}</div>
+            <div class="sheet-content">
+              <table class="header-table">
                 <tr>
-                  <th style="width: 30px;">#</th>
-                  <th>ID</th>
-                  <th>Employee Name</th>
-                  <th>Designation</th>
-                  <th>Branch</th>
-                  <th>Attendance (P/O/L/A)</th>
-                  <th>Base Salary</th>
-                  <th>Earned Basic</th>
-                  <th>Bonus</th>
-                  <th>Advance</th>
-                  <th>Fine</th>
-                  <th>Net Payable</th>
-                  <th>Status</th>
-                  <th>Receiver Signature</th>
+                  <td>
+                    <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
+                    <p class="header-sub">Monthly Master Salary Sheet & Disbursement Statement</p>
+                  </td>
+                  <td style="text-align: right; font-size: 12px; line-height: 1.5;">
+                    <strong>Branch:</strong> 🏢 ${branchVal === 'ALL' ? 'All Branches (Global)' : branchVal}<br>
+                    <strong>Salary Month:</strong> 📅 ${monthVal}<br>
+                    <strong>Total Employees:</strong> 👥 ${filtered.length} জন | <strong>Grand Total Payout:</strong> ৳ ${totalNet.toLocaleString()}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-                <tr class="grand-total-row">
-                  <td colspan="6" style="text-align: right; font-size: 12px;">GRAND TOTAL (সর্বমোট) :</td>
-                  <td style="text-align: right;">৳ ${totalBase.toLocaleString()}</td>
-                  <td style="text-align: right;">৳ ${totalEarned.toLocaleString()}</td>
-                  <td style="text-align: right; color:#047857;">+৳ ${totalBonus.toLocaleString()}</td>
-                  <td style="text-align: right; color:#b45309;">-৳ ${totalAdvance.toLocaleString()}</td>
-                  <td style="text-align: right; color:#b91c1c;">-৳ ${totalFine.toLocaleString()}</td>
-                  <td style="text-align: right; font-size: 14px; font-weight: 900; color: #1e1b4b; background: #c7d2fe;">৳ ${totalNet.toLocaleString()}</td>
-                  <td colspan="2" style="text-align: center;">${filtered.length} Employees</td>
-                </tr>
-              </tbody>
-            </table>
+              </table>
 
-            <div class="footer-signatures">
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Prepared By (HR Executive)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Checked By (Accounts Manager)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Approved By (Branch Incharge)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Managing Director / CEO</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>ID</th>
+                    <th>Employee Name</th>
+                    <th>Designation</th>
+                    <th>Branch</th>
+                    <th>Attendance (P/O/L/A)</th>
+                    <th>Base Salary</th>
+                    <th>Earned Basic</th>
+                    <th>Bonus</th>
+                    <th>Advance</th>
+                    <th>Fine</th>
+                    <th>Net Payable</th>
+                    <th>Status</th>
+                    <th>Receiver Signature</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                  <tr class="grand-total-row">
+                    <td colspan="6" style="text-align: right; font-size: 12px;">GRAND TOTAL (সর্বমোট) :</td>
+                    <td style="text-align: right;">৳ ${totalBase.toLocaleString()}</td>
+                    <td style="text-align: right;">৳ ${totalEarned.toLocaleString()}</td>
+                    <td style="text-align: right; color:#047857;">+৳ ${totalBonus.toLocaleString()}</td>
+                    <td style="text-align: right; color:#b45309;">-৳ ${totalAdvance.toLocaleString()}</td>
+                    <td style="text-align: right; color:#b91c1c;">-৳ ${totalFine.toLocaleString()}</td>
+                    <td style="text-align: right; font-size: 14px; font-weight: 900; color: #1e1b4b; background: #c7d2fe;">৳ ${totalNet.toLocaleString()}</td>
+                    <td colspan="2" style="text-align: center;">${filtered.length} Employees</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="footer-signatures">
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Prepared By (HR Executive)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Checked By (Accounts Manager)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Approved By (Branch Incharge)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Managing Director / CEO</div>
+                </div>
               </div>
             </div>
           </div>
@@ -7931,6 +8059,23 @@ ${messageText}
               padding: 20px 30px;
               background: #ffffff;
               min-height: 100vh;
+              position: relative;
+            }
+            .sheet-watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 480px;
+              height: 480px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.07 !important;
+              z-index: 0;
+            }
+            .sheet-content {
+              position: relative;
+              z-index: 1;
             }
             .header-table {
               width: 100%;
@@ -7943,6 +8088,7 @@ ${messageText}
               font-weight: 800;
               color: #be123c;
               margin: 0;
+              font-family: 'Cinzel', 'Segoe UI', serif;
             }
             .header-sub {
               font-size: 12px;
@@ -7953,6 +8099,7 @@ ${messageText}
               width: 100%;
               border-collapse: collapse;
               font-size: 11px;
+              background: rgba(255, 255, 255, 0.88);
             }
             table.data-table th, table.data-table td {
               border: 1px solid #cbd5e1;
@@ -7997,64 +8144,67 @@ ${messageText}
             <button onclick="window.print()">🖨️ Print / Save PDF</button>
           </div>
           <div class="sheet-container">
-            <table class="header-table">
-              <tr>
-                <td>
-                  <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
-                  <p class="header-sub">Monthly Employee Fine & Disciplinary Penalty Statement (কর্মচারী জরিমানা ও শৃঙ্খলা রেকর্ড)</p>
-                </td>
-                <td style="text-align: right; font-size: 12px; line-height: 1.5;">
-                  <strong>Branch:</strong> 🏢 ${branchVal}<br>
-                  <strong>Target Month:</strong> 📅 ${monthVal}<br>
-                  <strong>Total Records:</strong> 📋 ${filtered.length} টি | <strong>Total Fine:</strong> ৳ ${totalAmount.toLocaleString()}
-                </td>
-              </tr>
-            </table>
-
-            <table class="data-table">
-              <thead>
+            <div class="sheet-watermark">${getSanveesWatermarkSVG()}</div>
+            <div class="sheet-content">
+              <table class="header-table">
                 <tr>
-                  <th style="width: 30px;">#</th>
-                  <th>ID</th>
-                  <th>Employee Name</th>
-                  <th>Designation</th>
-                  <th>Branch</th>
-                  <th>Month</th>
-                  <th>Fine Date</th>
-                  <th>Category</th>
-                  <th>Reason / Violation Details</th>
-                  <th>Fine Amount</th>
-                  <th>Recorded By</th>
-                  <th>Status</th>
-                  <th>Authorized Signature</th>
+                  <td>
+                    <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
+                    <p class="header-sub">Monthly Employee Fine & Disciplinary Penalty Statement (কর্মচারী জরিমানা ও শৃঙ্খলা রেকর্ড)</p>
+                  </td>
+                  <td style="text-align: right; font-size: 12px; line-height: 1.5;">
+                    <strong>Branch:</strong> 🏢 ${branchVal}<br>
+                    <strong>Target Month:</strong> 📅 ${monthVal}<br>
+                    <strong>Total Records:</strong> 📋 ${filtered.length} টি | <strong>Total Fine:</strong> ৳ ${totalAmount.toLocaleString()}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-                <tr class="grand-total-row">
-                  <td colspan="9" style="text-align: right; font-size: 12px;">GRAND TOTAL FINE (সর্বমোট জরিমানা) :</td>
-                  <td style="text-align: right; font-size: 13.5px; font-weight: 900; color: #9f1239;">৳ ${totalAmount.toLocaleString()}</td>
-                  <td colspan="3" style="text-align: center; font-size: 11px;">(Deducted: ৳${totalDeducted.toLocaleString()} | Pending: ৳${totalPending.toLocaleString()})</td>
-                </tr>
-              </tbody>
-            </table>
+              </table>
 
-            <div class="footer-signatures">
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Recorded By (HR / Supervisor)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Checked By (Accounts Manager)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Approved By (Branch Incharge)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Managing Director / CEO</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>ID</th>
+                    <th>Employee Name</th>
+                    <th>Designation</th>
+                    <th>Branch</th>
+                    <th>Month</th>
+                    <th>Fine Date</th>
+                    <th>Category</th>
+                    <th>Reason / Violation Details</th>
+                    <th>Fine Amount</th>
+                    <th>Recorded By</th>
+                    <th>Status</th>
+                    <th>Authorized Signature</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                  <tr class="grand-total-row">
+                    <td colspan="9" style="text-align: right; font-size: 12px;">GRAND TOTAL FINE (সর্বমোট জরিমানা) :</td>
+                    <td style="text-align: right; font-size: 13.5px; font-weight: 900; color: #9f1239;">৳ ${totalAmount.toLocaleString()}</td>
+                    <td colspan="3" style="text-align: center; font-size: 11px;">(Deducted: ৳${totalDeducted.toLocaleString()} | Pending: ৳${totalPending.toLocaleString()})</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="footer-signatures">
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Recorded By (HR / Supervisor)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Checked By (Accounts Manager)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Approved By (Branch Incharge)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Managing Director / CEO</div>
+                </div>
               </div>
             </div>
           </div>
@@ -8187,6 +8337,23 @@ ${messageText}
               padding: 20px 30px;
               background: #ffffff;
               min-height: 100vh;
+              position: relative;
+            }
+            .sheet-watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 480px;
+              height: 480px;
+              pointer-events: none;
+              user-select: none;
+              opacity: 0.07 !important;
+              z-index: 0;
+            }
+            .sheet-content {
+              position: relative;
+              z-index: 1;
             }
             .header-table {
               width: 100%;
@@ -8199,6 +8366,7 @@ ${messageText}
               font-weight: 800;
               color: #92400e;
               margin: 0;
+              font-family: 'Cinzel', 'Segoe UI', serif;
             }
             .header-sub {
               font-size: 12px;
@@ -8209,6 +8377,7 @@ ${messageText}
               width: 100%;
               border-collapse: collapse;
               font-size: 11px;
+              background: rgba(255, 255, 255, 0.88);
             }
             table.data-table th, table.data-table td {
               border: 1px solid #cbd5e1;
@@ -8253,63 +8422,66 @@ ${messageText}
             <button onclick="window.print()">🖨️ Print / Save PDF</button>
           </div>
           <div class="sheet-container">
-            <table class="header-table">
-              <tr>
-                <td>
-                  <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
-                  <p class="header-sub">Monthly Advance Salary & Loan Disbursement Statement (মাসিক অগ্রিম বেতন ও লোন বিতরণ শিট)</p>
-                </td>
-                <td style="text-align: right; font-size: 12px; line-height: 1.5;">
-                  <strong>Branch:</strong> 🏢 ${branchVal}<br>
-                  <strong>Target Month:</strong> 📅 ${monthVal}<br>
-                  <strong>Total Records:</strong> 👥 ${filtered.length} টি | <strong>Total Advance:</strong> ৳ ${totalAmount.toLocaleString()}
-                </td>
-              </tr>
-            </table>
-
-            <table class="data-table">
-              <thead>
+            <div class="sheet-watermark">${getSanveesWatermarkSVG()}</div>
+            <div class="sheet-content">
+              <table class="header-table">
                 <tr>
-                  <th style="width: 30px;">#</th>
-                  <th>ID</th>
-                  <th>Employee Name</th>
-                  <th>Designation</th>
-                  <th>Branch</th>
-                  <th>Month</th>
-                  <th>Issue Date</th>
-                  <th>Note / Purpose</th>
-                  <th>Advance Amount</th>
-                  <th>Applied By</th>
-                  <th>Status</th>
-                  <th>Receiver Signature</th>
+                  <td>
+                    <h1 class="header-title">SANVEE'S MANAGEMENT SUITE</h1>
+                    <p class="header-sub">Monthly Advance Salary & Loan Disbursement Statement (মাসিক অগ্রিম বেতন ও লোন বিতরণ শিট)</p>
+                  </td>
+                  <td style="text-align: right; font-size: 12px; line-height: 1.5;">
+                    <strong>Branch:</strong> 🏢 ${branchVal}<br>
+                    <strong>Target Month:</strong> 📅 ${monthVal}<br>
+                    <strong>Total Records:</strong> 👥 ${filtered.length} টি | <strong>Total Advance:</strong> ৳ ${totalAmount.toLocaleString()}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                ${tableRows}
-                <tr class="grand-total-row">
-                  <td colspan="8" style="text-align: right; font-size: 12px;">GRAND TOTAL ADVANCE (সর্বমোট অগ্রিম) :</td>
-                  <td style="text-align: right; font-size: 13.5px; font-weight: 900; color: #92400e;">৳ ${totalAmount.toLocaleString()}</td>
-                  <td colspan="3" style="text-align: center; font-size: 11px;">(Cleared: ৳${totalCleared.toLocaleString()} | Approved: ৳${totalApproved.toLocaleString()} | Pending: ৳${totalPending.toLocaleString()})</td>
-                </tr>
-              </tbody>
-            </table>
+              </table>
 
-            <div class="footer-signatures">
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Prepared By (HR Executive)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Disbursed By (Accounts Manager)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Approved By (Branch Incharge)</div>
-              </div>
-              <div class="sig-box">
-                <div class="sig-line"></div>
-                <div>Managing Director / CEO</div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>ID</th>
+                    <th>Employee Name</th>
+                    <th>Designation</th>
+                    <th>Branch</th>
+                    <th>Month</th>
+                    <th>Issue Date</th>
+                    <th>Note / Purpose</th>
+                    <th>Advance Amount</th>
+                    <th>Applied By</th>
+                    <th>Status</th>
+                    <th>Receiver Signature</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                  <tr class="grand-total-row">
+                    <td colspan="8" style="text-align: right; font-size: 12px;">GRAND TOTAL ADVANCE (সর্বমোট অগ্রিম) :</td>
+                    <td style="text-align: right; font-size: 13.5px; font-weight: 900; color: #92400e;">৳ ${totalAmount.toLocaleString()}</td>
+                    <td colspan="3" style="text-align: center; font-size: 11px;">(Cleared: ৳${totalCleared.toLocaleString()} | Approved: ৳${totalApproved.toLocaleString()} | Pending: ৳${totalPending.toLocaleString()})</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="footer-signatures">
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Prepared By (HR Executive)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Disbursed By (Accounts Manager)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Approved By (Branch Incharge)</div>
+                </div>
+                <div class="sig-box">
+                  <div class="sig-line"></div>
+                  <div>Managing Director / CEO</div>
+                </div>
               </div>
             </div>
           </div>
@@ -9632,6 +9804,41 @@ ${messageText}
       }
     };
 
+    // Global Reusable SANVEE'S Luxury Watermark SVG Template
+    function getSanveesWatermarkSVG(customClass = 'sanvees-watermark-svg') {
+      return `
+        <svg class="${customClass}" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sanveesGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F2D06B"/>
+              <stop offset="25%" stop-color="#FDF3B8"/>
+              <stop offset="50%" stop-color="#D4AF37"/>
+              <stop offset="75%" stop-color="#A27116"/>
+              <stop offset="100%" stop-color="#C59B27"/>
+            </linearGradient>
+            <linearGradient id="sanveesRingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#AA771C"/>
+              <stop offset="30%" stop-color="#FDF3B8"/>
+              <stop offset="50%" stop-color="#D4AF37"/>
+              <stop offset="85%" stop-color="#FDF6D8"/>
+              <stop offset="100%" stop-color="#996515"/>
+            </linearGradient>
+            <filter id="goldGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#784b00" flood-opacity="0.35"/>
+            </filter>
+          </defs>
+          <g filter="url(#goldGlowFilter)">
+            <path d="M 115 350 A 200 200 0 1 1 485 350" fill="none" stroke="url(#sanveesRingGrad)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 230 460 A 200 200 0 0 0 370 460" fill="none" stroke="url(#sanveesRingGrad)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 320 140 C 290 135 240 148 240 185 C 240 220 280 234 310 248 C 345 264 370 282 370 320 C 370 368 318 385 265 378 C 235 374 212 356 200 342 L 222 318 C 234 332 254 350 280 354 C 315 356 340 340 340 314 C 340 288 312 272 280 256 C 245 240 210 220 210 182 C 210 134 265 108 322 112 C 348 114 370 125 384 138 L 364 162 C 352 150 336 142 320 140 Z" fill="url(#sanveesGoldGrad)" />
+            <path d="M 252 140 L 286 140 L 322 320 L 378 140 L 412 140 L 338 385 L 308 385 L 252 140 Z" fill="url(#sanveesGoldGrad)" />
+            <text x="300" y="420" font-family="'Cinzel', 'Playfair Display', 'Times New Roman', serif" font-size="50" font-weight="900" letter-spacing="8" fill="url(#sanveesGoldGrad)" text-anchor="middle">SANVEE'S</text>
+          </g>
+        </svg>
+      `;
+    }
+    window.getSanveesWatermarkSVG = getSanveesWatermarkSVG;
+
     window.addEventListener('DOMContentLoaded', () => {
       window.updateThemeIcon();
     });
@@ -9655,8 +9862,37 @@ ${messageText}
     <div class="absolute -bottom-40 -right-40 w-[550px] h-[550px] bg-cyan-600/15 rounded-full blur-[130px] pointer-events-none auraPulse z-0" style="animation-delay: -3s;"></div>
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-indigo-900/15 rounded-full blur-[150px] pointer-events-none z-0"></div>
 
-    <!-- Classic Watermark -->
-    <div class="classic-watermark">SANVEE'S</div>
+    <!-- Luxury SANVEE'S Gold Emblem Watermark for Login -->
+    <div class="login-watermark">
+      <svg class="sanvees-watermark-svg" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="loginGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#F2D06B"/>
+            <stop offset="25%" stop-color="#FDF3B8"/>
+            <stop offset="50%" stop-color="#D4AF37"/>
+            <stop offset="75%" stop-color="#A27116"/>
+            <stop offset="100%" stop-color="#C59B27"/>
+          </linearGradient>
+          <linearGradient id="loginRingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#AA771C"/>
+            <stop offset="30%" stop-color="#FDF3B8"/>
+            <stop offset="50%" stop-color="#D4AF37"/>
+            <stop offset="85%" stop-color="#FDF6D8"/>
+            <stop offset="100%" stop-color="#996515"/>
+          </linearGradient>
+          <filter id="loginGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#b8860b" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+        <g filter="url(#loginGoldGlow)">
+          <path d="M 115 350 A 200 200 0 1 1 485 350" fill="none" stroke="url(#loginRingGrad)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M 230 460 A 200 200 0 0 0 370 460" fill="none" stroke="url(#loginRingGrad)" stroke-width="5" stroke-linecap="round"/>
+          <path d="M 320 140 C 290 135 240 148 240 185 C 240 220 280 234 310 248 C 345 264 370 282 370 320 C 370 368 318 385 265 378 C 235 374 212 356 200 342 L 222 318 C 234 332 254 350 280 354 C 315 356 340 340 340 314 C 340 288 312 272 280 256 C 245 240 210 220 210 182 C 210 134 265 108 322 112 C 348 114 370 125 384 138 L 364 162 C 352 150 336 142 320 140 Z" fill="url(#loginGoldGrad)" />
+          <path d="M 252 140 L 286 140 L 322 320 L 378 140 L 412 140 L 338 385 L 308 385 L 252 140 Z" fill="url(#loginGoldGrad)" />
+          <text x="300" y="420" font-family="'Cinzel', 'Playfair Display', 'Times New Roman', serif" font-size="50" font-weight="900" letter-spacing="8" fill="url(#loginGoldGrad)" text-anchor="middle">SANVEE'S</text>
+        </g>
+      </svg>
+    </div>
 
     <!-- Surrounding Floating Executive Badges -->
     <div class="hidden md:flex items-center space-x-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/75 border border-slate-700/60 backdrop-blur-md shadow-2xl text-xs font-semibold text-slate-300 absolute top-12 left-12 floating-chip-1 z-10 pointer-events-none">
@@ -9868,7 +10104,42 @@ ${messageText}
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen relative">
+      
+      <!-- Global Background Luxury Watermark for All Application Pages/Tabs -->
+      <div id="sanvees-global-watermark" class="sanvees-watermark-container" aria-hidden="true">
+        <svg class="sanvees-watermark-svg" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="appGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F2D06B"/>
+              <stop offset="25%" stop-color="#FDF3B8"/>
+              <stop offset="50%" stop-color="#D4AF37"/>
+              <stop offset="75%" stop-color="#A27116"/>
+              <stop offset="100%" stop-color="#C59B27"/>
+            </linearGradient>
+            <linearGradient id="appRingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#AA771C"/>
+              <stop offset="30%" stop-color="#FDF3B8"/>
+              <stop offset="50%" stop-color="#D4AF37"/>
+              <stop offset="85%" stop-color="#FDF6D8"/>
+              <stop offset="100%" stop-color="#996515"/>
+            </linearGradient>
+            <filter id="appGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#784b00" flood-opacity="0.3"/>
+            </filter>
+          </defs>
+          <g filter="url(#appGoldGlow)">
+            <!-- Circular Crest Arcs -->
+            <path d="M 115 350 A 200 200 0 1 1 485 350" fill="none" stroke="url(#appRingGrad)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 230 460 A 200 200 0 0 0 370 460" fill="none" stroke="url(#appRingGrad)" stroke-width="5" stroke-linecap="round"/>
+            <!-- Monogram SV -->
+            <path d="M 320 140 C 290 135 240 148 240 185 C 240 220 280 234 310 248 C 345 264 370 282 370 320 C 370 368 318 385 265 378 C 235 374 212 356 200 342 L 222 318 C 234 332 254 350 280 354 C 315 356 340 340 340 314 C 340 288 312 272 280 256 C 245 240 210 220 210 182 C 210 134 265 108 322 112 C 348 114 370 125 384 138 L 364 162 C 352 150 336 142 320 140 Z" fill="url(#appGoldGrad)" />
+            <path d="M 252 140 L 286 140 L 322 320 L 378 140 L 412 140 L 338 385 L 308 385 L 252 140 Z" fill="url(#appGoldGrad)" />
+            <!-- SANVEE'S Wordmark -->
+            <text x="300" y="420" font-family="'Cinzel', 'Playfair Display', 'Times New Roman', serif" font-size="50" font-weight="900" letter-spacing="8" fill="url(#appGoldGrad)" text-anchor="middle">SANVEE'S</text>
+          </g>
+        </svg>
+      </div>
       
       <!-- Top Header Bar -->
       <header class="bg-white border-b border-slate-200/80 px-6 py-4 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-10 shadow-xs">

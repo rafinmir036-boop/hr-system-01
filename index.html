@@ -64,10 +64,197 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
-    .sidebar-active {
-      background: #1e1b4b !important;
-      color: #818cf8 !important;
-      border-left: 3.5px solid #6366f1;
+    /* ========================================================
+       ROYAL PURPLE LUXURY GLASSMORPHISM SIDEBAR & ANIMATIONS
+       ======================================================== */
+    @keyframes purpleGlassPulse {
+      0%, 100% {
+        box-shadow: 0 0 25px rgba(147, 51, 234, 0.18), inset 0 0 30px rgba(168, 85, 247, 0.08);
+        border-color: rgba(168, 85, 247, 0.28);
+      }
+      50% {
+        box-shadow: 0 0 45px rgba(168, 85, 247, 0.32), inset 0 0 45px rgba(192, 132, 252, 0.15);
+        border-color: rgba(192, 132, 252, 0.45);
+      }
+    }
+
+    @keyframes purpleGlassShimmer {
+      0% {
+        transform: translateY(-120%) rotate(35deg);
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.6;
+      }
+      50% {
+        transform: translateY(120%) rotate(35deg);
+        opacity: 0.85;
+      }
+      70% {
+        opacity: 0.3;
+      }
+      100% {
+        transform: translateY(240%) rotate(35deg);
+        opacity: 0;
+      }
+    }
+
+    @keyframes floatOrb {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-14px) scale(1.08); }
+    }
+
+    @keyframes purpleIconPulse {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.6)); }
+      50% { filter: drop-shadow(0 0 10px rgba(216, 180, 254, 0.95)); }
+    }
+
+    aside.purple-glass-sidebar {
+      background: linear-gradient(175deg, rgba(22, 10, 48, 0.95) 0%, rgba(42, 16, 88, 0.90) 45%, rgba(16, 7, 36, 0.97) 100%) !important;
+      backdrop-filter: blur(24px) saturate(200%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+      border-right: 1px solid rgba(168, 85, 247, 0.28) !important;
+      position: relative;
+      overflow: hidden;
+      animation: purpleGlassPulse 8s ease-in-out infinite;
+      z-index: 20;
+    }
+
+    html.dark aside.purple-glass-sidebar {
+      background: linear-gradient(175deg, rgba(15, 6, 34, 0.97) 0%, rgba(32, 12, 68, 0.94) 45%, rgba(10, 4, 24, 0.99) 100%) !important;
+      border-right: 1px solid rgba(192, 132, 252, 0.25) !important;
+    }
+
+    /* Ambient Glowing Purple Nebula Orbs in Sidebar */
+    .sidebar-purple-orb-1 {
+      position: absolute;
+      top: -60px;
+      left: -60px;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.38) 0%, rgba(147, 51, 234, 0.12) 70%, transparent 100%);
+      border-radius: 9999px;
+      filter: blur(40px);
+      pointer-events: none;
+      animation: floatOrb 7s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    .sidebar-purple-orb-2 {
+      position: absolute;
+      bottom: -60px;
+      right: -60px;
+      width: 210px;
+      height: 210px;
+      background: radial-gradient(circle, rgba(217, 70, 239, 0.32) 0%, rgba(126, 34, 206, 0.1) 70%, transparent 100%);
+      border-radius: 9999px;
+      filter: blur(35px);
+      pointer-events: none;
+      animation: floatOrb 9s ease-in-out infinite reverse;
+      z-index: 0;
+    }
+
+    /* Animated Glass Sheen Light Sweep */
+    .sidebar-glass-sheen {
+      position: absolute;
+      top: -50%;
+      left: -100%;
+      width: 300%;
+      height: 200%;
+      background: linear-gradient(
+        105deg,
+        transparent 35%,
+        rgba(255, 255, 255, 0.02) 45%,
+        rgba(216, 180, 254, 0.1) 50%,
+        rgba(255, 255, 255, 0.03) 55%,
+        transparent 65%
+      );
+      pointer-events: none;
+      animation: purpleGlassShimmer 11s ease-in-out infinite;
+      z-index: 1;
+    }
+
+    /* Sidebar Navigation Links - Frosted Purple Glass Capsules */
+    #sidebar-nav button {
+      position: relative;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #cbd5e1 !important;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    #sidebar-nav button:hover {
+      background: linear-gradient(90deg, rgba(168, 85, 247, 0.26) 0%, rgba(147, 51, 234, 0.15) 100%) !important;
+      border-color: rgba(192, 132, 252, 0.4) !important;
+      color: #ffffff !important;
+      transform: translateX(4px);
+      box-shadow: 0 4px 18px -2px rgba(147, 51, 234, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+    }
+
+    #sidebar-nav button:hover i {
+      transform: scale(1.18);
+      filter: drop-shadow(0 0 8px rgba(216, 180, 254, 0.9));
+    }
+
+    #sidebar-nav button i {
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    /* Active Sidebar Nav Item (Royal Purple Glass Active State) */
+    .sidebar-active,
+    #sidebar-nav button.sidebar-active {
+      background: linear-gradient(135deg, rgba(147, 51, 234, 0.45) 0%, rgba(168, 85, 247, 0.25) 100%) !important;
+      border: 1px solid rgba(216, 180, 254, 0.5) !important;
+      border-left: 4px solid #d8b4fe !important;
+      color: #ffffff !important;
+      font-weight: 700 !important;
+      box-shadow: 0 6px 22px -2px rgba(147, 51, 234, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
+      text-shadow: 0 0 12px rgba(192, 132, 252, 0.7);
+    }
+
+    .sidebar-active i,
+    #sidebar-nav button.sidebar-active i {
+      color: #f5d0fe !important;
+      animation: purpleIconPulse 3s ease-in-out infinite;
+      transform: scale(1.15);
+    }
+
+    /* Sidebar Header Banner */
+    .sidebar-header-banner {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(147, 51, 234, 0.12) 100%);
+      border-bottom: 1px solid rgba(168, 85, 247, 0.25);
+      backdrop-filter: blur(12px);
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Sidebar Footer Box */
+    .sidebar-footer-box {
+      border-top: 1px solid rgba(168, 85, 247, 0.22);
+      background: rgba(15, 6, 34, 0.5);
+      backdrop-filter: blur(12px);
+      position: relative;
+      z-index: 2;
+    }
+
+    .sidebar-logout-btn {
+      background: rgba(147, 51, 234, 0.18) !important;
+      border: 1px solid rgba(168, 85, 247, 0.3) !important;
+      color: #e9d5ff !important;
+      backdrop-filter: blur(8px);
+      transition: all 0.25s ease !important;
+    }
+
+    .sidebar-logout-btn:hover {
+      background: linear-gradient(135deg, rgba(225, 29, 72, 0.4) 0%, rgba(244, 63, 94, 0.22) 100%) !important;
+      border-color: rgba(251, 113, 133, 0.5) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 18px rgba(225, 29, 72, 0.4) !important;
+      transform: translateY(-1px);
     }
 
     /* ========================================================
@@ -90,10 +277,6 @@
     }
     html.dark #page-subtitle {
       color: #94a3b8 !important;
-    }
-    html.dark aside {
-      background-color: #080c14 !important;
-      border-color: #1e293b !important;
     }
     html.dark .bg-white {
       background-color: #111827 !important;
@@ -10018,86 +10201,92 @@ ${messageText}
   <!-- 2. MAIN APPLICATION -->
   <div id="app-screen" class="hidden flex-1 flex flex-col md:flex-row min-h-screen">
     
-    <!-- Sidebar -->
-    <aside class="w-full md:w-64 bg-slate-950 text-slate-300 flex flex-col justify-between border-r border-slate-800 shrink-0">
-      <div>
+    <!-- Sidebar (Royal Purple Luxury Glassmorphism) -->
+    <aside class="w-full md:w-64 purple-glass-sidebar text-slate-200 flex flex-col justify-between shrink-0">
+      
+      <!-- Glowing Ambient Background Orbs & Animated Glass Sheen -->
+      <div class="sidebar-purple-orb-1"></div>
+      <div class="sidebar-purple-orb-2"></div>
+      <div class="sidebar-glass-sheen"></div>
+
+      <div class="relative z-10">
         <!-- Logo & Header -->
-        <div class="p-5 flex items-center space-x-3 border-b border-slate-800/80">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/30 overflow-hidden shrink-0">
-            <svg class="w-10 h-10" viewBox="0 0 100 100">
+        <div class="p-5 flex items-center space-x-3 sidebar-header-banner">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/40 overflow-hidden shrink-0 bg-gradient-to-tr from-purple-700 via-violet-600 to-fuchsia-500 p-0.5 border border-purple-400/30">
+            <svg class="w-full h-full" viewBox="0 0 100 100">
               <defs>
                 <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#4f46e5"/>
-                  <stop offset="50%" stop-color="#7c3aed"/>
-                  <stop offset="100%" stop-color="#06b6d4"/>
+                  <stop offset="0%" stop-color="#7e22ce"/>
+                  <stop offset="50%" stop-color="#a855f7"/>
+                  <stop offset="100%" stop-color="#ec4899"/>
                 </linearGradient>
               </defs>
               <rect width="100" height="100" rx="24" fill="url(#sbGrad)"/>
-              <rect x="4" y="4" width="92" height="92" rx="20" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+              <rect x="4" y="4" width="92" height="92" rx="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
               <circle cx="50" cy="30" r="8" fill="#ffffff"/>
               <circle cx="30" cy="62" r="7" fill="#ffffff"/>
               <circle cx="70" cy="62" r="7" fill="#ffffff"/>
-              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-              <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
+              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+              <circle cx="50" cy="51" r="5" fill="#f0abfc" stroke="#ffffff" stroke-width="2.5"/>
               <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
             </svg>
           </div>
           <div class="min-w-0">
             <h2 class="font-black text-sm text-white tracking-wide truncate">SANVEE'S</h2>
-            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
+            <p class="text-[10px] text-purple-300 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
           </div>
         </div>
 
         <!-- Navigation Links -->
         <nav id="sidebar-nav" class="p-3 space-y-1 text-xs font-semibold">
-          <button id="nav-dashboard" onclick="switchNav('dashboard')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 transition sidebar-active">
-            <i class="fa-solid fa-chart-pie text-indigo-400 w-4"></i><span>Dashboard</span>
+          <button id="nav-dashboard" onclick="switchNav('dashboard')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl sidebar-active">
+            <i class="fa-solid fa-chart-pie text-purple-300 w-4"></i><span>Dashboard</span>
           </button>
-          <button id="nav-employees" onclick="switchNav('employees')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-employees" onclick="switchNav('employees')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-user-group text-emerald-400 w-4"></i><span>Employees</span>
           </button>
-          <button id="nav-attendance" onclick="switchNav('attendance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-attendance" onclick="switchNav('attendance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-clock text-amber-400 w-4"></i><span>Attendance</span>
           </button>
-          <button id="nav-advance" onclick="switchNav('advance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-advance" onclick="switchNav('advance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-hand-holding-dollar text-emerald-400 w-4"></i><span>Advance Salary</span>
           </button>
-          <button id="nav-fine" onclick="switchNav('fine')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-fine" onclick="switchNav('fine')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-gavel text-rose-400 w-4"></i><span>Fines / Penalties</span>
           </button>
-          <button id="nav-leave" onclick="switchNav('leave')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-leave" onclick="switchNav('leave')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-calendar-check text-rose-400 w-4"></i><span>Leave Requests</span>
           </button>
-          <button id="nav-payroll" onclick="switchNav('payroll')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-payroll" onclick="switchNav('payroll')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-money-check-dollar text-teal-400 w-4"></i><span>Payroll</span>
           </button>
-          <button id="nav-increment" onclick="switchNav('increment')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-increment" onclick="switchNav('increment')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-arrow-trend-up text-violet-400 w-4"></i><span>Increment</span>
           </button>
-          <button id="nav-documents" onclick="switchNav('documents')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-documents" onclick="switchNav('documents')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-folder-closed text-sky-400 w-4"></i><span>Documents</span>
           </button>
-          <button id="nav-performance" onclick="switchNav('performance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-performance" onclick="switchNav('performance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-star text-pink-400 w-4"></i><span>Performance</span>
           </button>
-          <button id="nav-notice" onclick="switchNav('notice')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-notice" onclick="switchNav('notice')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-bullhorn text-orange-400 w-4"></i><span>Notice Board</span>
           </button>
-          <button id="nav-reports" onclick="switchNav('reports')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-reports" onclick="switchNav('reports')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-file-invoice text-blue-400 w-4"></i><span>Reports & Analytics</span>
           </button>
-          <button id="nav-activity" onclick="switchNav('activity')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
+          <button id="nav-activity" onclick="switchNav('activity')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-clock-rotate-left text-cyan-400 w-4"></i><span>Activity Logs (অডিট রেকর্ড)</span>
           </button>
-          <button id="nav-settings" onclick="switchNav('settings')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-slate-200 transition">
-            <i class="fa-solid fa-gear text-slate-400 w-4"></i><span>Settings</span>
+          <button id="nav-settings" onclick="switchNav('settings')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
+            <i class="fa-solid fa-gear text-purple-300 w-4"></i><span>Settings</span>
           </button>
         </nav>
       </div>
 
       <!-- Logout & User Info -->
-      <div class="p-4 border-t border-slate-800">
-        <button onclick="logoutUser()" class="w-full flex items-center justify-center space-x-2 py-2.5 bg-slate-900 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 rounded-xl text-xs font-bold transition">
+      <div class="p-4 sidebar-footer-box">
+        <button onclick="logoutUser()" class="w-full flex items-center justify-center space-x-2 py-2.5 sidebar-logout-btn rounded-xl text-xs font-bold transition cursor-pointer">
           <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
         </button>
       </div>

@@ -800,28 +800,85 @@
       });
     };
 
+    window.currentLoginRoleTab = 'admin';
+
+    window.switchLoginRoleTab = function(tab) {
+      window.currentLoginRoleTab = tab;
+      const adminBtn = document.getElementById('tab-login-admin');
+      const empBtn = document.getElementById('tab-login-employee');
+      const hintBox = document.getElementById('login-role-hint-box');
+      const hintText = document.getElementById('login-role-hint-text');
+      const hintIcon = document.getElementById('login-role-hint-icon');
+      const emailLabel = document.getElementById('login-email-label');
+      const emailBadge = document.getElementById('login-email-badge');
+      const emailInput = document.getElementById('login-email');
+      const userIcon = document.getElementById('login-user-icon');
+      const btnText = document.getElementById('login-btn-text');
+      const btnIcon = document.getElementById('login-btn-icon');
+
+      if (tab === 'admin') {
+        if (adminBtn) {
+          adminBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30 cursor-pointer";
+        }
+        if (empBtn) {
+          empBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent cursor-pointer";
+        }
+        if (hintBox) hintBox.className = "px-3.5 py-2 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold flex items-center space-x-2 transition-all duration-300";
+        if (hintIcon) hintIcon.className = "fa-solid fa-crown text-amber-400 shrink-0";
+        if (hintText) hintText.innerText = "অ্যাডমিন ও ব্রাঞ্চ ম্যানেজার পোর্টাল • সম্পূর্ণ কন্ট্রোল ও অনুমোদন";
+        if (emailLabel) emailLabel.innerText = "Admin / User Email (অ্যাডমিন ইমেইল)";
+        if (emailBadge) emailBadge.innerText = "authorized";
+        if (userIcon) userIcon.className = "fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon";
+        if (emailInput) emailInput.placeholder = "admin@sanvees.com";
+        if (btnText) btnText.innerText = "Sign In as Admin / Manager";
+        if (btnIcon) btnIcon.className = "fa-solid fa-arrow-right text-xs";
+      } else {
+        if (empBtn) {
+          empBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400/30 cursor-pointer";
+        }
+        if (adminBtn) {
+          adminBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent cursor-pointer";
+        }
+        if (hintBox) hintBox.className = "px-3.5 py-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold flex items-center space-x-2 transition-all duration-300";
+        if (hintIcon) hintIcon.className = "fa-solid fa-user-check text-cyan-400 shrink-0";
+        if (hintText) hintText.innerText = "কর্মচারী সেলফ-সার্ভিস পোর্টাল • হাজিরা, ছুটি ও বেতন ভিউ এবং আবেদন";
+        if (emailLabel) emailLabel.innerText = "Employee Email (কর্মচারীর ইমেইল)";
+        if (emailBadge) emailBadge.innerText = "staff portal";
+        if (userIcon) userIcon.className = "fa-solid fa-id-badge absolute left-3.5 top-3.5 text-cyan-400 text-xs input-icon";
+        if (emailInput) emailInput.placeholder = "employee@sanvees.com";
+        if (btnText) btnText.innerText = "Sign In to Employee Portal";
+        if (btnIcon) btnIcon.className = "fa-solid fa-arrow-right-to-bracket text-xs";
+      }
+    };
+
     window.loginUser = async function() {
-      const email = document.getElementById('login-email').value.trim().toLowerCase();
+      let email = document.getElementById('login-email').value.trim().toLowerCase();
       const pass = document.getElementById('login-password').value;
       const btn = document.getElementById('login-btn');
       
       if(!email || !pass) {
-        showToast('warning', 'দয়া করে ইমেইল ও পাসওয়ার্ড দিন');
+        showToast('warning', 'দয়া করে ইমেইল ও পাসওয়ার্ড প্রদান করুন');
         return;
+      }
+
+      // If employee typed username without @, prompt or handle gracefully
+      if (!email.includes('@')) {
+        email = `${email}@sanvees.com`;
       }
 
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>প্রবেশ করা হচ্ছে...';
 
       try {
+        sessionStorage.setItem('preferred_login_role', window.currentLoginRoleTab || 'admin');
         await signInWithEmailAndPassword(auth, email, pass);
-        showToast('success', 'লগইন সফল হয়েছে!');
+        showToast('success', window.currentLoginRoleTab === 'employee' ? 'কর্মচারী পোর্টালে স্বাগতম!' : 'লগইন সফল হয়েছে!');
       } catch (err) {
         let errMsg = 'ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। অনুগ্রহ করে পুনরায় চেক করুন।';
         if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-login-credentials') {
           errMsg = 'ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। যদি আপনার একাউন্ট মুছে ফেলা হয়ে থাকে তবে অ্যাডমিনের সাথে যোগাযোগ করুন।';
         } else if (err.code === 'auth/invalid-email') {
-          errMsg = 'ইমেইল ফরম্যাটটি সঠিক নয়।';
+          errMsg = 'ইমেইল ফরম্যাটটি সঠিক নয়। সঠিক ইমেইল প্রদান করুন।';
         } else if (err.code === 'auth/too-many-requests') {
           errMsg = 'অতিরিক্ত ভুল চেষ্টার কারণে একাউন্ট সাময়িক লক হয়েছে। কিছুক্ষণ পর চেষ্টা করুন।';
         }
@@ -834,7 +891,8 @@
         });
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>Sign In to Dashboard</span> <i class="fa-solid fa-arrow-right ml-2 text-xs"></i>';
+        const isEmp = window.currentLoginRoleTab === 'employee';
+        btn.innerHTML = `<span id="login-btn-text">${isEmp ? 'Sign In to Employee Portal' : 'Sign In as Admin / Manager'}</span> <i id="login-btn-icon" class="fa-solid ${isEmp ? 'fa-arrow-right-to-bracket' : 'fa-arrow-right'} ml-2 text-xs"></i>`;
       }
     };
 
@@ -1584,9 +1642,25 @@
         const currentNormalizedEmail = (userEmail || '').trim().toLowerCase();
         const assignedInfo = userPermissions[currentNormalizedEmail];
         const hasExistingRoles = rolesList.length > 0;
+        const preferredRole = sessionStorage.getItem('preferred_login_role') || window.currentLoginRoleTab || 'admin';
 
-        // Security Check: If roles are configured in system and this user has no active assigned role (e.g. deleted user like Yasin)
-        if (hasExistingRoles && !assignedInfo) {
+        // Check role and permissions
+        if (assignedInfo) {
+          currentUserRole = assignedInfo.role;
+          currentUserBranch = assignedInfo.branch || 'ALL';
+          currentUserPermissions = assignedInfo.permissions || getDefaultPermissionsForRole(assignedInfo.role);
+        } else if (preferredRole === 'employee' || employeeList.some(e => e.email && e.email.trim().toLowerCase() === currentNormalizedEmail)) {
+          // Dedicated Employee Portal Login
+          currentUserRole = 'Employee';
+          currentUserBranch = 'ALL';
+          currentUserPermissions = getDefaultPermissionsForRole('Employee');
+        } else if (!hasExistingRoles) {
+          // If system has 0 user roles registered yet, let the first user be Admin to initialize
+          currentUserRole = 'Admin';
+          currentUserBranch = 'ALL';
+          currentUserPermissions = getDefaultPermissionsForRole('Admin');
+        } else {
+          // Security Check: If roles are configured in system and this user has no active assigned role (e.g. deleted user)
           Swal.fire({
             icon: 'error',
             title: 'প্রবেশাধিকার নেই (Access Denied)',
@@ -1603,15 +1677,24 @@
           return;
         }
 
-        if (assignedInfo) {
-          currentUserRole = assignedInfo.role;
-          currentUserBranch = assignedInfo.branch || 'ALL';
-          currentUserPermissions = assignedInfo.permissions || getDefaultPermissionsForRole(assignedInfo.role);
-        } else {
-          // If system has 0 user roles registered yet, let the first user be Admin to initialize
-          currentUserRole = 'Admin';
-          currentUserBranch = 'ALL';
-          currentUserPermissions = getDefaultPermissionsForRole('Admin');
+        // Strict Enforcement for Employee Role: View & Apply only, never Delete or Approve
+        if (currentUserRole === 'Employee') {
+          currentUserPermissions.can_dashboard = true;
+          currentUserPermissions.can_employees = false;
+          currentUserPermissions.can_attendance = false;
+          currentUserPermissions.can_advance_apply = true;
+          currentUserPermissions.can_advance_approve = false;
+          currentUserPermissions.can_fines = false;
+          currentUserPermissions.can_leave_apply = true;
+          currentUserPermissions.can_leave_approve = false;
+          currentUserPermissions.can_payroll = false;
+          currentUserPermissions.can_increment = false;
+          currentUserPermissions.can_documents = true;
+          currentUserPermissions.can_performance = false;
+          currentUserPermissions.can_notices = true;
+          currentUserPermissions.can_reports = false;
+          currentUserPermissions.can_settings = false;
+          currentUserPermissions.can_activity = false;
         }
 
         if (['Manager', 'Branch Manager'].includes(currentUserRole) && currentUserBranch !== 'ALL') {
@@ -2961,6 +3044,10 @@
     };
 
     window.deleteEmployee = async function(id) {
+      if (currentUserRole === 'Employee') {
+        Swal.fire('অনুমতি নেই', 'কর্মচারীদের কোনো তথ্য মুছে ফেলার অনুমতি নেই (Action Denied)।', 'warning');
+        return;
+      }
       const emp = employeeList.find(e => e.id === id);
       const name = emp ? emp.name : 'কর্মচারী';
       if (confirm(`আপনি কি নিশ্চিতভাবে "${name}" কে মুছে ফেলতে চান?`)) {
@@ -4750,8 +4837,8 @@
         ? advanceList.filter(a => a.employeeId === myEmployeeProfile.id || (myEmployeeProfile.email && a.employeeEmail === myEmployeeProfile.email))
         : advanceList;
 
-      const canApprove = hasPermission('can_advance_approve');
-      const canManage = canApprove || hasPermission('can_payroll');
+      const canApprove = currentUserRole !== 'Employee' && hasPermission('can_advance_approve');
+      const canManage = currentUserRole !== 'Employee' && (canApprove || hasPermission('can_payroll'));
 
       listToRender.forEach((adv) => {
         if (!isItemInActiveBranch(adv.branch)) return;
@@ -4901,6 +4988,10 @@
     };
 
     window.deleteAdvanceRecord = async function(id) {
+      if (currentUserRole === 'Employee') {
+        Swal.fire('অনুমতি নেই', 'কর্মচারীদের অগ্রিম রেকর্ড মুছে ফেলার অনুমতি নেই (Action Denied)।', 'warning');
+        return;
+      }
       const adv = advanceList.find(a => a.id === id);
       const name = adv ? adv.employeeName : 'Staff';
       if (confirm(`এই অগ্রিম বেতনের এন্ট্রি (৳${adv ? adv.amount : 0}) মুছে ফেলতে চান?`)) {
@@ -5878,8 +5969,8 @@ ${messageText}
         ? leaveList.filter(l => l.employeeId === myEmployeeProfile.id)
         : leaveList;
 
-      const canApprove = hasPermission('can_leave_approve');
-      const canManage = currentUserRole === 'Admin' || hasPermission('can_leave_approve');
+      const canApprove = currentUserRole !== 'Employee' && hasPermission('can_leave_approve');
+      const canManage = currentUserRole !== 'Employee' && (currentUserRole === 'Admin' || hasPermission('can_leave_approve'));
       let rowsHtml = '';
 
       listToRender.forEach((lv) => {
@@ -6054,6 +6145,10 @@ ${messageText}
     };
 
     window.deleteLeaveRequest = async function(id) {
+      if (currentUserRole === 'Employee') {
+        Swal.fire('অনুমতি নেই', 'কর্মচারীদের ছুটির আবেদন মুছে ফেলার অনুমতি নেই (Action Denied)।', 'warning');
+        return;
+      }
       const lv = leaveList.find(l => l.id === id);
       const empName = lv ? lv.employeeName : 'কর্মচারী';
       
@@ -9844,6 +9939,72 @@ ${messageText}
         document.getElementById('emp-p-advance-due').innerText = `৳ ${myPendingAdvance.toLocaleString()}`;
         document.getElementById('emp-p-last-salary').innerText = lastPayslip ? `৳ ${lastPayslip.netSalary.toLocaleString()} (${lastPayslip.month})` : 'No slip yet';
       }
+
+      // Calculate Employee Monthly Attendance Breakdown
+      const now = new Date();
+      const curYear = now.getFullYear();
+      const curMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const curMonthKey = `${curYear}-${curMonth}`;
+      
+      const monthBadge = document.getElementById('emp-att-month-badge');
+      if (monthBadge) {
+        monthBadge.innerText = `চলতি মাস (${curYear}-${curMonth})`;
+      }
+
+      let presentDays = 0;
+      let absentDays = 0;
+      let approvedLeaveDays = 0;
+      let dayOffDays = 0;
+
+      // Check today's status in memory
+      if (typeof todayAttendanceMap !== 'undefined' && typeof findAttendanceForEmployee === 'function') {
+        const todayRec = findAttendanceForEmployee(myEmployeeProfile, todayAttendanceMap);
+        if (todayRec) {
+          if (todayRec.status === 'Present') presentDays = Math.max(presentDays, 1);
+          else if (todayRec.status === 'Absent') absentDays = Math.max(absentDays, 1);
+          else if (todayRec.status === 'On Leave' || todayRec.status === 'Leave') approvedLeaveDays = Math.max(approvedLeaveDays, 1);
+          else if (todayRec.status === 'Day Off') dayOffDays = Math.max(dayOffDays, 1);
+        }
+      }
+
+      // Calculate approved leave days this month
+      myLeaves.filter(l => l.status === 'Approved' && (l.startDate && l.startDate.startsWith(curMonthKey))).forEach(l => {
+        const s = new Date(l.startDate);
+        const e = new Date(l.endDate);
+        const diff = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+        approvedLeaveDays += diff;
+      });
+
+      // Check attendance summaries
+      getDocs(collection(db, "attendance_summaries")).then(snap => {
+        snap.forEach(docSnap => {
+          const s = docSnap.data();
+          if (s.month === curMonthKey && (s.employeeId === myEmployeeProfile.id || (s.employeeName && s.employeeName === myEmployeeProfile.name))) {
+            if (s.presentCount !== undefined) presentDays = Number(s.presentCount) || 0;
+            if (s.absentCount !== undefined) absentDays = Number(s.absentCount) || 0;
+            if (s.leaveCount !== undefined) approvedLeaveDays = Number(s.leaveCount) || 0;
+            if (s.dayOffCount !== undefined) dayOffDays = Number(s.dayOffCount) || 0;
+          }
+        });
+
+        const pEl = document.getElementById('emp-p-att-present');
+        const aEl = document.getElementById('emp-p-att-absent');
+        const lEl = document.getElementById('emp-p-att-leave');
+        const dEl = document.getElementById('emp-p-att-dayoff');
+        if (pEl) pEl.innerText = `${presentDays} দিন`;
+        if (aEl) aEl.innerText = `${absentDays} দিন`;
+        if (lEl) lEl.innerText = `${approvedLeaveDays} দিন`;
+        if (dEl) dEl.innerText = `${dayOffDays} দিন`;
+      }).catch(() => {
+        const pEl = document.getElementById('emp-p-att-present');
+        const aEl = document.getElementById('emp-p-att-absent');
+        const lEl = document.getElementById('emp-p-att-leave');
+        const dEl = document.getElementById('emp-p-att-dayoff');
+        if (pEl) pEl.innerText = `${presentDays} দিন`;
+        if (aEl) aEl.innerText = `${absentDays} দিন`;
+        if (lEl) lEl.innerText = `${approvedLeaveDays} দিন`;
+        if (dEl) dEl.innerText = `${dayOffDays} দিন`;
+      });
     }
 
     // Modal & UI Routing Helpers
@@ -10091,107 +10252,194 @@ ${messageText}
       <span>Real-Time Cloud Sync</span>
     </div>
 
-    <!-- Main Classic Glassmorphic Card Container -->
-    <div id="classic-login-card" class="w-full max-w-md classic-glass-card p-8 sm:p-9 space-y-6 z-10 relative">
+    <!-- Main Showcase & Login Container (Split 2-Column Hero Showcase inspired by reference image) -->
+    <div class="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center z-10 relative px-3 py-4 sm:py-6">
       
-      <!-- Top Branding with Orbital Insignia & Metallic Title -->
-      <div class="text-center space-y-3">
-        <div class="relative w-18 h-18 mx-auto flex items-center justify-center">
-          <div class="orbital-ring-outer"></div>
-          <div class="orbital-ring-inner"></div>
-          <div class="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden relative z-10 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5">
-            <svg class="w-full h-full" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id="classicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#4f46e5"/>
-                  <stop offset="50%" stop-color="#7c3aed"/>
-                  <stop offset="100%" stop-color="#06b6d4"/>
-                </linearGradient>
-              </defs>
-              <rect width="100" height="100" rx="22" fill="url(#classicGrad)"/>
-              <rect x="4" y="4" width="92" height="92" rx="18" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
-              <circle cx="50" cy="30" r="8" fill="#ffffff"/>
-              <circle cx="30" cy="62" r="7" fill="#ffffff"/>
-              <circle cx="70" cy="62" r="7" fill="#ffffff"/>
-              <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-              <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
-              <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
-            </svg>
-          </div>
-          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5 z-20">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
+      <!-- LEFT COLUMN: SaaS Presentation Showcase Banner (Matching user reference layout) -->
+      <div class="lg:col-span-6 xl:col-span-7 space-y-6 text-white text-left select-none">
+        
+        <!-- Top Tech Pill Badge -->
+        <div class="inline-flex items-center space-x-2.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-cyan-500/20 border border-indigo-400/30 backdrop-blur-md shadow-lg shadow-indigo-500/10">
+          <span class="flex h-2 w-2 relative">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
           </span>
+          <span class="text-[11px] font-extrabold tracking-wider uppercase text-cyan-300">Enterprise Cloud HRMS & Biometrics</span>
         </div>
 
-        <div>
-          <h1 class="text-2xl sm:text-3xl font-black tracking-tight classic-metallic-title">
-            SANVEE'S
+        <!-- Big Bold Title & Subtitle -->
+        <div class="space-y-2">
+          <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-none text-white drop-shadow-md">
+            SANVEE'S <br class="hidden sm:inline">
+            <span class="bg-gradient-to-r from-indigo-400 via-sky-300 to-cyan-300 bg-clip-text text-transparent">HR SUITE</span>
           </h1>
-          <p class="text-[11px] font-bold tracking-widest text-slate-400 uppercase mt-0.5">
-            MANAGEMENT SUITE
+          <p class="text-xs sm:text-sm md:text-base text-slate-300 font-medium max-w-lg leading-relaxed pt-1">
+            Cloud-based HRMS, Multi-Branch Attendance, Employee Self-Service & Automated Payroll Software.
           </p>
         </div>
 
-        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[11px] font-semibold text-indigo-300 bg-indigo-950/70 border border-indigo-500/30 backdrop-blur-sm shadow-inner">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Enterprise Cloud Portal • Biometric Active</span>
-        </div>
-      </div>
+        <!-- 3 Feature Highlight Cards (Directly matching the user's reference mockup) -->
+        <div class="space-y-3.5 max-w-md pt-1">
+          <!-- Card 1 -->
+          <div class="flex items-center space-x-3.5 p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-700/60 backdrop-blur-md shadow-lg hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all duration-300 group">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-location-crosshairs text-base"></i>
+            </div>
+            <div>
+              <h4 class="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-300 transition">Smart Multi-Branch & Biometrics</h4>
+              <p class="text-[11px] text-slate-400 font-medium">রিয়েলটাইম বায়োমেট্রিক পাঞ্চ সিঙ্ক ও সকল ব্রাঞ্চ নিয়ন্ত্রণ</p>
+            </div>
+          </div>
 
-      <!-- Login Form -->
-      <form onsubmit="event.preventDefault(); loginUser();" class="space-y-4">
-        <div class="classic-input-group">
-          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-            <span>User Email (ইউজার ইমেইল)</span>
-            <span class="text-[10px] text-indigo-400 font-semibold lowercase">authorized only</span>
-          </label>
-          <div class="relative">
-            <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
-            <input type="email" id="login-email" required placeholder="admin@sanvees.com" class="classic-input pl-9 pr-4 py-2.5">
+          <!-- Card 2 -->
+          <div class="flex items-center space-x-3.5 p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-700/60 backdrop-blur-md shadow-lg hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all duration-300 group">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-user-check text-base"></i>
+            </div>
+            <div>
+              <h4 class="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition">Track Employee Attendance</h4>
+              <p class="text-[11px] text-slate-400 font-medium">উপস্থিতি, অনুপস্থিতি, লেট ও এক-ক্লিকে ছুটির আবেদন</p>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="flex items-center space-x-3.5 p-3 sm:p-3.5 rounded-2xl bg-slate-900/70 border border-slate-700/60 backdrop-blur-md shadow-lg hover:border-purple-500/50 hover:bg-slate-800/80 transition-all duration-300 group">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0 group-hover:scale-105 transition">
+              <i class="fa-solid fa-file-invoice-dollar text-base"></i>
+            </div>
+            <div>
+              <h4 class="text-xs sm:text-sm font-bold text-white group-hover:text-purple-300 transition">Automated Payroll & Slips</h4>
+              <p class="text-[11px] text-slate-400 font-medium">স্বয়ংক্রিয় পে-স্লিপ, অগ্রিম বেতন কর্তন ও মাসিক রিপোর্ট</p>
+            </div>
           </div>
         </div>
 
-        <div class="classic-input-group">
-          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-            <span>Password (পাসওয়ার্ড)</span>
-            <span class="text-[10px] text-slate-400 font-medium">min 6 chars</span>
-          </label>
-          <div class="relative">
-            <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
-            <input type="password" id="login-password" required placeholder="••••••••" class="classic-input pl-9 pr-10 py-2.5">
-            <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-400 focus:outline-none p-1 transition cursor-pointer">
-              <i id="login-eye-icon" class="fa-solid fa-eye text-xs"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-          <label class="flex items-center space-x-2 cursor-pointer select-none">
-            <input type="checkbox" id="login-remember" checked class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
-            <span class="text-slate-300 font-medium">Remember Session</span>
-          </label>
-          <span class="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold flex items-center space-x-1" onclick="showToast('info', 'পাসওয়ার্ড ভুলে গেলে আপনার কোম্পানি অ্যাডমিনের সাথে যোগাযোগ করুন।')">
-            <i class="fa-solid fa-circle-question text-[10px]"></i>
-            <span>Help / Support</span>
+        <!-- Bottom Trust & Support Row -->
+        <div class="flex flex-wrap items-center gap-4 pt-2 text-[11px] text-slate-400 font-semibold">
+          <span class="flex items-center space-x-1.5 text-slate-300">
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-xs"></i>
+            <span>256-Bit SSL Protected</span>
+          </span>
+          <span class="text-slate-600">•</span>
+          <span class="flex items-center space-x-1.5 text-slate-300">
+            <i class="fa-solid fa-headset text-indigo-400 text-xs"></i>
+            <span>24/7 Enterprise Cloud</span>
+          </span>
+          <span class="text-slate-600">•</span>
+          <span class="flex items-center space-x-1.5 text-cyan-400">
+            <i class="fa-solid fa-globe text-xs"></i>
+            <span>sanvees.com</span>
           </span>
         </div>
 
-        <button type="submit" id="login-btn" class="w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none">
-          <span>Sign In to Dashboard</span>
-          <i class="fa-solid fa-arrow-right text-xs"></i>
-        </button>
-      </form>
+      </div>
 
-      <!-- Feature Tags & Security Footer -->
-      <div class="pt-4 border-t border-slate-800/80 space-y-2.5 text-center">
-        <div class="flex flex-wrap items-center justify-center gap-1.5 text-[10px] font-bold text-slate-400">
-          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-building text-indigo-400"></i><span>Multi-Branch</span></span>
-          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-fingerprint text-emerald-400"></i><span>Biometric Sync</span></span>
-          <span class="bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-lg flex items-center space-x-1"><i class="fa-solid fa-shield-halved text-rose-400"></i><span>Enterprise Grade</span></span>
-        </div>
-        <div class="text-[11px] text-slate-500 font-medium">
-          SANVEE'S MANAGEMENT SUITE • Real-Time Employee Cloud
+      <!-- RIGHT COLUMN: Sleek Modern Card Frame with 2 Role Switcher Tabs -->
+      <div class="lg:col-span-6 xl:col-span-5 w-full flex justify-center">
+        <div id="classic-login-card" class="w-full max-w-md classic-glass-card p-6 sm:p-8 space-y-5 z-10 relative">
+          
+          <!-- Top Card Brand Header -->
+          <div class="text-center space-y-2.5">
+            <div class="relative w-14 h-14 mx-auto flex items-center justify-center">
+              <div class="orbital-ring-outer"></div>
+              <div class="orbital-ring-inner"></div>
+              <div class="w-13 h-13 rounded-2xl flex items-center justify-center shadow-xl overflow-hidden relative z-10 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 p-0.5">
+                <svg class="w-full h-full" viewBox="0 0 100 100">
+                  <defs>
+                    <linearGradient id="classicGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#4f46e5"/>
+                      <stop offset="50%" stop-color="#7c3aed"/>
+                      <stop offset="100%" stop-color="#06b6d4"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="100" height="100" rx="22" fill="url(#classicGrad2)"/>
+                  <circle cx="50" cy="30" r="8" fill="#ffffff"/>
+                  <circle cx="30" cy="62" r="7" fill="#ffffff"/>
+                  <circle cx="70" cy="62" r="7" fill="#ffffff"/>
+                  <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+                  <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
+                  <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
+                </svg>
+              </div>
+            </div>
+
+            <div>
+              <h2 class="text-xl sm:text-2xl font-black tracking-tight classic-metallic-title">
+                SANVEE'S
+              </h2>
+              <p class="text-[10px] font-bold tracking-widest text-slate-400 uppercase mt-0.5">
+                PORTAL AUTHENTICATION
+              </p>
+            </div>
+          </div>
+
+          <!-- THE 2 TABS / BAR (Role Switcher: Admin/Manager vs Employee) -->
+          <div class="bg-slate-950/80 p-1.5 rounded-2xl border border-slate-700/60 shadow-inner grid grid-cols-2 gap-1.5 relative">
+            <button type="button" id="tab-login-admin" onclick="switchLoginRoleTab('admin')" class="py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-400/30 cursor-pointer">
+              <i class="fa-solid fa-crown text-amber-300 text-xs"></i>
+              <span>Admin / Manager</span>
+            </button>
+            <button type="button" id="tab-login-employee" onclick="switchLoginRoleTab('employee')" class="py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent cursor-pointer">
+              <i class="fa-solid fa-user-tie text-xs"></i>
+              <span>Employee</span>
+            </button>
+          </div>
+
+          <!-- Dynamic Role Guidance Indicator -->
+          <div id="login-role-hint-box" class="px-3.5 py-2 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold flex items-center space-x-2 transition-all duration-300">
+            <i id="login-role-hint-icon" class="fa-solid fa-shield-halved text-indigo-400 shrink-0"></i>
+            <span id="login-role-hint-text">অ্যাডমিন ও ব্রাঞ্চ ম্যানেজার পোর্টাল • সম্পূর্ণ কন্ট্রোল ও অনুমোদন</span>
+          </div>
+
+          <!-- Login Form -->
+          <form onsubmit="event.preventDefault(); loginUser();" class="space-y-4">
+            <div class="classic-input-group">
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span id="login-email-label">User Email (ইউজার ইমেইল)</span>
+                <span id="login-email-badge" class="text-[10px] text-indigo-400 font-semibold lowercase">authorized</span>
+              </label>
+              <div class="relative">
+                <i id="login-user-icon" class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+                <input type="text" id="login-email" required placeholder="admin@sanvees.com" class="classic-input pl-9 pr-4 py-2.5">
+              </div>
+            </div>
+
+            <div class="classic-input-group">
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Password (পাসওয়ার্ড)</span>
+                <span class="text-[10px] text-slate-400 font-medium">min 6 chars</span>
+              </label>
+              <div class="relative">
+                <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+                <input type="password" id="login-password" required placeholder="••••••••" class="classic-input pl-9 pr-10 py-2.5">
+                <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-400 focus:outline-none p-1 transition cursor-pointer">
+                  <i id="login-eye-icon" class="fa-solid fa-eye text-xs"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+              <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="login-remember" checked class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
+                <span class="text-slate-300 font-medium">Remember Session</span>
+              </label>
+              <span class="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold flex items-center space-x-1" onclick="showToast('info', 'পাসওয়ার্ড ভুলে গেলে আপনার কোম্পানি অ্যাডমিনের সাথে যোগাযোগ করুন।')">
+                <i class="fa-solid fa-circle-question text-[10px]"></i>
+                <span>Help / Support</span>
+              </span>
+            </div>
+
+            <button type="submit" id="login-btn" class="w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none">
+              <span id="login-btn-text">Sign In as Admin / Manager</span>
+              <i id="login-btn-icon" class="fa-solid fa-arrow-right text-xs"></i>
+            </button>
+          </form>
+
+          <!-- Security Footer -->
+          <div class="pt-3 border-t border-slate-800/80 text-center text-[10px] text-slate-500 font-semibold">
+            SANVEE'S MANAGEMENT SUITE • Real-Time Employee Cloud
+          </div>
+
         </div>
       </div>
 
@@ -10587,7 +10835,11 @@ ${messageText}
                     </button>
                     <button onclick="toggleModal('add-leave-modal', true)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs flex items-center space-x-1.5">
                       <i class="fa-solid fa-calendar-plus"></i>
-                      <span>Apply for Leave</span>
+                      <span>Apply for Leave (ছুটির আবেদন)</span>
+                    </button>
+                    <button onclick="toggleModal('add-adv-modal', true)" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-xs flex items-center space-x-1.5">
+                      <i class="fa-solid fa-hand-holding-dollar"></i>
+                      <span>Apply for Advance (অগ্রিমের আবেদন)</span>
                     </button>
                   </div>
                 </div>
@@ -10620,6 +10872,52 @@ ${messageText}
               <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center">
                 <span class="text-xs text-slate-500 font-medium">Last Payslip</span>
                 <h4 id="emp-p-last-salary" class="text-lg font-bold text-indigo-600 mt-1">৳ 0</h4>
+              </div>
+            </div>
+
+            <!-- Employee Personal Attendance & Leave Record Card -->
+            <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl shadow-xl border border-indigo-500/20 space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-500/20 pb-3">
+                <div class="flex items-center space-x-2.5">
+                  <span class="w-8 h-8 rounded-xl bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-sm border border-indigo-400/30 shadow-inner">
+                    <i class="fa-solid fa-calendar-check"></i>
+                  </span>
+                  <div>
+                    <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                      <span>আমার চলতি মাসের হাজিরা বিবরণী (Monthly Attendance)</span>
+                      <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-semibold">Self-Service</span>
+                    </h3>
+                    <p class="text-[11px] text-slate-300">বায়োমেট্রিক ও ব্রাঞ্চ হাজিরা ডাটাবেজ থেকে সংগৃহীত ব্যক্তিগত রেকর্ড</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-[11px] bg-indigo-900/60 text-indigo-200 font-mono font-bold px-3 py-1 rounded-xl border border-indigo-500/30" id="emp-att-month-badge">চলতি মাস</span>
+                  <button onclick="calculateMyPersonalSummary()" class="p-1.5 bg-indigo-600/50 hover:bg-indigo-600 text-white rounded-lg text-xs transition" title="Refresh Attendance Stats"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+              </div>
+
+              <!-- 4 Attendance Metrics Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div class="bg-slate-800/80 border border-emerald-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-emerald-500/50 transition">
+                  <span class="text-[11px] font-bold text-emerald-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>উপস্থিত (Present)</span></span>
+                  <h4 id="emp-p-att-present" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
+                  <span class="text-[10px] text-slate-400 font-medium">সঠিক সময়ে উপস্থিতি</span>
+                </div>
+                <div class="bg-slate-800/80 border border-rose-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-rose-500/50 transition">
+                  <span class="text-[11px] font-bold text-rose-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-xmark text-xs"></i><span>অনুপস্থিত (Absent)</span></span>
+                  <h4 id="emp-p-att-absent" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
+                  <span class="text-[10px] text-slate-400 font-medium">অননুমোদিত অনুপস্থিতি</span>
+                </div>
+                <div class="bg-slate-800/80 border border-amber-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-amber-500/50 transition">
+                  <span class="text-[11px] font-bold text-amber-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-umbrella-beach text-xs"></i><span>ছুটি (Leave)</span></span>
+                  <h4 id="emp-p-att-leave" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
+                  <span class="text-[10px] text-slate-400 font-medium">অনুমোদিত অফিসিয়াল ছুটি</span>
+                </div>
+                <div class="bg-slate-800/80 border border-sky-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-sky-500/50 transition">
+                  <span class="text-[11px] font-bold text-sky-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-mug-hot text-xs"></i><span>ডে অফ (Day Off)</span></span>
+                  <h4 id="emp-p-att-dayoff" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
+                  <span class="text-[10px] text-slate-400 font-medium">সাপ্তাহিক ও নির্ধারিত ছুটি</span>
+                </div>
               </div>
             </div>
           </div>

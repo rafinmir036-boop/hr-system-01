@@ -2356,9 +2356,11 @@
           }
         }
         
-        if (st === 'Present' || st === 'Late') {
+        if (st === 'Present' || st === 'Late' || st === 'Extra Duty') {
           presentCount++;
-        } else if (st === 'On Leave') {
+        } else if (st === 'Half Day') {
+          presentCount += 0.5;
+        } else if (st === 'On Leave' || st === 'Leave') {
           leaveCount++;
         } else if (st === 'Day Off') {
           dayOffCount++;
@@ -2532,8 +2534,8 @@
           lastIncDate
         };
 
-        if (st === 'Present' || st === 'Late') presentList.push(record);
-        else if (st === 'On Leave') leaveListMatch.push(record);
+        if (st === 'Present' || st === 'Late' || st === 'Extra Duty' || st === 'Half Day') presentList.push(record);
+        else if (st === 'On Leave' || st === 'Leave') leaveListMatch.push(record);
         else if (st === 'Day Off') dayOffList.push(record);
         else absentList.push(record);
 
@@ -3542,6 +3544,38 @@
       });
     }
 
+    window.timeStringTo24 = function(timeStr) {
+      if (!timeStr || timeStr === '--:--') {
+        const d = new Date();
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      }
+      const m = timeStr.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+      if (m) {
+        let h = parseInt(m[1], 10);
+        const min = m[2];
+        const meridiem = m[3] ? m[3].toUpperCase() : null;
+        if (meridiem === 'PM' && h < 12) h += 12;
+        if (meridiem === 'AM' && h === 12) h = 0;
+        return `${String(h).padStart(2, '0')}:${min}`;
+      }
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+
+    window.timeStringTo12 = function(time24) {
+      if (!time24) {
+        return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+      const parts = time24.split(':');
+      if (parts.length < 2) return time24;
+      let h = parseInt(parts[0], 10);
+      const min = parts[1];
+      const meridiem = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${String(h).padStart(2, '0')}:${min}:00 ${meridiem}`;
+    };
+
     window.renderAttendanceTable = function() {
       const tbody = document.getElementById('att-table-body');
       if (!tbody) return;
@@ -3582,6 +3616,8 @@
           }
         }
 
+        const rowTimeHHMM = window.timeStringTo24(punchTime);
+
         rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 flex items-center space-x-3">
@@ -3596,21 +3632,42 @@
               </div>
             </td>
             <td class="px-6 py-4">
-              <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
-                ${currentStatus}
-              </span>
-              <div class="text-[10px] text-slate-400 font-medium mt-1">${method} ${punchTime !== '--:--' ? `• ${punchTime}` : ''}</div>
+              <div class="flex items-center space-x-1.5 flex-wrap gap-1">
+                <span class="px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(currentStatus)}">
+                  ${currentStatus}
+                </span>
+                ${punchTime !== '--:--' ? `
+                  <span class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                    <i class="fa-regular fa-clock text-indigo-500 text-[10px]"></i>
+                    <span>${punchTime}</span>
+                  </span>
+                ` : ''}
+              </div>
+              <div class="text-[10px] text-slate-400 font-medium mt-1">
+                ${method} ${punchTime !== '--:--' ? `• আসার সময়: <b class="text-slate-700 font-mono">${punchTime}</b>` : (currentStatus === 'Absent' ? '• অনুপস্থিত' : '')}
+              </div>
             </td>
-            <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+            <td class="px-6 py-4 text-right whitespace-nowrap">
               ${currentUserRole !== 'Employee' ? `
-                <button onclick="openMonthlyTotalAttendanceModal('${emp.id}')" title="ইন-টোটাল / মাসিক হাজিরা দিন নির্ধারণ করুন" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition shadow-2xs inline-flex items-center space-x-1">
-                  <i class="fa-solid fa-calendar-check"></i>
-                  <span>মোট হাজিরা</span>
-                </button>
-                <button onclick="markAttendance('${emp.id}', 'Present')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Present</button>
-                <button onclick="markAttendance('${emp.id}', 'Late')" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-2xs">Late</button>
-                <button onclick="markAttendance('${emp.id}', 'Day Off')" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Day Off</button>
-                <button onclick="markAttendance('${emp.id}', 'Absent')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Absent</button>
+                <div class="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                  <div class="inline-flex items-center bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-2xs transition focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500" title="আসার সময় (টাইম দিন / পরিবর্তন করুন)">
+                    <label for="att-time-${emp.id}" class="text-[10px] font-bold text-slate-500 mr-1 flex items-center cursor-pointer">
+                      <i class="fa-regular fa-clock text-indigo-600 mr-0.5 text-[10px]"></i>সময়:
+                    </label>
+                    <input type="time" id="att-time-${emp.id}" value="${rowTimeHHMM}" onchange="updatePunchTime('${emp.id}', this.value)" class="bg-transparent text-xs font-bold text-slate-800 font-mono outline-none cursor-pointer w-18">
+                  </div>
+                  <button onclick="openMonthlyTotalAttendanceModal('${emp.id}')" title="ইন-টোটাল / মাসিক হাজিরা দিন নির্ধারণ করুন" class="px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition shadow-2xs inline-flex items-center space-x-1">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span>মোট হাজিরা</span>
+                  </button>
+                  <button onclick="markAttendance('${emp.id}', 'Present')" title="উপস্থিত হিসেবে মার্ক করুন (নির্ধারিত সময়ে)" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Present</button>
+                  <button onclick="markAttendance('${emp.id}', 'Late')" title="দেরিতে উপস্থিতি মার্ক করুন" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-2xs">Late</button>
+                  <button onclick="markAttendance('${emp.id}', 'Half Day')" title="অর্ধদিবস / হাফ ডে উপস্থিতি মার্ক করুন" class="px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition shadow-2xs">Half Day</button>
+                  <button onclick="markAttendance('${emp.id}', 'Leave')" title="ছুটি মার্ক করুন" class="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Leave</button>
+                  <button onclick="markAttendance('${emp.id}', 'Extra Duty')" title="অতিরিক্ত ডিউটি / ওভারটাইম মার্ক করুন" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Extra Duty</button>
+                  <button onclick="markAttendance('${emp.id}', 'Day Off')" title="সাপ্তাহিক ছুটি" class="px-2.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Day Off</button>
+                  <button onclick="markAttendance('${emp.id}', 'Absent')" title="অনুপস্থিত মার্ক করুন" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-2xs">Absent</button>
+                </div>
               ` : '<span class="text-xs text-slate-400 font-semibold">Self View</span>'}
             </td>
           </tr>
@@ -3622,9 +3679,11 @@
     function getStatusBadge(status) {
       if (status === 'Present') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
       if (status === 'Late') return 'bg-amber-50 text-amber-700 border border-amber-200';
+      if (status === 'Half Day') return 'bg-orange-50 text-orange-700 border border-orange-200';
+      if (status === 'Leave' || status === 'On Leave') return 'bg-purple-50 text-purple-700 border border-purple-200';
+      if (status === 'Extra Duty') return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
       if (status === 'Absent') return 'bg-rose-50 text-rose-700 border border-rose-200';
       if (status === 'Day Off') return 'bg-sky-50 text-sky-700 border border-sky-200';
-      if (status === 'On Leave') return 'bg-purple-50 text-purple-700 border border-purple-200';
       return 'bg-slate-100 text-slate-600';
     }
 
@@ -3760,9 +3819,10 @@
             }
           }
 
-          if (status === 'Present' || status === 'Late') presentCount++;
+          if (status === 'Present' || status === 'Late' || status === 'Extra Duty') presentCount++;
+          else if (status === 'Half Day') presentCount += 0.5;
           else if (status === 'Day Off') dayOffCount++;
-          else if (status === 'On Leave') leaveCount++;
+          else if (status === 'On Leave' || status === 'Leave') leaveCount++;
           else if (status === 'Absent' && !isFuture) absentCount++;
 
           let badgeClass = getStatusBadge(status);
@@ -4190,7 +4250,17 @@
       const branch = emp ? (emp.branch || 'Head Office') : 'Head Office';
 
       const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const timeInput = document.getElementById('att-time-' + empId);
+      const customTimeVal = timeInput ? timeInput.value : '';
+
+      let finalPunchTime = '--:--';
+      if (status !== 'Absent' && status !== 'Day Off') {
+        if (customTimeVal) {
+          finalPunchTime = window.timeStringTo12(customTimeVal);
+        } else {
+          finalPunchTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+      }
 
       try {
         await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
@@ -4198,7 +4268,7 @@
           customEmpCode: customEmpCode,
           branch: branch,
           status: status,
-          punchTime: status !== 'Absent' ? timeStr : '--:--',
+          punchTime: finalPunchTime,
           method: 'Manual Override',
           updatedAt: now.toISOString()
         });
@@ -4206,13 +4276,28 @@
         await logSystemActivity(
           'UPDATE',
           'Attendance',
-          `${currentUserEmail} manually marked "${emp ? emp.name : 'Staff'}" as ${status} on ${selectedDate}`,
-          { employeeName: emp ? emp.name : '', status, date: selectedDate }
+          `${currentUserEmail} manually marked "${emp ? emp.name : 'Staff'}" as ${status} on ${selectedDate}${finalPunchTime !== '--:--' ? ` (Time: ${finalPunchTime})` : ''}`,
+          { employeeName: emp ? emp.name : '', status, punchTime: finalPunchTime, date: selectedDate }
         );
 
-        showToast('success', `${emp ? emp.name : 'কর্মচারী'} এর উপস্থিতি (${status}) আপডেট করা হয়েছে`);
+        showToast('success', `${emp ? emp.name : 'কর্মচারী'} এর উপস্থিতি (${status}${finalPunchTime !== '--:--' ? ` • ${finalPunchTime}` : ''}) আপডেট করা হয়েছে`);
       } catch (err) {
         showToast('error', err.message);
+      }
+    };
+
+    window.updatePunchTime = async function(empId, timeVal) {
+      const selectedDate = document.getElementById('att-date').value;
+      if (!selectedDate || !timeVal) return;
+      const finalPunchTime = window.timeStringTo12(timeVal);
+      try {
+        await setDoc(doc(db, `attendance_${selectedDate}`, empId), {
+          punchTime: finalPunchTime,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        showToast('success', `আসার সময় আপডেট: ${finalPunchTime}`);
+      } catch (err) {
+        console.error("updatePunchTime error:", err);
       }
     };
 
@@ -4258,7 +4343,7 @@
             customEmpCode: emp.customEmpCode || '',
             branch: emp.branch || 'Head Office',
             status: status,
-            punchTime: status !== 'Absent' ? timeStr : '--:--',
+            punchTime: (status !== 'Absent' && status !== 'Day Off') ? timeStr : '--:--',
             method: 'Manual Branch Batch Mark',
             updatedAt: now.toISOString()
           });
@@ -7423,10 +7508,11 @@ ${messageText}
               if (hasLeave) st = 'On Leave';
             }
 
-            if (st === 'Present') presentDays++;
+            if (st === 'Present' || st === 'Extra Duty') presentDays++;
             else if (st === 'Late') lateDays++;
+            else if (st === 'Half Day') { presentDays += 0.5; absentDays += 0.5; }
             else if (st === 'Day Off') dayOffDays++;
-            else if (st === 'On Leave') leaveDays++;
+            else if (st === 'On Leave' || st === 'Leave') leaveDays++;
             else absentDays++;
           });
 
@@ -7837,10 +7923,11 @@ ${messageText}
                 if (hasLeave) st = 'On Leave';
               }
 
-              if (st === 'Present') presentDays++;
+              if (st === 'Present' || st === 'Extra Duty') presentDays++;
               else if (st === 'Late') lateDays++;
+              else if (st === 'Half Day') { presentDays += 0.5; absentDays += 0.5; }
               else if (st === 'Day Off') dayOffDays++;
-              else if (st === 'On Leave') leaveDays++;
+              else if (st === 'On Leave' || st === 'Leave') leaveDays++;
               else absentDays++;
             });
             presentDays += lateDays;
@@ -10275,13 +10362,16 @@ ${messageText}
                 if (hasLeave) st = 'On Leave';
               }
 
-              if (st === 'Present') {
+              if (st === 'Present' || st === 'Extra Duty') {
                 empPresent++;
               } else if (st === 'Late') {
                 empLate++;
+              } else if (st === 'Half Day') {
+                empPresent += 0.5;
+                empAbsent += 0.5;
               } else if (st === 'Day Off') {
                 empDayOff++;
-              } else if (st === 'On Leave') {
+              } else if (st === 'On Leave' || st === 'Leave') {
                 empLeave++;
               } else {
                 empAbsent++;
@@ -10754,7 +10844,8 @@ ${messageText}
 
           if (rec) {
             const st = rec.status;
-            if (st === 'Present' || st === 'Late') dPres++;
+            if (st === 'Present' || st === 'Late' || st === 'Extra Duty') dPres++;
+            else if (st === 'Half Day') dPres += 0.5;
             else if (st === 'Day Off') dOff++;
             else if (st === 'On Leave' || st === 'Leave') dLev++;
             else if (st === 'Absent') dAbs++;
@@ -11967,6 +12058,14 @@ ${messageText}
               <button onclick="markAllAttendanceForBranch('Present')" title="বর্তমান ব্রাঞ্চের সবাইকে উপস্থিত করুন" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
                 <i class="fa-solid fa-user-check"></i>
                 <span>সবাইকে Present</span>
+              </button>
+              <button onclick="markAllAttendanceForBranch('Half Day')" title="বর্তমান ব্রাঞ্চের সবাইকে হাফ ডে দিন" class="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
+                <i class="fa-solid fa-business-time"></i>
+                <span>সবাইকে Half Day</span>
+              </button>
+              <button onclick="markAllAttendanceForBranch('Leave')" title="বর্তমান ব্রাঞ্চের সবাইকে ছুটি দিন" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
+                <i class="fa-solid fa-umbrella-beach"></i>
+                <span>সবাইকে Leave</span>
               </button>
               <button onclick="markAllAttendanceForBranch('Day Off')" title="বর্তমান ব্রাঞ্চের সবাইকে ডে অফ দিন" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1 shadow-2xs">
                 <i class="fa-solid fa-mug-hot"></i>

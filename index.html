@@ -21,10 +21,10 @@
   <script>
     (function() {
       const savedTheme = localStorage.getItem('hrms_theme');
-      if (savedTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else {
+      if (savedTheme === 'dark') {
         document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
       }
       if (window.location.hash) {
         try {
@@ -65,423 +65,277 @@
       background: #94a3b8;
     }
     /* ========================================================
-       ROYAL PURPLE LUXURY GLASSMORPHISM SIDEBAR & ANIMATIONS
+       EXECUTIVE DARK NAVY SIDEBAR (MATCHING USER SCREENSHOT)
        ======================================================== */
-    @keyframes purpleGlassPulse {
-      0%, 100% {
-        box-shadow: 0 0 25px rgba(147, 51, 234, 0.18), inset 0 0 30px rgba(168, 85, 247, 0.08);
-        border-color: rgba(168, 85, 247, 0.28);
-      }
-      50% {
-        box-shadow: 0 0 45px rgba(168, 85, 247, 0.32), inset 0 0 45px rgba(192, 132, 252, 0.15);
-        border-color: rgba(192, 132, 252, 0.45);
-      }
-    }
-
-    @keyframes purpleGlassShimmer {
-      0% {
-        transform: translateY(-120%) rotate(35deg);
-        opacity: 0;
-      }
-      20% {
-        opacity: 0.6;
-      }
-      50% {
-        transform: translateY(120%) rotate(35deg);
-        opacity: 0.85;
-      }
-      70% {
-        opacity: 0.3;
-      }
-      100% {
-        transform: translateY(240%) rotate(35deg);
-        opacity: 0;
-      }
-    }
-
-    @keyframes floatOrb {
-      0%, 100% { transform: translateY(0px) scale(1); }
-      50% { transform: translateY(-14px) scale(1.08); }
-    }
-
-    @keyframes purpleIconPulse {
-      0%, 100% { filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.6)); }
-      50% { filter: drop-shadow(0 0 10px rgba(216, 180, 254, 0.95)); }
-    }
-
     aside.purple-glass-sidebar {
-      background: linear-gradient(175deg, rgba(22, 10, 48, 0.95) 0%, rgba(42, 16, 88, 0.90) 45%, rgba(16, 7, 36, 0.97) 100%) !important;
-      backdrop-filter: blur(24px) saturate(200%) !important;
-      -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
-      border-right: 1px solid rgba(168, 85, 247, 0.28) !important;
+      background: #0d1e33 !important;
+      border-right: 1px solid #162c46 !important;
+      box-shadow: 2px 0 16px rgba(5, 12, 22, 0.45) !important;
       position: relative;
       overflow: hidden;
-      animation: purpleGlassPulse 8s ease-in-out infinite;
+      animation: none !important;
       z-index: 20;
     }
 
-    html.dark aside.purple-glass-sidebar {
-      background: linear-gradient(175deg, rgba(15, 6, 34, 0.97) 0%, rgba(32, 12, 68, 0.94) 45%, rgba(10, 4, 24, 0.99) 100%) !important;
-      border-right: 1px solid rgba(192, 132, 252, 0.25) !important;
-    }
-
-    /* Ambient Glowing Purple Nebula Orbs in Sidebar */
-    .sidebar-purple-orb-1 {
-      position: absolute;
-      top: -60px;
-      left: -60px;
-      width: 220px;
-      height: 220px;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.38) 0%, rgba(147, 51, 234, 0.12) 70%, transparent 100%);
-      border-radius: 9999px;
-      filter: blur(40px);
-      pointer-events: none;
-      animation: floatOrb 7s ease-in-out infinite;
-      z-index: 0;
-    }
-
-    .sidebar-purple-orb-2 {
-      position: absolute;
-      bottom: -60px;
-      right: -60px;
-      width: 210px;
-      height: 210px;
-      background: radial-gradient(circle, rgba(217, 70, 239, 0.32) 0%, rgba(126, 34, 206, 0.1) 70%, transparent 100%);
-      border-radius: 9999px;
-      filter: blur(35px);
-      pointer-events: none;
-      animation: floatOrb 9s ease-in-out infinite reverse;
-      z-index: 0;
-    }
-
-    /* Animated Glass Sheen Light Sweep */
+    /* Hide glowing ambient orbs and sheen sweeps */
+    .sidebar-purple-orb-1,
+    .sidebar-purple-orb-2,
     .sidebar-glass-sheen {
-      position: absolute;
-      top: -50%;
-      left: -100%;
-      width: 300%;
-      height: 200%;
-      background: linear-gradient(
-        105deg,
-        transparent 35%,
-        rgba(255, 255, 255, 0.02) 45%,
-        rgba(216, 180, 254, 0.1) 50%,
-        rgba(255, 255, 255, 0.03) 55%,
-        transparent 65%
-      );
-      pointer-events: none;
-      animation: purpleGlassShimmer 11s ease-in-out infinite;
-      z-index: 1;
+      display: none !important;
     }
 
-    /* Sidebar Navigation Links - Frosted Purple Glass Capsules */
-    #sidebar-nav button {
+    /* Sidebar Header Banner (Demosystem / SANVEE'S header style) */
+    .sidebar-header-banner {
+      background: #091624 !important;
+      border-bottom: 1px solid #162c46 !important;
+      padding: 1.25rem 1rem !important;
+      backdrop-filter: none !important;
       position: relative;
-      background: rgba(255, 255, 255, 0.035);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      color: #cbd5e1 !important;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      overflow: hidden;
       z-index: 2;
     }
 
-    #sidebar-nav button:hover {
-      background: linear-gradient(90deg, rgba(168, 85, 247, 0.26) 0%, rgba(147, 51, 234, 0.15) 100%) !important;
-      border-color: rgba(192, 132, 252, 0.4) !important;
+    .sidebar-header-banner h2 {
       color: #ffffff !important;
-      transform: translateX(4px);
-      box-shadow: 0 4px 18px -2px rgba(147, 51, 234, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+      letter-spacing: 0.05em !important;
     }
 
-    #sidebar-nav button:hover i {
-      transform: scale(1.18);
-      filter: drop-shadow(0 0 8px rgba(216, 180, 254, 0.9));
+    .sidebar-header-banner p {
+      color: #7c9bbb !important;
+      font-size: 9px !important;
+      letter-spacing: 0.08em !important;
+    }
+
+    /* Sidebar Navigation Links - Sleek Matte Dark Navy */
+    #sidebar-nav button {
+      position: relative;
+      background: transparent !important;
+      border: 1px solid transparent !important;
+      color: #8da4be !important;
+      font-size: 0.8125rem !important;
+      font-weight: 500 !important;
+      padding: 0.65rem 0.85rem !important;
+      border-radius: 0.5rem !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      transition: background-color 0.18s ease, color 0.18s ease !important;
+      transform: none !important;
+      box-shadow: none !important;
+      display: flex !important;
+      align-items: center !important;
+      width: 100% !important;
+      text-shadow: none !important;
     }
 
     #sidebar-nav button i {
-      transition: transform 0.25s ease, filter 0.25s ease;
+      color: #65809e !important;
+      font-size: 0.95rem !important;
+      width: 1.25rem !important;
+      text-align: center !important;
+      margin-right: 0.5rem !important;
+      transition: color 0.18s ease !important;
+      filter: none !important;
+      transform: none !important;
+      animation: none !important;
     }
 
-    /* Active Sidebar Nav Item (Royal Purple Glass Active State) */
+    #sidebar-nav button:hover {
+      background: #142a45 !important;
+      color: #ffffff !important;
+      border-color: transparent !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    #sidebar-nav button:hover i {
+      color: #38bdf8 !important;
+      filter: none !important;
+      transform: none !important;
+    }
+
+    /* Active Sidebar Nav Item (Exact Match to "Startseite" in Screenshot) */
     .sidebar-active,
     #sidebar-nav button.sidebar-active {
-      background: linear-gradient(135deg, rgba(147, 51, 234, 0.45) 0%, rgba(168, 85, 247, 0.25) 100%) !important;
-      border: 1px solid rgba(216, 180, 254, 0.5) !important;
-      border-left: 4px solid #d8b4fe !important;
+      background: #17304f !important;
       color: #ffffff !important;
       font-weight: 700 !important;
-      box-shadow: 0 6px 22px -2px rgba(147, 51, 234, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.3) !important;
-      text-shadow: 0 0 12px rgba(192, 132, 252, 0.7);
+      border: none !important;
+      border-left: 3.5px solid #38bdf8 !important;
+      border-radius: 0 0.5rem 0.5rem 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transform: none !important;
     }
 
     .sidebar-active i,
     #sidebar-nav button.sidebar-active i {
-      color: #f5d0fe !important;
-      animation: purpleIconPulse 3s ease-in-out infinite;
-      transform: scale(1.15);
+      color: #ffffff !important;
+      filter: none !important;
+      animation: none !important;
+      transform: none !important;
     }
 
-    /* Sidebar Header Banner */
-    .sidebar-header-banner {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(147, 51, 234, 0.12) 100%);
-      border-bottom: 1px solid rgba(168, 85, 247, 0.25);
-      backdrop-filter: blur(12px);
-      position: relative;
-      z-index: 2;
-    }
-
-    /* Sidebar Footer Box */
+    /* Sidebar Footer Box & Logout Button */
     .sidebar-footer-box {
-      border-top: 1px solid rgba(168, 85, 247, 0.22);
-      background: rgba(15, 6, 34, 0.5);
-      backdrop-filter: blur(12px);
+      border-top: 1px solid #162c46 !important;
+      background: #091624 !important;
+      backdrop-filter: none !important;
       position: relative;
       z-index: 2;
+      padding: 0.85rem !important;
     }
 
     .sidebar-logout-btn {
-      background: rgba(147, 51, 234, 0.18) !important;
-      border: 1px solid rgba(168, 85, 247, 0.3) !important;
-      color: #e9d5ff !important;
-      backdrop-filter: blur(8px);
-      transition: all 0.25s ease !important;
+      background: #13263d !important;
+      border: 1px solid #1c385a !important;
+      color: #8da4be !important;
+      font-weight: 600 !important;
+      border-radius: 0.5rem !important;
+      padding: 0.6rem !important;
+      backdrop-filter: none !important;
+      box-shadow: none !important;
+      transition: all 0.2s ease !important;
     }
 
     .sidebar-logout-btn:hover {
-      background: linear-gradient(135deg, rgba(225, 29, 72, 0.4) 0%, rgba(244, 63, 94, 0.22) 100%) !important;
-      border-color: rgba(251, 113, 133, 0.5) !important;
+      background: #be123c !important;
+      border-color: #f43f5e !important;
       color: #ffffff !important;
-      box-shadow: 0 4px 18px rgba(225, 29, 72, 0.4) !important;
-      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(190, 18, 60, 0.35) !important;
+      transform: none !important;
     }
 
     /* ========================================================
-       ROYAL PURPLE LUXURY THEME SYSTEM (PAGE & SIDEBAR HARMONY)
+       ENTERPRISE THEME SYSTEM
+       (Light Mode is 100% Original, Dark Mode only when .dark)
        ======================================================== */
     html.dark {
       color-scheme: dark;
     }
-    html.dark body, body {
-      background: radial-gradient(circle at 18% 12%, #1a0a38 0%, #0d041c 55%, #06020e 100%) !important;
-      color: #f1f5f9 !important;
-    }
-    html.dark header, header {
-      background: rgba(22, 10, 48, 0.88) !important;
-      backdrop-filter: blur(24px) !important;
-      -webkit-backdrop-filter: blur(24px) !important;
-      border-color: rgba(168, 85, 247, 0.22) !important;
+    html.dark body {
+      background-color: #0b1120 !important;
       color: #f8fafc !important;
     }
-    html.dark #page-title, #page-title {
+    html.dark header {
+      background-color: #0f172a !important;
+      border-color: #1e293b !important;
+      color: #f8fafc !important;
+    }
+    html.dark #page-title {
       color: #ffffff !important;
     }
-    html.dark #page-subtitle, #page-subtitle {
-      color: #d8b4fe !important;
+    html.dark #page-subtitle {
+      color: #94a3b8 !important;
     }
-    html.dark .bg-white, .bg-white {
-      background-color: rgba(26, 12, 54, 0.78) !important;
-      backdrop-filter: blur(16px) !important;
-      -webkit-backdrop-filter: blur(16px) !important;
+    html.dark .bg-white {
+      background-color: #0f172a !important;
+      color: #f8fafc !important;
+      border-color: #1e293b !important;
+    }
+    html.dark .bg-slate-50 {
+      background-color: #0b1120 !important;
+      color: #f8fafc !important;
+      border-color: #1e293b !important;
+    }
+    html.dark .bg-slate-100,
+    html.dark .bg-slate-100\/90 {
+      background-color: #1e293b !important;
       color: #f1f5f9 !important;
-      border-color: rgba(168, 85, 247, 0.22) !important;
-      box-shadow: 0 10px 30px -5px rgba(12, 4, 28, 0.5) !important;
-    }
-    html.dark .bg-slate-50, .bg-slate-50 {
-      background-color: rgba(20, 8, 44, 0.65) !important;
-      color: #f1f5f9 !important;
-      border-color: rgba(168, 85, 247, 0.2) !important;
-    }
-    html.dark .bg-slate-100, .bg-slate-100 {
-      background-color: rgba(45, 20, 92, 0.55) !important;
-      color: #e9d5ff !important;
-      border-color: rgba(168, 85, 247, 0.25) !important;
-    }
-    html.dark .bg-slate-100\/90, .bg-slate-100\/90 {
-      background-color: rgba(45, 20, 92, 0.8) !important;
-      color: #e9d5ff !important;
-      border-color: rgba(168, 85, 247, 0.25) !important;
+      border-color: #334155 !important;
     }
     html.dark .border-slate-100,
     html.dark .border-slate-200,
     html.dark .border-slate-200\/80,
-    html.dark .border-slate-300,
-    .border-slate-100,
-    .border-slate-200,
-    .border-slate-200\/80,
-    .border-slate-300 {
-      border-color: rgba(168, 85, 247, 0.22) !important;
+    html.dark .border-slate-300 {
+      border-color: #1e293b !important;
     }
     html.dark .text-slate-900,
-    html.dark .text-slate-800,
-    .text-slate-900,
-    .text-slate-800 {
-      color: #ffffff !important;
+    html.dark .text-slate-800 {
+      color: #f8fafc !important;
     }
     html.dark .text-slate-700,
-    html.dark .text-slate-600,
-    .text-slate-700,
-    .text-slate-600 {
-      color: #e9d5ff !important;
+    html.dark .text-slate-600 {
+      color: #cbd5e1 !important;
     }
     html.dark .text-slate-500,
-    html.dark .text-slate-400,
-    .text-slate-500,
-    .text-slate-400 {
-      color: #c084fc !important;
+    html.dark .text-slate-400 {
+      color: #94a3b8 !important;
     }
     html.dark input,
     html.dark select,
-    html.dark textarea,
-    input, select, textarea {
-      background-color: rgba(28, 12, 58, 0.7) !important;
-      border-color: rgba(168, 85, 247, 0.3) !important;
+    html.dark textarea {
+      background-color: #0f172a !important;
+      border-color: #334155 !important;
       color: #ffffff !important;
     }
-    html.dark input[type="checkbox"],
-    input[type="checkbox"] {
-      background-color: rgba(35, 16, 73, 0.8) !important;
-      border-color: rgba(168, 85, 247, 0.4) !important;
-      accent-color: #a855f7 !important;
+    html.dark input[type="checkbox"] {
+      background-color: #1e293b !important;
+      border-color: #475569 !important;
+      accent-color: #0ea5e9 !important;
     }
     html.dark input:focus,
     html.dark select:focus,
-    html.dark textarea:focus,
-    input:focus, select:focus, textarea:focus {
-      background-color: rgba(38, 16, 80, 0.9) !important;
-      border-color: #c084fc !important;
-      box-shadow: 0 0 12px rgba(168, 85, 247, 0.3) !important;
+    html.dark textarea:focus {
+      background-color: #1e293b !important;
+      border-color: #38bdf8 !important;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
     }
     html.dark input::placeholder,
-    html.dark textarea::placeholder,
-    input::placeholder, textarea::placeholder {
-      color: #a855f7 !important;
-      opacity: 0.7;
+    html.dark textarea::placeholder {
+      color: #64748b !important;
+      opacity: 0.8;
     }
     html.dark thead,
     html.dark thead tr,
-    html.dark th,
-    thead, thead tr, th {
-      background-color: rgba(25, 10, 52, 0.85) !important;
-      color: #e9d5ff !important;
-      border-color: rgba(168, 85, 247, 0.22) !important;
+    html.dark th {
+      background-color: #0f172a !important;
+      color: #94a3b8 !important;
+      border-color: #1e293b !important;
     }
     html.dark tbody tr {
-      border-color: rgba(168, 85, 247, 0.18) !important;
+      border-color: #1e293b !important;
     }
-    html.dark tbody tr:hover,
-    tbody tr:hover {
-      background-color: rgba(168, 85, 247, 0.12) !important;
+    html.dark tbody tr:hover {
+      background-color: #1e293b !important;
     }
     html.dark .modal-content,
-    html.dark .swal2-popup,
-    .modal-content, .swal2-popup {
-      background: linear-gradient(165deg, rgba(26, 12, 54, 0.98) 0%, rgba(18, 8, 38, 0.98) 100%) !important;
+    html.dark .swal2-popup {
+      background-color: #0f172a !important;
       color: #f8fafc !important;
-      border: 1px solid rgba(168, 85, 247, 0.35) !important;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(168, 85, 247, 0.2) !important;
+      border: 1px solid #334155 !important;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8) !important;
     }
-    html.dark .swal2-title, .swal2-title {
+    html.dark .swal2-title {
       color: #ffffff !important;
     }
-    html.dark .swal2-html-container, .swal2-html-container {
-      color: #e9d5ff !important;
+    html.dark .swal2-html-container {
+      color: #cbd5e1 !important;
     }
-    html.dark ::-webkit-scrollbar-track, ::-webkit-scrollbar-track {
-      background: #0d041c;
+    html.dark ::-webkit-scrollbar-track {
+      background: #0b1120;
     }
-    html.dark ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb {
-      background: #3b1464;
+    html.dark ::-webkit-scrollbar-thumb {
+      background: #1e293b;
       border-radius: 4px;
     }
-    html.dark ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:hover {
-      background: #6b21a8;
+    html.dark ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
     }
-    html.dark #header-branch-switcher-box, #header-branch-switcher-box {
-      background-color: rgba(45, 20, 92, 0.5) !important;
-      border-color: rgba(168, 85, 247, 0.35) !important;
+    html.dark #header-branch-switcher-box {
+      background-color: #1e293b !important;
+      border-color: #334155 !important;
     }
-    html.dark #header-branch-select, #header-branch-select {
-      background-color: rgba(22, 10, 48, 0.9) !important;
-      color: #f3e8ff !important;
-      border-color: rgba(168, 85, 247, 0.35) !important;
+    html.dark #header-branch-select {
+      background-color: #0f172a !important;
+      color: #f1f5f9 !important;
+      border-color: #334155 !important;
     }
-    html.dark #theme-toggle-btn, #theme-toggle-btn {
-      background-color: rgba(45, 20, 92, 0.6) !important;
-      border-color: rgba(168, 85, 247, 0.35) !important;
+    html.dark #theme-toggle-btn {
+      background-color: #1e293b !important;
+      border-color: #334155 !important;
       color: #fbbf24 !important;
     }
-    html.dark #theme-toggle-btn:hover, #theme-toggle-btn:hover {
-      background-color: rgba(147, 51, 234, 0.4) !important;
-    }
-    html.dark .bg-indigo-50,
-    html.dark .bg-indigo-50\/70,
-    .bg-indigo-50,
-    .bg-indigo-50\/70 {
-      background-color: rgba(147, 51, 234, 0.18) !important;
-    }
-    html.dark .bg-emerald-50, .bg-emerald-50 {
-      background-color: rgba(16, 185, 129, 0.18) !important;
-    }
-    html.dark .bg-rose-50, .bg-rose-50 {
-      background-color: rgba(244, 63, 94, 0.18) !important;
-    }
-    html.dark .bg-amber-50, .bg-amber-50 {
-      background-color: rgba(245, 158, 11, 0.18) !important;
-    }
-    html.dark .bg-sky-50, .bg-sky-50 {
-      background-color: rgba(14, 165, 233, 0.18) !important;
-    }
-    html.dark .bg-purple-50, .bg-purple-50 {
-      background-color: rgba(168, 85, 247, 0.18) !important;
-    }
-    html.dark .bg-teal-50, .bg-teal-50 {
-      background-color: rgba(20, 184, 166, 0.18) !important;
-    }
-    html.dark .border-indigo-100,
-    html.dark .border-indigo-200,
-    .border-indigo-100,
-    .border-indigo-200 {
-      border-color: rgba(168, 85, 247, 0.3) !important;
-    }
-    html.dark .border-emerald-100,
-    html.dark .border-emerald-200,
-    .border-emerald-100,
-    .border-emerald-200 {
-      border-color: rgba(16, 185, 129, 0.3) !important;
-    }
-    html.dark .border-rose-100,
-    html.dark .border-rose-200,
-    .border-rose-100,
-    .border-rose-200 {
-      border-color: rgba(244, 63, 94, 0.3) !important;
-    }
-    html.dark .border-amber-100,
-    html.dark .border-amber-200,
-    .border-amber-100,
-    .border-amber-200 {
-      border-color: rgba(245, 158, 11, 0.3) !important;
-    }
-    html.dark .border-purple-100,
-    html.dark .border-purple-200,
-    .border-purple-100,
-    .border-purple-200 {
-      border-color: rgba(168, 85, 247, 0.3) !important;
-    }
-    html.dark .text-indigo-900,
-    html.dark .text-indigo-800,
-    .text-indigo-900,
-    .text-indigo-800 {
-      color: #e9d5ff !important;
-    }
-    html.dark .text-amber-950,
-    html.dark .text-amber-900,
-    html.dark .text-amber-800,
-    .text-amber-950,
-    .text-amber-900,
-    .text-amber-800 {
-      color: #fde68a !important;
+    html.dark #theme-toggle-btn:hover {
+      background-color: #334155 !important;
     }
 
     /* ========================================================
@@ -2888,23 +2742,26 @@
             ? `<img src="${emp.photoUrl}" alt="${emp.name}" class="w-full h-full object-cover" onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\\'font-black text-2xl text-white\\'>${empInitial}</span>';">`
             : `<span class="font-black text-2xl text-white">${empInitial}</span>`;
 
-          const activeCardTheme = localStorage.getItem('sanvees_emp_card_theme') || 'purple';
-          const bannerGradClass = activeCardTheme === 'blue'
-            ? 'from-sky-500 via-sky-600 to-blue-600'
-            : 'from-purple-900 via-purple-700 to-indigo-600';
+          const activeCardTheme = localStorage.getItem('sanvees_emp_card_theme') || 'blue';
+          const bannerGradClass = activeCardTheme === 'purple'
+            ? 'from-purple-900 via-purple-700 to-indigo-600'
+            : 'from-sky-500 via-sky-600 to-blue-600';
+          const avatarBgClass = activeCardTheme === 'purple'
+            ? 'from-purple-600 to-indigo-600'
+            : 'from-sky-500 to-blue-600';
 
           // 1. Modern Card Item matching screenshot
           cardItems += `
-            <div class="emp-card-item relative bg-white dark:bg-[#1a0c36]/90 rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-purple-500/25 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group" data-emp-id="${id}" data-name="${(emp.name || '').toLowerCase()}" data-code="${(emp.customEmpCode || '').toLowerCase()}" data-dept="${(emp.department || '').toLowerCase()}">
+            <div class="emp-card-item relative bg-white dark:bg-[#0f172a] rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group" data-emp-id="${id}" data-name="${(emp.name || '').toLowerCase()}" data-code="${(emp.customEmpCode || '').toLowerCase()}" data-dept="${(emp.department || '').toLowerCase()}">
               
               <!-- Curved Top Banner -->
               <div class="emp-card-banner h-28 relative overflow-hidden bg-gradient-to-r ${bannerGradClass} p-4 flex justify-between items-start transition-all duration-300">
                 <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-                <div class="absolute -left-6 -bottom-6 w-24 h-24 bg-purple-400/20 rounded-full blur-lg pointer-events-none"></div>
+                <div class="absolute -left-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-lg pointer-events-none"></div>
                 
                 <!-- Select Checkbox for Bulk Actions -->
                 <div class="relative z-10 flex items-center">
-                  <input type="checkbox" class="emp-row-select w-4 h-4 rounded border-white/40 text-purple-600 focus:ring-purple-400 cursor-pointer transition accent-purple-500 bg-white/20 backdrop-blur-sm" value="${id}" data-name="${emp.name ? emp.name.replace(/"/g, '&quot;') : ''}" onchange="onEmployeeSelectChange()" title="Select ${emp.name}">
+                  <input type="checkbox" class="emp-row-select w-4 h-4 rounded border-white/40 text-sky-600 focus:ring-sky-400 cursor-pointer transition accent-sky-500 bg-white/20 backdrop-blur-sm" value="${id}" data-name="${emp.name ? emp.name.replace(/"/g, '&quot;') : ''}" onchange="onEmployeeSelectChange()" title="Select ${emp.name}">
                 </div>
                 
                 <!-- Role Pill Badge (Admin / Employee) -->
@@ -2917,7 +2774,7 @@
 
               <!-- Floating Avatar Box overlapping Banner -->
               <div class="absolute top-14 left-6 z-10">
-                <div class="w-16 h-16 rounded-2xl border-4 border-white dark:border-[#1a0c36] shadow-md bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center overflow-hidden transition-transform duration-300 group-hover:scale-105">
+                <div class="w-16 h-16 rounded-2xl border-4 border-white dark:border-[#0f172a] shadow-md bg-gradient-to-tr ${avatarBgClass} text-white flex items-center justify-center overflow-hidden transition-transform duration-300 group-hover:scale-105">
                   ${avatarHtml}
                 </div>
               </div>
@@ -3572,6 +3429,11 @@
         }
       }
     };
+    setTimeout(() => {
+      if (typeof window.setEmployeeCardTheme === 'function') {
+        window.setEmployeeCardTheme(localStorage.getItem('sanvees_emp_card_theme') || 'blue');
+      }
+    }, 100);
 
     window.setEmployeeView = function(view) {
       const cardsCont = document.getElementById('emp-cards-container');
@@ -11657,13 +11519,13 @@ ${messageText}
       <div class="relative z-10">
         <!-- Logo & Header -->
         <div class="p-5 flex items-center space-x-3 sidebar-header-banner">
-          <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/40 overflow-hidden shrink-0 bg-gradient-to-tr from-purple-700 via-violet-600 to-fuchsia-500 p-0.5 border border-purple-400/30">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-sky-900/40 overflow-hidden shrink-0 bg-gradient-to-tr from-sky-600 via-blue-600 to-indigo-700 p-0.5 border border-sky-400/30">
             <svg class="w-full h-full" viewBox="0 0 100 100">
               <defs>
                 <linearGradient id="sbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#7e22ce"/>
-                  <stop offset="50%" stop-color="#a855f7"/>
-                  <stop offset="100%" stop-color="#ec4899"/>
+                  <stop offset="0%" stop-color="#0284c7"/>
+                  <stop offset="50%" stop-color="#2563eb"/>
+                  <stop offset="100%" stop-color="#4f46e5"/>
                 </linearGradient>
               </defs>
               <rect width="100" height="100" rx="24" fill="url(#sbGrad)"/>
@@ -11672,13 +11534,13 @@ ${messageText}
               <circle cx="30" cy="62" r="7" fill="#ffffff"/>
               <circle cx="70" cy="62" r="7" fill="#ffffff"/>
               <path d="M 50 30 L 30 62 M 50 30 L 70 62 M 30 62 L 70 62" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-              <circle cx="50" cy="51" r="5" fill="#f0abfc" stroke="#ffffff" stroke-width="2.5"/>
+              <circle cx="50" cy="51" r="5" fill="#38bdf8" stroke="#ffffff" stroke-width="2.5"/>
               <path d="M 74 22 Q 78 22 78 18 Q 78 22 82 22 Q 78 22 78 26 Q 78 22 74 22 Z" fill="#fef08a"/>
             </svg>
           </div>
           <div class="min-w-0">
             <h2 class="font-black text-sm text-white tracking-wide truncate">SANVEE'S</h2>
-            <p class="text-[10px] text-purple-300 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">MANAGEMENT SUITE</p>
           </div>
         </div>
 

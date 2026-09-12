@@ -738,12 +738,18 @@
       mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 80%);
       -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 80%);
     }
+
+    #login-employee-select option {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 8px 12px;
+    }
   </style>
 
   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, onSnapshot, setDoc, updateDoc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -801,20 +807,166 @@
     };
 
     window.currentLoginRoleTab = 'admin';
+    let cachedLoginEmployees = [];
+
+    // ==========================================
+    // EMPLOYEE PASSWORDLESS / DROPDOWN LOGIN SYSTEM
+    // ==========================================
+    window.populateLoginEmployeeDropdown = function() {
+      const select = document.getElementById('login-employee-select');
+      if (!select) return;
+
+      // 1. In-memory list
+      let list = (employeeList && employeeList.length > 0) ? [...employeeList] : [];
+
+      // 2. Cached login employees list
+      if (list.length === 0 && cachedLoginEmployees.length > 0) {
+        list = [...cachedLoginEmployees];
+      }
+
+      // 3. Fallback to localStorage
+      if (list.length === 0) {
+        try {
+          const stored = localStorage.getItem('sanvees_cached_employees');
+          if (stored) {
+            list = JSON.parse(stored);
+            cachedLoginEmployees = list;
+          }
+        } catch (e) {
+          console.warn('Could not parse cached employees:', e);
+        }
+      }
+
+      // Sort alphabetically
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      const currentVal = select.value;
+      let opts = '<option value="">-- তালিকা থেকে আপনার নাম ও পদবি বেছে নিন --</option>';
+
+      list.forEach(emp => {
+        const branchTag = emp.branch ? ` • 🏢 ${emp.branch}` : '';
+        const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : '';
+        const desigTag = emp.designation ? ` (${emp.designation})` : '';
+        opts += `<option value="${emp.id}">${emp.name}${desigTag}${codeTag}${branchTag}</option>`;
+      });
+
+      select.innerHTML = opts;
+      if (currentVal && list.some(e => e.id === currentVal)) {
+        select.value = currentVal;
+      }
+    };
+
+    window.onLoginEmployeeSelectChange = function() {
+      const select = document.getElementById('login-employee-select');
+      const previewBox = document.getElementById('login-emp-preview-box');
+      const previewPhoto = document.getElementById('login-emp-preview-photo');
+      const previewName = document.getElementById('login-emp-preview-name');
+      const previewSub = document.getElementById('login-emp-preview-sub');
+
+      if (!select || !select.value) {
+        if (previewBox) previewBox.classList.add('hidden');
+        return;
+      }
+
+      const list = (employeeList && employeeList.length > 0) ? employeeList : cachedLoginEmployees;
+      const emp = list.find(e => e.id === select.value);
+
+      if (emp && previewBox) {
+        previewBox.classList.remove('hidden');
+        if (previewPhoto) {
+          previewPhoto.src = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || 'User')}&background=06b6d4&color=fff`;
+        }
+        if (previewName) {
+          previewName.innerText = emp.name;
+        }
+        if (previewSub) {
+          const code = emp.customEmpCode ? `ID: ${emp.customEmpCode}` : 'Staff';
+          const branch = emp.branch || 'Head Office';
+          previewSub.innerText = `${emp.designation || 'Employee'} • ${code} • 🏢 ${branch}`;
+        }
+      }
+    };
+
+    window.filterLoginEmployeeDropdown = function() {
+      const searchInput = document.getElementById('login-employee-search');
+      const select = document.getElementById('login-employee-select');
+      if (!searchInput || !select) return;
+
+      const q = searchInput.value.trim().toLowerCase();
+      const list = (employeeList && employeeList.length > 0) ? employeeList : cachedLoginEmployees;
+
+      let filtered = list;
+      if (q) {
+        filtered = list.filter(emp => {
+          const name = (emp.name || '').toLowerCase();
+          const desig = (emp.designation || '').toLowerCase();
+          const code = (emp.customEmpCode || '').toLowerCase();
+          const branch = (emp.branch || '').toLowerCase();
+          return name.includes(q) || desig.includes(q) || code.includes(q) || branch.includes(q);
+        });
+      }
+
+      filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      let opts = '<option value="">-- তালিকা থেকে আপনার নাম ও পদবি বেছে নিন --</option>';
+      filtered.forEach(emp => {
+        const branchTag = emp.branch ? ` • 🏢 ${emp.branch}` : '';
+        const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : '';
+        const desigTag = emp.designation ? ` (${emp.designation})` : '';
+        opts += `<option value="${emp.id}">${emp.name}${desigTag}${codeTag}${branchTag}</option>`;
+      });
+
+      select.innerHTML = opts;
+      if (filtered.length === 1 && q.length >= 2) {
+        select.value = filtered[0].id;
+        window.onLoginEmployeeSelectChange();
+      }
+    };
+
+    // Pre-cache & live listen employees collection for instant login dropdown
+    function initLoginEmployeesListener() {
+      try {
+        const stored = localStorage.getItem('sanvees_cached_employees');
+        if (stored) {
+          cachedLoginEmployees = JSON.parse(stored);
+          populateLoginEmployeeDropdown();
+        }
+      } catch (e) {}
+
+      try {
+        onSnapshot(collection(db, "employees"), (snapshot) => {
+          const emps = [];
+          snapshot.forEach(docSnap => {
+            emps.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          if (emps.length > 0) {
+            cachedLoginEmployees = emps;
+            try {
+              localStorage.setItem('sanvees_cached_employees', JSON.stringify(emps));
+            } catch (e) {}
+            populateLoginEmployeeDropdown();
+          }
+        }, (err) => {
+          console.log('Login employees snapshot note:', err.message);
+        });
+      } catch (err) {
+        console.warn('Init login employees error:', err);
+      }
+    }
+    initLoginEmployeesListener();
 
     window.switchLoginRoleTab = function(tab) {
       window.currentLoginRoleTab = tab;
       const adminBtn = document.getElementById('tab-login-admin');
       const empBtn = document.getElementById('tab-login-employee');
+      const adminFields = document.getElementById('login-admin-fields');
+      const empFields = document.getElementById('login-employee-fields');
       const hintBox = document.getElementById('login-role-hint-box');
       const hintText = document.getElementById('login-role-hint-text');
       const hintIcon = document.getElementById('login-role-hint-icon');
-      const emailLabel = document.getElementById('login-email-label');
-      const emailBadge = document.getElementById('login-email-badge');
-      const emailInput = document.getElementById('login-email');
-      const userIcon = document.getElementById('login-user-icon');
       const btnText = document.getElementById('login-btn-text');
       const btnIcon = document.getElementById('login-btn-icon');
+      const loginBtn = document.getElementById('login-btn');
 
       if (tab === 'admin') {
         if (adminBtn) {
@@ -823,15 +975,17 @@
         if (empBtn) {
           empBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent cursor-pointer";
         }
+        if (adminFields) adminFields.classList.remove('hidden');
+        if (empFields) empFields.classList.add('hidden');
+
         if (hintBox) hintBox.className = "px-3.5 py-2 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold flex items-center space-x-2 transition-all duration-300";
         if (hintIcon) hintIcon.className = "fa-solid fa-crown text-amber-400 shrink-0";
         if (hintText) hintText.innerText = "অ্যাডমিন ও ব্রাঞ্চ ম্যানেজার পোর্টাল • সম্পূর্ণ কন্ট্রোল ও অনুমোদন";
-        if (emailLabel) emailLabel.innerText = "Admin / User Email (অ্যাডমিন ইমেইল)";
-        if (emailBadge) emailBadge.innerText = "authorized";
-        if (userIcon) userIcon.className = "fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon";
-        if (emailInput) emailInput.placeholder = "admin@sanvees.com";
         if (btnText) btnText.innerText = "Sign In as Admin / Manager";
         if (btnIcon) btnIcon.className = "fa-solid fa-arrow-right text-xs";
+        if (loginBtn) {
+          loginBtn.className = "w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25";
+        }
       } else {
         if (empBtn) {
           empBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400/30 cursor-pointer";
@@ -839,29 +993,144 @@
         if (adminBtn) {
           adminBtn.className = "py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center space-x-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent cursor-pointer";
         }
+        if (adminFields) adminFields.classList.add('hidden');
+        if (empFields) empFields.classList.remove('hidden');
+
         if (hintBox) hintBox.className = "px-3.5 py-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold flex items-center space-x-2 transition-all duration-300";
         if (hintIcon) hintIcon.className = "fa-solid fa-user-check text-cyan-400 shrink-0";
-        if (hintText) hintText.innerText = "কর্মচারী সেলফ-সার্ভিস পোর্টাল • হাজিরা, ছুটি ও বেতন ভিউ এবং আবেদন";
-        if (emailLabel) emailLabel.innerText = "Employee Email (কর্মচারীর ইমেইল)";
-        if (emailBadge) emailBadge.innerText = "staff portal";
-        if (userIcon) userIcon.className = "fa-solid fa-id-badge absolute left-3.5 top-3.5 text-cyan-400 text-xs input-icon";
-        if (emailInput) emailInput.placeholder = "employee@sanvees.com";
-        if (btnText) btnText.innerText = "Sign In to Employee Portal";
+        if (hintText) hintText.innerText = "কর্মচারী সেলফ-সার্ভিস পোর্টাল • নাম নির্বাচন করে সরাসরি প্রবেশ করুন (পাসওয়ার্ড ছাড়া)";
+        if (btnText) btnText.innerText = "Sign In to Employee Portal (পোর্টালে প্রবেশ করুন)";
         if (btnIcon) btnIcon.className = "fa-solid fa-arrow-right-to-bracket text-xs";
+        if (loginBtn) {
+          loginBtn.className = "w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/25";
+        }
+
+        populateLoginEmployeeDropdown();
+      }
+    };
+
+    window.enterEmployeePortal = function(selectedEmp) {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app-screen').classList.remove('hidden');
+
+      const empName = selectedEmp.name || 'Employee';
+      const empDesig = selectedEmp.designation || 'Staff';
+
+      const userEmailElem = document.getElementById('user-email');
+      if (userEmailElem) userEmailElem.innerText = `${empName} (${empDesig})`;
+
+      const avatarElem = document.getElementById('header-user-avatar');
+      if (avatarElem) avatarElem.innerText = empName.charAt(0).toUpperCase();
+
+      const badgeElem = document.getElementById('user-role-badge');
+      if (badgeElem) {
+        badgeElem.className = 'text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200';
+        badgeElem.innerText = 'EMPLOYEE';
+      }
+
+      const branchBadgeElem = document.getElementById('user-branch-badge');
+      if (branchBadgeElem) {
+        branchBadgeElem.innerText = `🏢 ${selectedEmp.branch || 'Head Office'}`;
+        branchBadgeElem.classList.remove('hidden');
+      }
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const currentMonthStr = todayStr.substring(0, 7);
+
+      const attDateElem = document.getElementById('att-date');
+      if (attDateElem) attDateElem.value = todayStr;
+      if (document.getElementById('adv-filter-month')) document.getElementById('adv-filter-month').value = currentMonthStr;
+      if (document.getElementById('fine-filter-month')) document.getElementById('fine-filter-month').value = currentMonthStr;
+      if (document.getElementById('payroll-filter-month')) document.getElementById('payroll-filter-month').value = currentMonthStr;
+      if (document.getElementById('rep-month')) document.getElementById('rep-month').value = currentMonthStr;
+      if (document.getElementById('rep-date')) document.getElementById('rep-date').value = todayStr;
+
+      loadBranchesRealtime();
+      loadEmployeesRealtime();
+      listenTodayAttendance(todayStr);
+      loadLeaveRequestsRealtime();
+      loadPayrollRealtime();
+      loadAdvancesRealtime();
+      loadFinesRealtime();
+      loadCompanyDocsRealtime();
+      loadPerformanceRealtime();
+      loadNoticesRealtime();
+      loadActivityLogsRealtime();
+      loadWhatsAppSettingsRealtime();
+
+      applyRoleAccessUI();
+      if (typeof calculateMyPersonalSummary === 'function') {
+        calculateMyPersonalSummary();
       }
     };
 
     window.loginUser = async function() {
+      const btn = document.getElementById('login-btn');
+
+      if (window.currentLoginRoleTab === 'employee') {
+        // === PASSWORDLESS DIRECT EMPLOYEE LOGIN ===
+        const select = document.getElementById('login-employee-select');
+        const selectedEmpId = select ? select.value : '';
+
+        if (!selectedEmpId) {
+          showToast('warning', 'দয়া করে তালিকা থেকে আপনার নাম নির্বাচন করুন');
+          return;
+        }
+
+        const list = (employeeList && employeeList.length > 0) ? employeeList : cachedLoginEmployees;
+        const selectedEmp = list.find(e => e.id === selectedEmpId);
+
+        if (!selectedEmp) {
+          showToast('error', 'নির্বাচিত কর্মচারীর তথ্য পাওয়া যায়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>প্রবেশ করা হচ্ছে...';
+
+        try {
+          sessionStorage.setItem('preferred_login_role', 'employee');
+          sessionStorage.setItem('direct_employee_id', selectedEmp.id);
+          sessionStorage.setItem('direct_employee_data', JSON.stringify(selectedEmp));
+
+          myEmployeeProfile = selectedEmp;
+          currentUserRole = 'Employee';
+          currentUserEmail = (selectedEmp.email && selectedEmp.email.trim()) 
+            ? selectedEmp.email.trim().toLowerCase() 
+            : (selectedEmp.customEmpCode ? `${selectedEmp.customEmpCode.toLowerCase()}@sanvees.com` : `emp_${selectedEmp.id}@sanvees.com`);
+          currentUserBranch = selectedEmp.branch || 'Head Office';
+          currentUserPermissions = getDefaultPermissionsForRole('Employee');
+
+          // Silently attempt anonymous sign in if enabled
+          if (!auth.currentUser) {
+            try {
+              await signInAnonymously(auth);
+            } catch (e) {
+              console.log('Anonymous auth note:', e.message);
+            }
+          }
+
+          enterEmployeePortal(selectedEmp);
+          showToast('success', `স্বাগতম ${selectedEmp.name}! কর্মচারী পোর্টালে প্রবেশ করেছেন।`);
+        } catch (err) {
+          console.error('Employee direct login error:', err);
+          showToast('error', 'লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = `<span id="login-btn-text">Sign In to Employee Portal (পোর্টালে প্রবেশ করুন)</span> <i id="login-btn-icon" class="fa-solid fa-arrow-right-to-bracket ml-2 text-xs"></i>`;
+        }
+        return;
+      }
+
+      // === ADMIN / MANAGER EMAIL & PASSWORD LOGIN ===
       let email = document.getElementById('login-email').value.trim().toLowerCase();
       const pass = document.getElementById('login-password').value;
-      const btn = document.getElementById('login-btn');
       
       if(!email || !pass) {
         showToast('warning', 'দয়া করে ইমেইল ও পাসওয়ার্ড প্রদান করুন');
         return;
       }
 
-      // If employee typed username without @, prompt or handle gracefully
       if (!email.includes('@')) {
         email = `${email}@sanvees.com`;
       }
@@ -870,9 +1139,11 @@
       btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>প্রবেশ করা হচ্ছে...';
 
       try {
-        sessionStorage.setItem('preferred_login_role', window.currentLoginRoleTab || 'admin');
+        sessionStorage.setItem('preferred_login_role', 'admin');
+        sessionStorage.removeItem('direct_employee_id');
+        sessionStorage.removeItem('direct_employee_data');
         await signInWithEmailAndPassword(auth, email, pass);
-        showToast('success', window.currentLoginRoleTab === 'employee' ? 'কর্মচারী পোর্টালে স্বাগতম!' : 'লগইন সফল হয়েছে!');
+        showToast('success', 'লগইন সফল হয়েছে!');
       } catch (err) {
         let errMsg = 'ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। অনুগ্রহ করে পুনরায় চেক করুন।';
         if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-login-credentials') {
@@ -891,8 +1162,7 @@
         });
       } finally {
         btn.disabled = false;
-        const isEmp = window.currentLoginRoleTab === 'employee';
-        btn.innerHTML = `<span id="login-btn-text">${isEmp ? 'Sign In to Employee Portal' : 'Sign In as Admin / Manager'}</span> <i id="login-btn-icon" class="fa-solid ${isEmp ? 'fa-arrow-right-to-bracket' : 'fa-arrow-right'} ml-2 text-xs"></i>`;
+        btn.innerHTML = `<span id="login-btn-text">Sign In as Admin / Manager</span> <i id="login-btn-icon" class="fa-solid fa-arrow-right ml-2 text-xs"></i>`;
       }
     };
 
@@ -921,18 +1191,37 @@
         cancelButtonText: 'বাতিল'
       }).then((result) => {
         if (result.isConfirmed) {
-          signOut(auth);
+          sessionStorage.removeItem('preferred_login_role');
+          sessionStorage.removeItem('direct_employee_id');
+          sessionStorage.removeItem('direct_employee_data');
+          myEmployeeProfile = null;
+          currentUserRole = 'Employee';
+          currentUserEmail = '';
+          signOut(auth).catch(() => {});
+          document.getElementById('app-screen').classList.add('hidden');
+          document.getElementById('login-screen').classList.remove('hidden');
+          if (typeof window.resumeLoginAnimation === 'function') {
+            window.resumeLoginAnimation();
+          }
+          if (typeof populateLoginEmployeeDropdown === 'function') {
+            populateLoginEmployeeDropdown();
+          }
         }
       });
     };
 
     onAuthStateChanged(auth, (user) => {
+      const preferredRole = sessionStorage.getItem('preferred_login_role');
+      const directEmpId = sessionStorage.getItem('direct_employee_id');
+      const directEmpData = sessionStorage.getItem('direct_employee_data');
+
       if (user) {
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
-        document.getElementById('user-email').innerText = user.email;
-        document.getElementById('header-user-avatar').innerText = user.email.charAt(0).toUpperCase();
-        currentUserEmail = user.email.toLowerCase();
+        const displayUser = user.email || (myEmployeeProfile ? `${myEmployeeProfile.name} (${myEmployeeProfile.designation || 'Employee'})` : 'User');
+        document.getElementById('user-email').innerText = displayUser;
+        document.getElementById('header-user-avatar').innerText = (displayUser || 'U').charAt(0).toUpperCase();
+        currentUserEmail = (user.email || '').toLowerCase();
         
         const todayStr = new Date().toISOString().split('T')[0];
         const currentMonthStr = todayStr.substring(0, 7);
@@ -967,11 +1256,28 @@
         loadNoticesRealtime();
         loadActivityLogsRealtime();
         loadWhatsAppSettingsRealtime();
+      } else if (preferredRole === 'employee' && directEmpId && directEmpData) {
+        // Session restore on reload for direct passwordless employee
+        try {
+          const emp = JSON.parse(directEmpData);
+          myEmployeeProfile = emp;
+          currentUserRole = 'Employee';
+          currentUserEmail = (emp.email && emp.email.trim()) ? emp.email.trim().toLowerCase() : (emp.customEmpCode ? `${emp.customEmpCode.toLowerCase()}@sanvees.com` : `emp_${emp.id}@sanvees.com`);
+          currentUserBranch = emp.branch || 'Head Office';
+          currentUserPermissions = getDefaultPermissionsForRole('Employee');
+          enterEmployeePortal(emp);
+          return;
+        } catch (e) {
+          console.warn('Session restore failed:', e);
+        }
       } else {
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
         if (typeof window.resumeLoginAnimation === 'function') {
           window.resumeLoginAnimation();
+        }
+        if (typeof populateLoginEmployeeDropdown === 'function') {
+          populateLoginEmployeeDropdown();
         }
       }
     });
@@ -1649,7 +1955,7 @@
           currentUserRole = assignedInfo.role;
           currentUserBranch = assignedInfo.branch || 'ALL';
           currentUserPermissions = assignedInfo.permissions || getDefaultPermissionsForRole(assignedInfo.role);
-        } else if (preferredRole === 'employee' || employeeList.some(e => e.email && e.email.trim().toLowerCase() === currentNormalizedEmail)) {
+        } else if (preferredRole === 'employee' || sessionStorage.getItem('direct_employee_id') || employeeList.some(e => e.email && e.email.trim().toLowerCase() === currentNormalizedEmail)) {
           // Dedicated Employee Portal Login
           currentUserRole = 'Employee';
           currentUserBranch = 'ALL';
@@ -2381,8 +2687,11 @@
 
           permOptions += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}] - 🏢 ${emp.branch || 'Head Office'}</option>`;
 
+          const directEmpId = sessionStorage.getItem('direct_employee_id');
           let isMatch = false;
-          if (emp.email && emp.email.trim().toLowerCase() === currentUserEmail.trim().toLowerCase()) {
+          if (directEmpId && directEmpId === id) {
+            isMatch = true;
+          } else if (emp.email && emp.email.trim().toLowerCase() === currentUserEmail.trim().toLowerCase()) {
             isMatch = true;
           } else if (assignedRoleInfo && assignedRoleInfo.employeeId && assignedRoleInfo.employeeId === id) {
             isMatch = true;
@@ -2490,6 +2799,20 @@
 
           if (leaveSelect) leaveSelect.value = myEmployeeProfile.id;
           populateSettingsSelfProfileForm();
+        }
+
+        if (currentUserRole === 'Employee' && myEmployeeProfile) {
+          const userEmailElem = document.getElementById('user-email');
+          if (userEmailElem) userEmailElem.innerText = `${myEmployeeProfile.name} (${myEmployeeProfile.designation || 'Employee'})`;
+          const avatarElem = document.getElementById('header-user-avatar');
+          if (avatarElem) avatarElem.innerText = (myEmployeeProfile.name || 'E').charAt(0).toUpperCase();
+        }
+
+        try {
+          localStorage.setItem('sanvees_cached_employees', JSON.stringify(employeeList));
+        } catch(e) {}
+        if (typeof populateLoginEmployeeDropdown === 'function') {
+          populateLoginEmployeeDropdown();
         }
 
         applyRoleAccessUI();
@@ -10393,40 +10716,81 @@ ${messageText}
 
           <!-- Login Form -->
           <form onsubmit="event.preventDefault(); loginUser();" class="space-y-4">
-            <div class="classic-input-group">
-              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                <span id="login-email-label">User Email (ইউজার ইমেইল)</span>
-                <span id="login-email-badge" class="text-[10px] text-indigo-400 font-semibold lowercase">authorized</span>
-              </label>
-              <div class="relative">
-                <i id="login-user-icon" class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
-                <input type="text" id="login-email" required placeholder="admin@sanvees.com" class="classic-input pl-9 pr-4 py-2.5">
+            
+            <!-- 1. ADMIN / MANAGER CREDENTIAL FIELDS -->
+            <div id="login-admin-fields" class="space-y-4">
+              <div class="classic-input-group">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span id="login-email-label">Admin / User Email (অ্যাডমিন ইমেইল)</span>
+                  <span class="text-[10px] text-indigo-400 font-semibold lowercase">authorized</span>
+                </label>
+                <div class="relative">
+                  <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+                  <input type="email" id="login-email" placeholder="admin@sanvees.com" class="classic-input pl-9 pr-4 py-2.5">
+                </div>
+              </div>
+
+              <div class="classic-input-group">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Password (পাসওয়ার্ড)</span>
+                  <span class="text-[10px] text-slate-400 font-medium">min 6 chars</span>
+                </label>
+                <div class="relative">
+                  <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
+                  <input type="password" id="login-password" placeholder="••••••••" class="classic-input pl-9 pr-10 py-2.5">
+                  <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-400 focus:outline-none p-1 transition cursor-pointer">
+                    <i id="login-eye-icon" class="fa-solid fa-eye text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                <label class="flex items-center space-x-2 cursor-pointer select-none">
+                  <input type="checkbox" id="login-remember" checked class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
+                  <span class="text-slate-300 font-medium">Remember Session</span>
+                </label>
+                <span class="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold flex items-center space-x-1" onclick="showToast('info', 'পাসওয়ার্ড ভুলে গেলে আপনার কোম্পানি অ্যাডমিনের সাথে যোগাযোগ করুন।')">
+                  <i class="fa-solid fa-circle-question text-[10px]"></i>
+                  <span>Help / Support</span>
+                </span>
               </div>
             </div>
 
-            <div class="classic-input-group">
-              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                <span>Password (পাসওয়ার্ড)</span>
-                <span class="text-[10px] text-slate-400 font-medium">min 6 chars</span>
-              </label>
-              <div class="relative">
-                <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs input-icon"></i>
-                <input type="password" id="login-password" required placeholder="••••••••" class="classic-input pl-9 pr-10 py-2.5">
-                <button type="button" onclick="toggleLoginPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-400 focus:outline-none p-1 transition cursor-pointer">
-                  <i id="login-eye-icon" class="fa-solid fa-eye text-xs"></i>
-                </button>
+            <!-- 2. EMPLOYEE DIRECT SELECTOR FIELDS (No Password / No Email Needed) -->
+            <div id="login-employee-fields" class="hidden space-y-3.5">
+              <div class="classic-input-group">
+                <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Select Employee Name (আপনার নাম নির্বাচন করুন)</span>
+                  <span class="text-[10px] text-cyan-400 font-bold lowercase bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30">direct access</span>
+                </label>
+                <div class="relative">
+                  <i class="fa-solid fa-user-check absolute left-3.5 top-3.5 text-cyan-400 text-xs pointer-events-none"></i>
+                  <select id="login-employee-select" onchange="onLoginEmployeeSelectChange()" class="w-full bg-slate-900/90 border border-cyan-500/40 rounded-xl pl-9 pr-8 py-2.5 text-xs text-white font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-cyan-400 outline-none transition cursor-pointer appearance-none">
+                    <option value="">-- তালিকা থেকে আপনার নাম ও পদবি বেছে নিন --</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-slate-400 text-xs pointer-events-none"></i>
+                </div>
               </div>
-            </div>
 
-            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-              <label class="flex items-center space-x-2 cursor-pointer select-none">
-                <input type="checkbox" id="login-remember" checked class="w-3.5 h-3.5 rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-slate-900">
-                <span class="text-slate-300 font-medium">Remember Session</span>
-              </label>
-              <span class="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold flex items-center space-x-1" onclick="showToast('info', 'পাসওয়ার্ড ভুলে গেলে আপনার কোম্পানি অ্যাডমিনের সাথে যোগাযোগ করুন।')">
-                <i class="fa-solid fa-circle-question text-[10px]"></i>
-                <span>Help / Support</span>
-              </span>
+              <!-- Quick Search Filter Input for large employee lists -->
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="login-employee-search" onkeyup="filterLoginEmployeeDropdown()" placeholder="নাম বা আইডি দিয়ে দ্রুত খুঁজুন..." class="w-full pl-8 pr-3 py-1.5 bg-slate-900/60 border border-slate-700/60 rounded-xl text-xs text-slate-300 font-medium placeholder:text-slate-500 outline-none focus:border-cyan-500">
+              </div>
+
+              <!-- Selected Employee Profile Preview Box -->
+              <div id="login-emp-preview-box" class="hidden p-3 rounded-2xl bg-gradient-to-r from-cyan-950/50 to-indigo-950/50 border border-cyan-500/30 flex items-center space-x-3 transition animate-in fade-in duration-200">
+                <img id="login-emp-preview-photo" src="" class="w-11 h-11 rounded-full object-cover border-2 border-cyan-400 shadow-md shrink-0">
+                <div class="overflow-hidden">
+                  <h4 id="login-emp-preview-name" class="text-xs font-bold text-white truncate">Name</h4>
+                  <p id="login-emp-preview-sub" class="text-[10px] text-cyan-300 font-semibold truncate mt-0.5">Designation • Branch</p>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-[11px] text-cyan-200/90 flex items-start space-x-2">
+                <i class="fa-solid fa-circle-check text-cyan-400 text-xs mt-0.5 shrink-0"></i>
+                <span>তালিকা থেকে আপনার নাম সিলেক্ট করে সরাসরি আপনার হাজিরা, ছুটির হিসেব ও বেতন দেখতে প্রবেশ করুন। কোনো পাসওয়ার্ড লাগবে না।</span>
+              </div>
             </div>
 
             <button type="submit" id="login-btn" class="w-full classic-exec-btn text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 cursor-pointer select-none">

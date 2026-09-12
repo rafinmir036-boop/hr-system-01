@@ -1612,7 +1612,7 @@
         return {
           can_dashboard: true,
           can_employees: false,
-          can_attendance: false,
+          can_attendance: true,
           can_advance_apply: true,
           can_advance_approve: false,
           can_fines: false,
@@ -1620,7 +1620,7 @@
           can_leave_approve: false,
           can_payroll: false,
           can_increment: false,
-          can_documents: false,
+          can_documents: true,
           can_performance: false,
           can_notices: true,
           can_reports: false,
@@ -1987,7 +1987,7 @@
         if (currentUserRole === 'Employee') {
           currentUserPermissions.can_dashboard = true;
           currentUserPermissions.can_employees = false;
-          currentUserPermissions.can_attendance = false;
+          currentUserPermissions.can_attendance = true;
           currentUserPermissions.can_advance_apply = true;
           currentUserPermissions.can_advance_approve = false;
           currentUserPermissions.can_fines = false;
@@ -2030,6 +2030,7 @@
         renderAdvanceTable();
         renderFineTable();
         renderLeaveTable();
+        calculateMyPersonalSummary();
       });
     }
 
@@ -2069,6 +2070,8 @@
           isVisible = true;
         } else if (navId === 'settings') {
           isVisible = true;
+        } else if (navId === 'attendance') {
+          isVisible = currentUserRole === 'Employee' || hasPermission('can_attendance');
         } else if (navId === 'advance') {
           isVisible = hasPermission('can_advance_apply') || hasPermission('can_advance_approve');
         } else if (navId === 'fine') {
@@ -2098,6 +2101,14 @@
       const waSettings = document.getElementById('sec-settings-whatsapp');
       const empBulkBtn = document.getElementById('emp-bulk-btn');
       const empAddBtn = document.getElementById('emp-add-btn');
+
+      const execRatioCard = document.getElementById('executive-live-ratio-card');
+      const attSearchBox = document.getElementById('att-search-container');
+      const attTotalBtn = document.getElementById('att-total-btn');
+      const attZkBtn = document.getElementById('att-zk-btn');
+      const attBranchQuickBar = document.getElementById('att-branch-quick-bar');
+      const attEmpViewControls = document.getElementById('att-emp-view-controls');
+      const attNav = document.getElementById('nav-attendance');
 
       if (currentUserRole === 'Admin' || (currentUserBranch === 'ALL' && hasPermission('can_employees'))) {
         if (headerBranchContainer) headerBranchContainer.classList.remove('hidden');
@@ -2137,7 +2148,7 @@
 
       const attBulkBtn = document.getElementById('att-bulk-btn');
       if (attBulkBtn) {
-        if (hasPermission('can_attendance')) attBulkBtn.classList.remove('hidden');
+        if (currentUserRole !== 'Employee' && hasPermission('can_attendance')) attBulkBtn.classList.remove('hidden');
         else attBulkBtn.classList.add('hidden');
       }
 
@@ -2151,24 +2162,56 @@
         else docUploadBtn.classList.add('hidden');
       }
 
+      // Notice posting permission: Employee CANNOT post notice
       if (noticePostBtn) {
-        if (hasPermission('can_notices')) noticePostBtn.classList.remove('hidden');
+        if (currentUserRole !== 'Employee' && hasPermission('can_notices')) noticePostBtn.classList.remove('hidden');
         else noticePostBtn.classList.add('hidden');
       }
 
       if (currentUserRole === 'Employee') {
+        // Hide Admin Cards, Charts, and Executive Live Ratio Bar (বেতন প্রসেস / জরিমানা এন্ট্রি bar)
         if (adminDash) adminDash.classList.add('hidden');
         if (adminCharts) adminCharts.classList.add('hidden');
+        if (execRatioCard) execRatioCard.classList.add('hidden');
         if (empDash) empDash.classList.remove('hidden');
         if (leaveEmpSelectBox) leaveEmpSelectBox.classList.add('hidden');
         
+        // Attendance Navigation & Self-View Controls
+        if (attNav) {
+          attNav.classList.remove('hidden');
+          const span = attNav.querySelector('span');
+          if (span) span.innerText = 'My Attendance';
+        }
+        if (attSearchBox) attSearchBox.classList.add('hidden');
+        if (attBulkBtn) attBulkBtn.classList.add('hidden');
+        if (attTotalBtn) attTotalBtn.classList.add('hidden');
+        if (attZkBtn) attZkBtn.classList.add('hidden');
+        if (attBranchQuickBar) attBranchQuickBar.classList.add('hidden');
+        if (attEmpViewControls) attEmpViewControls.classList.remove('hidden');
+
+        const attSectionSub = document.getElementById('att-section-sub');
+        if (attSectionSub) attSectionSub.innerText = 'আপনার ব্যক্তিগত দৈনিক ও মাসিক উপস্থিতির বিস্তারিত রেকর্ড';
+
         const payHeading = document.getElementById('payroll-section-heading');
         if(payHeading) payHeading.innerText = 'My Salary Slips & Payslips (আমার বেতন বিবরণী)';
+
+        calculateMyPersonalSummary();
       } else {
         if (adminDash) adminDash.classList.remove('hidden');
         if (adminCharts) adminCharts.classList.remove('hidden');
+        if (execRatioCard) execRatioCard.classList.remove('hidden');
         if (empDash) empDash.classList.add('hidden');
         if (leaveEmpSelectBox) leaveEmpSelectBox.classList.remove('hidden');
+
+        if (attSearchBox) attSearchBox.classList.remove('hidden');
+        if (attBulkBtn && hasPermission('can_attendance')) attBulkBtn.classList.remove('hidden');
+        if (attTotalBtn && hasPermission('can_attendance')) attTotalBtn.classList.remove('hidden');
+        if (attZkBtn && (currentUserRole === 'Admin' || currentUserBranch === 'Head Office')) attZkBtn.classList.remove('hidden');
+        if (attBranchQuickBar && hasPermission('can_attendance')) attBranchQuickBar.classList.remove('hidden');
+        if (attEmpViewControls) attEmpViewControls.classList.add('hidden');
+
+        const attSectionSub = document.getElementById('att-section-sub');
+        if (attSectionSub) attSectionSub.innerText = 'হেড অফিসে বায়োমেট্রিক সিঙ্ক এবং অন্যান্য শাখায় ম্যানুয়াল হাজিরা';
 
         const payHeading = document.getElementById('payroll-section-heading');
         if(payHeading) payHeading.innerText = ['Manager', 'Branch Manager'].includes(currentUserRole) ? `Payroll Management (${currentUserBranch})` : 'Payroll & Salary Management';
@@ -3432,6 +3475,7 @@
 
         updateAttendanceDashboardMetrics();
         renderAttendanceTable();
+        calculateMyPersonalSummary();
       });
     }
 
@@ -3520,6 +3564,192 @@
       if (status === 'On Leave') return 'bg-purple-50 text-purple-700 border border-purple-200';
       return 'bg-slate-100 text-slate-600';
     }
+
+    // ==========================================
+    // EMPLOYEE SELF ATTENDANCE ENGINE (DATE VS MONTH WISE)
+    // ==========================================
+    window.switchEmployeeAttendanceView = function(mode) {
+      const dateTab = document.getElementById('att-tab-date-view');
+      const monthTab = document.getElementById('att-tab-month-view');
+      const dateContainer = document.getElementById('att-date-container');
+      const monthPickerBox = document.getElementById('att-emp-month-picker-box');
+      const monthInput = document.getElementById('att-emp-month');
+
+      if (mode === 'month') {
+        if (dateTab) {
+          dateTab.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition';
+        }
+        if (monthTab) {
+          monthTab.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-white text-indigo-700 shadow-xs transition';
+        }
+        if (dateContainer) dateContainer.classList.add('hidden');
+        if (monthPickerBox) monthPickerBox.classList.remove('hidden');
+        if (monthInput && !monthInput.value) {
+          const now = new Date();
+          monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+        renderEmployeeMonthlyLog();
+      } else {
+        if (dateTab) {
+          dateTab.className = 'px-2.5 py-1 text-xs font-bold rounded-lg bg-white text-indigo-700 shadow-xs transition';
+        }
+        if (monthTab) {
+          monthTab.className = 'px-2.5 py-1 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition';
+        }
+        if (dateContainer) dateContainer.classList.remove('hidden');
+        if (monthPickerBox) monthPickerBox.classList.add('hidden');
+        renderAttendanceTable();
+      }
+    };
+
+    window.renderEmployeeMonthlyLog = async function() {
+      const tbody = document.getElementById('att-table-body');
+      if (!tbody) return;
+
+      if (!myEmployeeProfile) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400 font-medium">প্রোফাইল লোড হচ্ছে...</td></tr>';
+        return;
+      }
+
+      const monthInput = document.getElementById('att-emp-month');
+      let targetMonth = monthInput ? monthInput.value : '';
+      if (!targetMonth) {
+        const now = new Date();
+        targetMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (monthInput) monthInput.value = targetMonth;
+      }
+
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-indigo-600"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><div class="text-xs font-bold">মাসিক হাজিরা হিসাব সংগ্রহ করা হচ্ছে...</div></td></tr>';
+
+      const [yearStr, mStr] = targetMonth.split('-');
+      const y = parseInt(yearStr, 10);
+      const m = parseInt(mStr, 10);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const dayNamesBn = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+
+      try {
+        const dailyPromises = [];
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = `${yearStr}-${mStr}-${String(d).padStart(2, '0')}`;
+          dailyPromises.push(
+            getDocs(collection(db, `attendance_${dStr}`)).then(snap => {
+              const dayMap = {};
+              snap.forEach(docSnap => {
+                const data = docSnap.data();
+                const k1 = data.employeeId || docSnap.id;
+                dayMap[k1] = data;
+              });
+              return { date: dStr, day: d, logs: dayMap };
+            }).catch(() => ({ date: dStr, day: d, logs: {} }))
+          );
+        }
+
+        const results = await Promise.all(dailyPromises);
+
+        let presentCount = 0;
+        let absentCount = 0;
+        let dayOffCount = 0;
+        let leaveCount = 0;
+        let rowsHtml = '';
+
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        results.forEach(({ date, day, logs }) => {
+          const dateObj = new Date(y, m - 1, day);
+          const dayNameBn = dayNamesBn[dateObj.getDay()];
+          const isFriday = dateObj.getDay() === 5;
+          const isFuture = date > todayStr;
+
+          let rec = findAttendanceForEmployee(myEmployeeProfile, logs);
+          if (date === todayStr && typeof todayAttendanceData !== 'undefined') {
+            const todayRec = findAttendanceForEmployee(myEmployeeProfile, todayAttendanceData);
+            if (todayRec) rec = todayRec;
+          }
+
+          let status = 'Absent';
+          let punchTime = '--:--';
+          let method = 'Not Punched';
+
+          if (rec) {
+            status = rec.status || 'Absent';
+            punchTime = rec.punchTime || rec.time || '--:--';
+            method = rec.method || (status === 'Present' ? 'Biometric Machine' : 'Manual Entry');
+          } else {
+            const hasLeave = leaveList.some(l =>
+              l.employeeId === myEmployeeProfile.id &&
+              l.status === 'Approved' &&
+              date >= l.startDate &&
+              date <= l.endDate
+            );
+            if (hasLeave) {
+              status = 'On Leave';
+              method = 'Approved Leave';
+            } else if (isFriday) {
+              status = 'Day Off';
+              method = 'Weekly Off';
+            } else if (isFuture) {
+              status = 'Upcoming';
+              method = 'Future Date';
+            } else {
+              status = 'Absent';
+              method = 'No Punch Record';
+            }
+          }
+
+          if (status === 'Present' || status === 'Late') presentCount++;
+          else if (status === 'Day Off') dayOffCount++;
+          else if (status === 'On Leave') leaveCount++;
+          else if (status === 'Absent' && !isFuture) absentCount++;
+
+          let badgeClass = getStatusBadge(status);
+          if (status === 'Upcoming') badgeClass = 'bg-slate-50 text-slate-400 border border-slate-200';
+
+          rowsHtml += `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
+              <td class="px-6 py-3.5">
+                <div class="font-bold text-slate-800 font-mono flex items-center space-x-2">
+                  <span class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-[11px] font-bold">${String(day).padStart(2, '0')}</span>
+                  <span>${date}</span>
+                </div>
+                <div class="text-[11px] text-slate-500 font-medium pl-8">${dayNameBn} ${isFriday ? '<span class="text-sky-600 font-bold">(Weekly Day Off)</span>' : ''}</div>
+              </td>
+              <td class="px-6 py-3.5">
+                <span class="px-3 py-1 rounded-full text-xs font-bold ${badgeClass}">
+                  ${status}
+                </span>
+                <div class="text-[10px] text-slate-400 font-medium mt-1">${method} ${punchTime !== '--:--' ? `• ${punchTime}` : ''}</div>
+              </td>
+              <td class="px-6 py-3.5 text-right whitespace-nowrap">
+                <span class="text-xs text-slate-400 font-semibold">Self View</span>
+              </td>
+            </tr>
+          `;
+        });
+
+        const summaryHeaderHtml = `
+          <tr class="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white font-bold">
+            <td colspan="3" class="px-6 py-3">
+              <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center space-x-2">
+                  <span class="text-amber-400"><i class="fa-solid fa-calendar-check mr-1"></i>${targetMonth} মাসের মোট উপস্থিতি সারাংশ:</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2.5 font-mono text-[11px]">
+                  <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg">🟢 উপস্থিত: <b>${presentCount} দিন</b></span>
+                  <span class="bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2.5 py-1 rounded-lg">🔵 ডে অফ: <b>${dayOffCount} দিন</b></span>
+                  <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg">🟡 ছুটি: <b>${leaveCount} দিন</b></span>
+                  <span class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-1 rounded-lg">🔴 অনুপস্থিত: <b>${absentCount} দিন</b></span>
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+
+        tbody.innerHTML = summaryHeaderHtml + rowsHtml;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center py-6 text-rose-500 font-medium">ডাটা লোড করতে সমস্যা হয়েছে: ${err.message}</td></tr>`;
+      }
+    };
 
     // Monthly / In-Total Attendance Management
     window.openMonthlyTotalAttendanceModal = function(empId = null) {
@@ -9235,7 +9465,7 @@ ${messageText}
 
       if (currentUserRole === 'Employee') {
         const myBranch = myEmployeeProfile ? (myEmployeeProfile.branch || 'Head Office') : 'Head Office';
-        return target === myBranch;
+        return target === 'ALL' || target === 'Head Office' || target === myBranch;
       }
 
       return false;
@@ -9355,6 +9585,10 @@ ${messageText}
 
     window.saveNewNotice = async function(e) {
       e.preventDefault();
+      if (currentUserRole === 'Employee') {
+        showToast('error', 'কর্মচারীদের নতুন নোটিশ পোস্ট করার অনুমতি নেই');
+        return;
+      }
       const title = document.getElementById('notice-title').value;
       const desc = document.getElementById('notice-desc').value;
       const targetBranch = document.getElementById('notice-target-branch') ? document.getElementById('notice-target-branch').value : 'ALL';
@@ -10268,65 +10502,101 @@ ${messageText}
       const curYear = now.getFullYear();
       const curMonth = String(now.getMonth() + 1).padStart(2, '0');
       const curMonthKey = `${curYear}-${curMonth}`;
+      const currentDay = now.getDate();
       
       const monthBadge = document.getElementById('emp-att-month-badge');
       if (monthBadge) {
         monthBadge.innerText = `চলতি মাস (${curYear}-${curMonth})`;
       }
 
-      let presentDays = 0;
-      let absentDays = 0;
-      let approvedLeaveDays = 0;
-      let dayOffDays = 0;
+      const updateAttendanceCounters = (pres, abs, lev, off) => {
+        const pEl = document.getElementById('emp-p-att-present');
+        const aEl = document.getElementById('emp-p-att-absent');
+        const lEl = document.getElementById('emp-p-att-leave');
+        const dEl = document.getElementById('emp-p-att-dayoff');
+        if (pEl) pEl.innerText = `${pres} দিন`;
+        if (aEl) aEl.innerText = `${abs} দিন`;
+        if (lEl) lEl.innerText = `${lev} দিন`;
+        if (dEl) dEl.innerText = `${off} দিন`;
+      };
 
-      // Check today's status in memory
-      if (typeof todayAttendanceMap !== 'undefined' && typeof findAttendanceForEmployee === 'function') {
-        const todayRec = findAttendanceForEmployee(myEmployeeProfile, todayAttendanceMap);
-        if (todayRec) {
-          if (todayRec.status === 'Present') presentDays = Math.max(presentDays, 1);
-          else if (todayRec.status === 'Absent') absentDays = Math.max(absentDays, 1);
-          else if (todayRec.status === 'On Leave' || todayRec.status === 'Leave') approvedLeaveDays = Math.max(approvedLeaveDays, 1);
-          else if (todayRec.status === 'Day Off') dayOffDays = Math.max(dayOffDays, 1);
-        }
-      }
+      // 1. Check attendance_summaries for precalculated/in-total record
+      getDocs(collection(db, "attendance_summaries")).then(async (snap) => {
+        let foundSummary = false;
+        let pres = 0, abs = 0, lev = 0, off = 0;
 
-      // Calculate approved leave days this month
-      myLeaves.filter(l => l.status === 'Approved' && (l.startDate && l.startDate.startsWith(curMonthKey))).forEach(l => {
-        const s = new Date(l.startDate);
-        const e = new Date(l.endDate);
-        const diff = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
-        approvedLeaveDays += diff;
-      });
-
-      // Check attendance summaries
-      getDocs(collection(db, "attendance_summaries")).then(snap => {
         snap.forEach(docSnap => {
           const s = docSnap.data();
-          if (s.month === curMonthKey && (s.employeeId === myEmployeeProfile.id || (s.employeeName && s.employeeName === myEmployeeProfile.name))) {
-            if (s.presentCount !== undefined) presentDays = Number(s.presentCount) || 0;
-            if (s.absentCount !== undefined) absentDays = Number(s.absentCount) || 0;
-            if (s.leaveCount !== undefined) approvedLeaveDays = Number(s.leaveCount) || 0;
-            if (s.dayOffCount !== undefined) dayOffDays = Number(s.dayOffCount) || 0;
+          if (s.month === curMonthKey && (s.employeeId === myEmployeeProfile.id || (s.customEmpCode && s.customEmpCode === myEmployeeProfile.customEmpCode) || (s.employeeName && s.employeeName === myEmployeeProfile.name))) {
+            pres = Number(s.presentDays ?? s.presentCount ?? 0);
+            abs = Number(s.absentDays ?? s.absentCount ?? 0);
+            lev = Number(s.leaveDays ?? s.leaveCount ?? 0);
+            off = Number(s.dayOffDays ?? s.dayOffCount ?? 0);
+            foundSummary = true;
           }
         });
 
-        const pEl = document.getElementById('emp-p-att-present');
-        const aEl = document.getElementById('emp-p-att-absent');
-        const lEl = document.getElementById('emp-p-att-leave');
-        const dEl = document.getElementById('emp-p-att-dayoff');
-        if (pEl) pEl.innerText = `${presentDays} দিন`;
-        if (aEl) aEl.innerText = `${absentDays} দিন`;
-        if (lEl) lEl.innerText = `${approvedLeaveDays} দিন`;
-        if (dEl) dEl.innerText = `${dayOffDays} দিন`;
-      }).catch(() => {
-        const pEl = document.getElementById('emp-p-att-present');
-        const aEl = document.getElementById('emp-p-att-absent');
-        const lEl = document.getElementById('emp-p-att-leave');
-        const dEl = document.getElementById('emp-p-att-dayoff');
-        if (pEl) pEl.innerText = `${presentDays} দিন`;
-        if (aEl) aEl.innerText = `${absentDays} দিন`;
-        if (lEl) lEl.innerText = `${approvedLeaveDays} দিন`;
-        if (dEl) dEl.innerText = `${dayOffDays} দিন`;
+        if (foundSummary && (pres + abs + lev + off) > 0) {
+          updateAttendanceCounters(pres, abs, lev, off);
+          return;
+        }
+
+        // 2. If no summary found or all zeros, compute from daily logs up to today
+        const dailyPromises = [];
+        for (let d = 1; d <= currentDay; d++) {
+          const dStr = `${curYear}-${curMonth}-${String(d).padStart(2, '0')}`;
+          dailyPromises.push(
+            getDocs(collection(db, `attendance_${dStr}`)).then(dSnap => {
+              const dayMap = {};
+              dSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                const k1 = data.employeeId || docSnap.id;
+                dayMap[k1] = data;
+              });
+              return { date: dStr, day: d, logs: dayMap };
+            }).catch(() => ({ date: dStr, day: d, logs: {} }))
+          );
+        }
+
+        const dailyResults = await Promise.all(dailyPromises);
+        let dPres = 0, dAbs = 0, dLev = 0, dOff = 0;
+        const todayStr = `${curYear}-${curMonth}-${String(currentDay).padStart(2, '0')}`;
+
+        dailyResults.forEach(({ date, day, logs }) => {
+          let rec = findAttendanceForEmployee(myEmployeeProfile, logs);
+          if (date === todayStr && typeof todayAttendanceData !== 'undefined') {
+            const todayRec = findAttendanceForEmployee(myEmployeeProfile, todayAttendanceData);
+            if (todayRec) rec = todayRec;
+          }
+
+          if (rec) {
+            const st = rec.status;
+            if (st === 'Present' || st === 'Late') dPres++;
+            else if (st === 'Day Off') dOff++;
+            else if (st === 'On Leave' || st === 'Leave') dLev++;
+            else if (st === 'Absent') dAbs++;
+          } else {
+            const hasLeave = myLeaves.some(l => 
+              l.status === 'Approved' && 
+              date >= l.startDate && 
+              date <= l.endDate
+            );
+            if (hasLeave) {
+              dLev++;
+            } else {
+              const dayOfWeek = new Date(curYear, parseInt(curMonth, 10) - 1, day).getDay();
+              if (dayOfWeek === 5) {
+                dOff++;
+              } else if (date < todayStr) {
+                dAbs++;
+              }
+            }
+          }
+        });
+
+        updateAttendanceCounters(dPres, dAbs, dLev, dOff);
+      }).catch(err => {
+        console.warn("calculateMyPersonalSummary error note:", err);
       });
     }
 
@@ -11119,7 +11389,7 @@ ${messageText}
           </div>
 
           <!-- Executive Live Ratio Bar & Action Shortcuts -->
-          <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div id="executive-live-ratio-card" class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             
             <!-- Attendance Rate & Live Ratio Bar -->
             <div class="space-y-1.5 w-full lg:w-96">
@@ -11261,26 +11531,26 @@ ${messageText}
               </div>
 
               <!-- 4 Attendance Metrics Grid -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                <div class="bg-slate-800/80 border border-emerald-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-emerald-500/50 transition">
-                  <span class="text-[11px] font-bold text-emerald-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>উপস্থিত (Present)</span></span>
-                  <h4 id="emp-p-att-present" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
-                  <span class="text-[10px] text-slate-400 font-medium">সঠিক সময়ে উপস্থিতি</span>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2 pb-2">
+                <div class="bg-emerald-950/40 border border-emerald-500/50 p-4 rounded-2xl text-center shadow-lg hover:border-emerald-400 transition">
+                  <span class="text-xs font-extrabold text-emerald-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>উপস্থিত (Present)</span></span>
+                  <h4 id="emp-p-att-present" class="text-3xl font-black text-emerald-300 font-mono my-2 tracking-tight">0 দিন</h4>
+                  <span class="text-[10px] text-emerald-200/70 font-semibold">সঠিক সময়ে উপস্থিতি</span>
                 </div>
-                <div class="bg-slate-800/80 border border-rose-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-rose-500/50 transition">
-                  <span class="text-[11px] font-bold text-rose-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-xmark text-xs"></i><span>অনুপস্থিত (Absent)</span></span>
-                  <h4 id="emp-p-att-absent" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
-                  <span class="text-[10px] text-slate-400 font-medium">অননুমোদিত অনুপস্থিতি</span>
+                <div class="bg-rose-950/40 border border-rose-500/50 p-4 rounded-2xl text-center shadow-lg hover:border-rose-400 transition">
+                  <span class="text-xs font-extrabold text-rose-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-circle-xmark text-xs"></i><span>অনুপস্থিত (Absent)</span></span>
+                  <h4 id="emp-p-att-absent" class="text-3xl font-black text-rose-300 font-mono my-2 tracking-tight">0 দিন</h4>
+                  <span class="text-[10px] text-rose-200/70 font-semibold">অননুমোদিত অনুপস্থিতি</span>
                 </div>
-                <div class="bg-slate-800/80 border border-amber-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-amber-500/50 transition">
-                  <span class="text-[11px] font-bold text-amber-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-umbrella-beach text-xs"></i><span>ছুটি (Leave)</span></span>
-                  <h4 id="emp-p-att-leave" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
-                  <span class="text-[10px] text-slate-400 font-medium">অনুমোদিত অফিসিয়াল ছুটি</span>
+                <div class="bg-amber-950/40 border border-amber-500/50 p-4 rounded-2xl text-center shadow-lg hover:border-amber-400 transition">
+                  <span class="text-xs font-extrabold text-amber-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-umbrella-beach text-xs"></i><span>ছুটি (Leave)</span></span>
+                  <h4 id="emp-p-att-leave" class="text-3xl font-black text-amber-300 font-mono my-2 tracking-tight">0 দিন</h4>
+                  <span class="text-[10px] text-amber-200/70 font-semibold">অনুমোদিত ছুটি</span>
                 </div>
-                <div class="bg-slate-800/80 border border-sky-500/30 p-3.5 rounded-2xl text-center shadow-sm hover:border-sky-500/50 transition">
-                  <span class="text-[11px] font-bold text-sky-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-mug-hot text-xs"></i><span>ডে অফ (Day Off)</span></span>
-                  <h4 id="emp-p-att-dayoff" class="text-2xl font-black text-white mt-1.5">0 দিন</h4>
-                  <span class="text-[10px] text-slate-400 font-medium">সাপ্তাহিক ও নির্ধারিত ছুটি</span>
+                <div class="bg-sky-950/40 border border-sky-500/50 p-4 rounded-2xl text-center shadow-lg hover:border-sky-400 transition">
+                  <span class="text-xs font-extrabold text-sky-400 flex items-center justify-center space-x-1.5"><i class="fa-solid fa-mug-hot text-xs"></i><span>ডে অফ (Day Off)</span></span>
+                  <h4 id="emp-p-att-dayoff" class="text-3xl font-black text-sky-300 font-mono my-2 tracking-tight">0 দিন</h4>
+                  <span class="text-[10px] text-sky-200/70 font-semibold">সাপ্তাহিক ও ডে অফ</span>
                 </div>
               </div>
             </div>
@@ -11366,16 +11636,16 @@ ${messageText}
         <section id="sec-attendance" class="hidden space-y-5">
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+              <h2 id="att-section-heading" class="text-base font-bold text-slate-800 flex items-center space-x-2">
                 <i class="fa-solid fa-clock text-amber-500"></i>
                 <span>Daily Attendance Log (দৈনিক উপস্থিতি ট্র্যাকিং)</span>
               </h2>
-              <p class="text-xs text-slate-500">হেড অফিসে বায়োমেট্রিক সিঙ্ক এবং অন্যান্য শাখায় ম্যানুয়াল হাজিরা</p>
+              <p id="att-section-sub" class="text-xs text-slate-500">হেড অফিসে বায়োমেট্রিক সিঙ্ক এবং অন্যান্য শাখায় ম্যানুয়াল হাজিরা</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2">
               <!-- Search Employee by ID / Name in Attendance -->
-              <div class="relative">
+              <div id="att-search-container" class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
                 <input type="text" id="att-search-input" oninput="renderAttendanceTable()" placeholder="আইডি বা নাম দিয়ে খুঁজুন... (e.g. 16, 58)" class="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 transition w-44 sm:w-56">
               </div>
@@ -11387,16 +11657,30 @@ ${messageText}
               </button>
 
               <!-- Monthly / In-Total Attendance Modal Button -->
-              <button onclick="openMonthlyTotalAttendanceModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="কর্মচারীর পুরো মাসের মোট হাজিরা (Present, Absent, Day Off) একবারে নির্ধারণ করুন">
+              <button id="att-total-btn" onclick="openMonthlyTotalAttendanceModal()" class="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="কর্মচারীর পুরো মাসের মোট হাজিরা (Present, Absent, Day Off) একবারে নির্ধারণ করুন">
                 <i class="fa-solid fa-calendar-check"></i>
                 <span>ইন-টোটাল হাজিরা এন্ট্রি</span>
               </button>
 
-              <span class="text-xs font-bold text-slate-700 ml-1">তারিখ:</span>
-              <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 focus:bg-white outline-none">
+              <div id="att-date-container" class="flex items-center space-x-1">
+                <span class="text-xs font-bold text-slate-700 ml-1">তারিখ:</span>
+                <input type="date" id="att-date" onchange="loadAttendanceForDate()" class="p-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 focus:bg-white outline-none">
+              </div>
+
+              <!-- Employee View Mode Controls (Date vs Monthly History) -->
+              <div id="att-emp-view-controls" class="hidden flex items-center space-x-2">
+                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button type="button" id="att-tab-date-view" onclick="switchEmployeeAttendanceView('date')" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-white text-indigo-700 shadow-xs transition">তারিখ ভিত্তিক</button>
+                  <button type="button" id="att-tab-month-view" onclick="switchEmployeeAttendanceView('month')" class="px-2.5 py-1 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition">মাসিক হিসেব</button>
+                </div>
+                <div id="att-emp-month-picker-box" class="hidden flex items-center space-x-1 bg-indigo-50 px-2.5 py-1.5 rounded-xl border border-indigo-200">
+                  <span class="text-xs font-bold text-indigo-900">মাস:</span>
+                  <input type="month" id="att-emp-month" onchange="renderEmployeeMonthlyLog()" class="p-1 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-900 bg-white outline-none">
+                </div>
+              </div>
               
               <!-- ZKTeco log punch file import (Head Office Only) -->
-              <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="শুধুমাত্র হেড অফিসের বায়োমেট্রিক ডিভাইসের ফাইল আপলোড করুন">
+              <label id="att-zk-btn" class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-xs flex items-center space-x-1.5" title="শুধুমাত্র হেড অফিসের বায়োমেট্রিক ডিভাইসের ফাইল আপলোড করুন">
                 <i class="fa-solid fa-fingerprint"></i>
                 <span>Import ZKTeco Log (Head Office Only)</span>
                 <input type="file" id="zk-log-file" onchange="handleZKLogUpload(event)" accept=".dat,.txt,.csv,.log" class="hidden">
@@ -11405,7 +11689,7 @@ ${messageText}
           </div>
 
           <!-- Branch Manual Attendance Quick Batch Control Bar -->
-          <div class="bg-indigo-50/70 border border-indigo-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+          <div id="att-branch-quick-bar" class="bg-indigo-50/70 border border-indigo-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
             <div class="flex items-center space-x-2.5">
               <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
               <div class="text-xs">

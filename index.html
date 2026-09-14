@@ -1312,6 +1312,7 @@
       renderDashboardCharts();
       loadEmployeesRealtime();
       renderNotices();
+      if (typeof updateNotificationCenter === 'function') updateNotificationCenter();
       showToast('info', `ফিল্টার করা হয়েছে: ${selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch}`);
     };
 
@@ -5612,6 +5613,10 @@
 
       const emp = employeeList.find(e => e.id === empId);
 
+      const docUrl = document.getElementById('adv-doc-url') ? document.getElementById('adv-doc-url').value : '';
+      const docName = document.getElementById('adv-doc-name') ? document.getElementById('adv-doc-name').value : '';
+      const docType = document.getElementById('adv-doc-type') ? document.getElementById('adv-doc-type').value : '';
+
       try {
         const advDocRef = await addDoc(collection(db, "advances"), {
           employeeId: empId,
@@ -5625,20 +5630,47 @@
           date: date || new Date().toISOString().split('T')[0],
           note: note,
           status: 'Pending',
+          hasDocument: !!docUrl,
+          documentUrl: docUrl || '',
+          documentName: docName || '',
+          documentType: docType || '',
           appliedBy: currentUserEmail,
           createdAt: new Date().toISOString()
         });
+
+        // Also sync copy into company_documents if document was attached
+        if (docUrl) {
+          try {
+            await addDoc(collection(db, "company_documents"), {
+              title: `অগ্রিম বেতন স্লিপ/আবেদন - ${emp ? emp.name : 'Staff'} (৳${amount.toLocaleString()})`,
+              category: 'Advance Requisition',
+              targetEmployee: emp ? emp.name : 'General',
+              fileUrl: docUrl,
+              fileName: docName || `Advance_${emp ? emp.name : 'Staff'}.png`,
+              fileType: docType || 'image/png',
+              relatedModule: 'Advance',
+              relatedId: advDocRef.id,
+              uploadedBy: currentUserEmail,
+              uploadedAt: new Date().toISOString()
+            });
+          } catch (e) {
+            console.warn('Sync advance document error:', e);
+          }
+        }
 
         await logSystemActivity(
           'CREATE',
           'Advance',
           `${currentUserEmail} added advance salary ৳${amount.toLocaleString()} for "${emp ? emp.name : 'Staff'}" (${month})`,
-          { employeeName: emp ? emp.name : '', amount, month }
+          { employeeName: emp ? emp.name : '', amount, month, hasDocument: !!docUrl }
         );
 
         document.getElementById('adv-form').reset();
+        if (typeof removeAdvDocAttachment === 'function') removeAdvDocAttachment();
         toggleModal('add-adv-modal', false);
         showToast('success', 'অগ্রিম বেতনের আবেদন যুক্ত হয়েছে! (Pending Approval)');
+
+        if (typeof updateNotificationCenter === 'function') updateNotificationCenter();
 
         if (whatsappConfig.notifyOnAdvanceApply !== false && advDocRef && advDocRef.id) {
           sendAdvanceWhatsAppNotification(advDocRef.id, 'APPLY');
@@ -5657,6 +5689,9 @@
         renderAdvanceTable();
         calculateMyPersonalSummary();
         generateReport();
+        if (typeof window.updateNotificationCenter === 'function') {
+          window.updateNotificationCenter();
+        }
       });
     }
 
@@ -5721,10 +5756,18 @@
           </button>
         `;
 
+        const viewDocBtn = adv.documentUrl ? `
+          <button onclick="window.openAttachedDocViewer('advance', '${adv.id}')" title="সংযুক্ত প্রমাণপত্র/ডকুমেন্ট দেখুন" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1 border border-indigo-200">
+            <i class="fa-solid fa-paperclip"></i>
+            <span class="hidden sm:inline">Doc</span>
+          </button>
+        ` : '';
+
         let actionButtons = '';
         if (adv.status === 'Pending') {
           if (canApprove) {
             actionButtons = `
+              ${viewDocBtn}
               ${waBtn}
               <button onclick="updateAdvanceStatus('${adv.id}', 'Approved')" title="অনুমোদন করুন" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1 border border-emerald-200">
                 <i class="fa-solid fa-check"></i> <span>Approve</span>
@@ -5735,11 +5778,12 @@
               <button onclick="deleteAdvanceRecord('${adv.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
             `;
           } else {
-            actionButtons = `${waBtn} <span class="text-xs font-bold text-amber-600">⏳ Awaiting Approval</span>`;
+            actionButtons = `${viewDocBtn} ${waBtn} <span class="text-xs font-bold text-amber-600">⏳ Awaiting Approval</span>`;
           }
         } else if (adv.status === 'Approved') {
           if (canManage) {
             actionButtons = `
+              ${viewDocBtn}
               ${waBtn}
               <button onclick="updateAdvanceStatus('${adv.id}', 'Cleared')" title="বেতনে ক্লিয়ার বা পেইড মার্ক করুন" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition border border-blue-200 inline-flex items-center space-x-1">
                 <i class="fa-solid fa-check-double"></i> <span>Clear</span>
@@ -5748,11 +5792,12 @@
               <button onclick="deleteAdvanceRecord('${adv.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
             `;
           } else {
-            actionButtons = `${waBtn} <span class="text-xs font-bold text-emerald-600">✓ Approved (Waiting Payroll)</span>`;
+            actionButtons = `${viewDocBtn} ${waBtn} <span class="text-xs font-bold text-emerald-600">✓ Approved (Waiting Payroll)</span>`;
           }
         } else if (adv.status === 'Cleared') {
           if (canManage) {
             actionButtons = `
+              ${viewDocBtn}
               ${waBtn}
               <button onclick="updateAdvanceStatus('${adv.id}', 'Pending')" title="পুনরায় পেন্ডিং করুন" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition">
                 <i class="fa-solid fa-rotate-left"></i> Revert
@@ -5760,11 +5805,12 @@
               <button onclick="deleteAdvanceRecord('${adv.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
             `;
           } else {
-            actionButtons = `${waBtn} <span class="text-xs font-bold text-blue-600">✓ Cleared</span>`;
+            actionButtons = `${viewDocBtn} ${waBtn} <span class="text-xs font-bold text-blue-600">✓ Cleared</span>`;
           }
         } else if (adv.status === 'Rejected') {
           if (canApprove) {
             actionButtons = `
+              ${viewDocBtn}
               ${waBtn}
               <button onclick="updateAdvanceStatus('${adv.id}', 'Approved')" title="পুনরায় অনুমোদন করুন" class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-xs transition border border-emerald-200">
                 <i class="fa-solid fa-check"></i> Re-Approve
@@ -5772,9 +5818,23 @@
               <button onclick="deleteAdvanceRecord('${adv.id}')" title="ডিলিট" class="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
             `;
           } else {
-            actionButtons = `${waBtn} <span class="text-xs font-bold text-rose-600">✗ Rejected</span>`;
+            actionButtons = `${viewDocBtn} ${waBtn} <span class="text-xs font-bold text-rose-600">✗ Rejected</span>`;
           }
         }
+
+        const noteWithDoc = `
+          <div>
+            <div class="truncate max-w-xs">${adv.note || '-'}</div>
+            ${adv.documentUrl ? `
+              <div class="mt-1">
+                <button type="button" onclick="window.openAttachedDocViewer('advance', '${adv.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] border border-indigo-200 transition shadow-2xs">
+                  <i class="fa-solid fa-paperclip text-indigo-500"></i>
+                  <span>${adv.documentName ? adv.documentName.substring(0, 18) : 'View Document'}</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
 
         rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
@@ -5785,7 +5845,7 @@
             <td class="px-6 py-4 font-semibold text-slate-700">${adv.month}</td>
             <td class="px-6 py-4 text-slate-500 font-medium">${adv.date || '-'}</td>
             <td class="px-6 py-4 font-bold text-amber-600 text-sm">৳ ${amt.toLocaleString()}</td>
-            <td class="px-6 py-4 text-slate-500 italic max-w-xs truncate">${adv.note || '-'}</td>
+            <td class="px-6 py-4 text-slate-500 italic">${noteWithDoc}</td>
             <td class="px-6 py-4">${statusBadge}</td>
             <td class="px-6 py-4 text-right">${actionButtons}</td>
           </tr>
@@ -6799,6 +6859,9 @@ ${messageText}
         renderLeaveTable();
         calculateMyPersonalSummary();
         updateAttendanceDashboardMetrics();
+        if (typeof window.updateNotificationCenter === 'function') {
+          window.updateNotificationCenter();
+        }
       });
     }
 
@@ -6817,10 +6880,18 @@ ${messageText}
       listToRender.forEach((lv) => {
         if (!isItemInActiveBranch(lv.branch)) return;
 
+        const viewDocBtn = lv.documentUrl ? `
+          <button onclick="window.openAttachedDocViewer('leave', '${lv.id}')" title="সংযুক্ত প্রমাণপত্র/ডকুমেন্ট দেখুন" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1 border border-indigo-200">
+            <i class="fa-solid fa-paperclip"></i>
+            <span class="hidden sm:inline">Doc</span>
+          </button>
+        ` : '';
+
         let actionButtons = '';
         if (lv.status === 'Pending') {
           if (canApprove) {
             actionButtons = `
+              ${viewDocBtn}
               <button onclick="updateLeaveStatus('${lv.id}', 'Approved')" title="Approve Leave" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg text-xs transition inline-flex items-center space-x-1 border border-emerald-200">
                 <i class="fa-solid fa-check"></i> <span>Approve</span>
               </button>
@@ -6829,15 +6900,15 @@ ${messageText}
               </button>
             `;
           } else {
-            actionButtons = '<span class="text-xs font-bold text-amber-600">⏳ Awaiting Approval</span>';
+            actionButtons = `${viewDocBtn} <span class="text-xs font-bold text-amber-600">⏳ Awaiting Approval</span>`;
           }
         } else if (lv.status === 'Approved') {
-          actionButtons = '<span class="text-xs font-bold text-emerald-600">✓ Approved</span>';
+          actionButtons = `${viewDocBtn} <span class="text-xs font-bold text-emerald-600">✓ Approved</span>`;
           if (canApprove) {
             actionButtons += ` <button onclick="updateLeaveStatus('${lv.id}', 'Rejected')" title="Revoke" class="p-1 text-rose-400 hover:text-rose-600"><i class="fa-solid fa-rotate-left"></i></button>`;
           }
         } else if (lv.status === 'Rejected') {
-          actionButtons = '<span class="text-xs font-bold text-rose-600">✗ Rejected</span>';
+          actionButtons = `${viewDocBtn} <span class="text-xs font-bold text-rose-600">✗ Rejected</span>`;
           if (canApprove) {
             actionButtons += ` <button onclick="updateLeaveStatus('${lv.id}', 'Approved')" title="Re-approve" class="p-1 text-emerald-600 hover:text-emerald-800"><i class="fa-solid fa-rotate-left"></i></button>`;
           }
@@ -6858,12 +6929,26 @@ ${messageText}
           `;
         }
 
+        const reasonWithDoc = `
+          <div>
+            <div class="truncate max-w-xs">${lv.reason || '-'}</div>
+            ${lv.documentUrl ? `
+              <div class="mt-1">
+                <button type="button" onclick="window.openAttachedDocViewer('leave', '${lv.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] border border-indigo-200 transition shadow-2xs">
+                  <i class="fa-solid fa-paperclip text-indigo-500"></i>
+                  <span>${lv.documentName ? lv.documentName.substring(0, 18) : 'View Document'}</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
         rowsHtml += `
           <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
             <td class="px-6 py-4 font-bold text-slate-800">${lv.employeeName || 'Staff'} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${lv.branch || 'Head Office'}</span></td>
             <td class="px-6 py-4 font-semibold text-indigo-700">${lv.leaveType}</td>
             <td class="px-6 py-4 text-slate-600">${lv.startDate} to ${lv.endDate}</td>
-            <td class="px-6 py-4 text-slate-500 max-w-xs truncate">${lv.reason || '-'}</td>
+            <td class="px-6 py-4 text-slate-500">${reasonWithDoc}</td>
             <td class="px-6 py-4">
               <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${getLeaveBadge(lv.status)}">${lv.status}</span>
             </td>
@@ -7022,6 +7107,115 @@ ${messageText}
       }
     };
 
+    // ==========================================
+    // LEAVE & ADVANCE DOCUMENT ATTACHMENT HANDLERS
+    // ==========================================
+    window.handleLeaveDocFileSelect = function(e) {
+      const file = e.target.files ? e.target.files[0] : null;
+      if (!file) return;
+
+      if (file.size > 2.5 * 1024 * 1024) {
+        showToast('warning', 'ফাইলের সাইজ ২.৫ মেগাবাইট (MB) এর কম হতে হবে');
+        e.target.value = '';
+        return;
+      }
+
+      const previewBox = document.getElementById('leave-doc-preview-box');
+      const previewImg = document.getElementById('leave-doc-preview-img');
+      const previewIcon = document.getElementById('leave-doc-preview-icon');
+      const previewName = document.getElementById('leave-doc-preview-name');
+      const previewSize = document.getElementById('leave-doc-preview-size');
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const dataUrl = evt.target.result;
+        document.getElementById('leave-doc-url').value = dataUrl;
+        document.getElementById('leave-doc-name').value = file.name;
+        document.getElementById('leave-doc-type').value = file.type || '';
+
+        if (previewName) previewName.innerText = file.name;
+        if (previewSize) previewSize.innerText = `${(file.size / 1024).toFixed(1)} KB`;
+
+        if (file.type && file.type.startsWith('image/')) {
+          if (previewImg) {
+            previewImg.src = dataUrl;
+            previewImg.classList.remove('hidden');
+          }
+          if (previewIcon) previewIcon.classList.add('hidden');
+        } else {
+          if (previewImg) previewImg.classList.add('hidden');
+          if (previewIcon) previewIcon.classList.remove('hidden');
+        }
+
+        if (previewBox) previewBox.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.removeLeaveDocAttachment = function() {
+      const fileInput = document.getElementById('leave-doc-file');
+      if (fileInput) fileInput.value = '';
+      if (document.getElementById('leave-doc-url')) document.getElementById('leave-doc-url').value = '';
+      if (document.getElementById('leave-doc-name')) document.getElementById('leave-doc-name').value = '';
+      if (document.getElementById('leave-doc-type')) document.getElementById('leave-doc-type').value = '';
+
+      const previewBox = document.getElementById('leave-doc-preview-box');
+      if (previewBox) previewBox.classList.add('hidden');
+    };
+
+    window.handleAdvDocFileSelect = function(e) {
+      const file = e.target.files ? e.target.files[0] : null;
+      if (!file) return;
+
+      if (file.size > 2.5 * 1024 * 1024) {
+        showToast('warning', 'ফাইলের সাইজ ২.৫ মেগাবাইট (MB) এর কম হতে হবে');
+        e.target.value = '';
+        return;
+      }
+
+      const previewBox = document.getElementById('adv-doc-preview-box');
+      const previewImg = document.getElementById('adv-doc-preview-img');
+      const previewIcon = document.getElementById('adv-doc-preview-icon');
+      const previewName = document.getElementById('adv-doc-preview-name');
+      const previewSize = document.getElementById('adv-doc-preview-size');
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const dataUrl = evt.target.result;
+        document.getElementById('adv-doc-url').value = dataUrl;
+        document.getElementById('adv-doc-name').value = file.name;
+        document.getElementById('adv-doc-type').value = file.type || '';
+
+        if (previewName) previewName.innerText = file.name;
+        if (previewSize) previewSize.innerText = `${(file.size / 1024).toFixed(1)} KB`;
+
+        if (file.type && file.type.startsWith('image/')) {
+          if (previewImg) {
+            previewImg.src = dataUrl;
+            previewImg.classList.remove('hidden');
+          }
+          if (previewIcon) previewIcon.classList.add('hidden');
+        } else {
+          if (previewImg) previewImg.classList.add('hidden');
+          if (previewIcon) previewIcon.classList.remove('hidden');
+        }
+
+        if (previewBox) previewBox.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    window.removeAdvDocAttachment = function() {
+      const fileInput = document.getElementById('adv-doc-file');
+      if (fileInput) fileInput.value = '';
+      if (document.getElementById('adv-doc-url')) document.getElementById('adv-doc-url').value = '';
+      if (document.getElementById('adv-doc-name')) document.getElementById('adv-doc-name').value = '';
+      if (document.getElementById('adv-doc-type')) document.getElementById('adv-doc-type').value = '';
+
+      const previewBox = document.getElementById('adv-doc-preview-box');
+      if (previewBox) previewBox.classList.add('hidden');
+    };
+
     window.saveLeaveRequest = async function(e) {
       e.preventDefault();
       let empId = document.getElementById('leave-emp-id').value;
@@ -7056,7 +7250,11 @@ ${messageText}
       const empBranch = emp ? (emp.branch || 'Head Office') : (myEmployeeProfile ? (myEmployeeProfile.branch || 'Head Office') : 'Head Office');
       const empCode = emp ? (emp.customEmpCode || '') : (myEmployeeProfile ? (myEmployeeProfile.customEmpCode || '') : '');
 
-      await addDoc(collection(db, "leaves"), {
+      const docUrl = document.getElementById('leave-doc-url') ? document.getElementById('leave-doc-url').value : '';
+      const docName = document.getElementById('leave-doc-name') ? document.getElementById('leave-doc-name').value : '';
+      const docType = document.getElementById('leave-doc-type') ? document.getElementById('leave-doc-type').value : '';
+
+      const leaveDocRef = await addDoc(collection(db, "leaves"), {
         employeeId: empId,
         employeeName: empName,
         employeePhone: empPhone,
@@ -7067,20 +7265,47 @@ ${messageText}
         endDate: end,
         reason: reason,
         status: 'Pending',
+        hasDocument: !!docUrl,
+        documentUrl: docUrl || '',
+        documentName: docName || '',
+        documentType: docType || '',
         appliedBy: currentUserEmail,
         appliedAt: new Date().toISOString()
       });
+
+      // Also sync copy into company_documents if document was attached
+      if (docUrl) {
+        try {
+          await addDoc(collection(db, "company_documents"), {
+            title: `ছুটির আবেদন প্রমাণপত্র - ${empName} (${type})`,
+            category: 'Leave Document',
+            targetEmployee: empName,
+            fileUrl: docUrl,
+            fileName: docName || `Leave_${empName}.png`,
+            fileType: docType || 'image/png',
+            relatedModule: 'Leave',
+            relatedId: leaveDocRef.id,
+            uploadedBy: currentUserEmail,
+            uploadedAt: new Date().toISOString()
+          });
+        } catch (e) {
+          console.warn('Sync leave document error:', e);
+        }
+      }
 
       await logSystemActivity(
         'CREATE',
         'Leave',
         `${currentUserEmail} applied for ${type} (${start} to ${end}) for employee "${empName}"`,
-        { employeeName: empName, leaveType: type, startDate: start, endDate: end }
+        { employeeName: empName, leaveType: type, startDate: start, endDate: end, hasDocument: !!docUrl }
       );
 
       document.getElementById('leave-form').reset();
+      if (typeof removeLeaveDocAttachment === 'function') removeLeaveDocAttachment();
       toggleModal('add-leave-modal', false);
       showToast('success', 'ছুটির আবেদন জমা দেওয়া হয়েছে!');
+
+      if (typeof updateNotificationCenter === 'function') updateNotificationCenter();
 
       // Notify Admin via WhatsApp
       if (whatsappConfig.notifyOnLeaveApply !== false) {
@@ -7111,6 +7336,437 @@ ${messageText}
           `🔔 অ্যাডমিনকে ছুটির আবেদনের বার্তা পাঠান`,
           `ছুটির আবেদন সফলভাবে জমা হয়েছে। অ্যাডমিনকে সুন্দরভাবে সাজানো WhatsApp নোটিফিকেশন পাঠানো হচ্ছে:`
         );
+      }
+    };
+
+    // ==========================================
+    // ATTACHED DOCUMENT & APPLICATION DETAIL VIEWER
+    // ==========================================
+    window.currentViewerState = { type: null, id: null };
+
+    window.openAttachedDocViewer = function(type, id) {
+      window.currentViewerState = { type, id };
+      
+      let item = null;
+      if (type === 'leave') {
+        item = leaveList.find(l => l.id === id);
+      } else if (type === 'advance') {
+        item = advanceList.find(a => a.id === id);
+      } else if (type === 'doc') {
+        item = docList.find(d => d.id === id);
+      }
+
+      if (!item) {
+        showToast('warning', 'আবেদনের তথ্য খুঁজে পাওয়া যায়নি');
+        return;
+      }
+
+      const emp = employeeList.find(e => e.id === item.employeeId || e.name === item.employeeName);
+      const empName = item.employeeName || (emp ? emp.name : 'Staff');
+      const empCode = (emp && emp.customEmpCode) ? emp.customEmpCode : (item.customEmpCode || 'N/A');
+      const empBranch = item.branch || (emp ? emp.branch : 'Head Office') || 'Head Office';
+      const empDesig = (emp && emp.designation) ? emp.designation : (item.designation || 'Employee');
+      const empPhoto = emp ? (emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(empName)}&background=6366f1&color=fff`) : `https://ui-avatars.com/api/?name=${encodeURIComponent(empName)}&background=6366f1&color=fff`;
+
+      // Set Employee Card Info
+      if (document.getElementById('viewer-emp-name')) document.getElementById('viewer-emp-name').innerText = empName;
+      if (document.getElementById('viewer-emp-designation')) document.getElementById('viewer-emp-designation').innerText = empDesig;
+      if (document.getElementById('viewer-emp-code')) document.getElementById('viewer-emp-code').innerText = `ID: ${empCode}`;
+      if (document.getElementById('viewer-emp-branch')) document.getElementById('viewer-emp-branch').innerText = `🏢 ${empBranch}`;
+      if (document.getElementById('viewer-emp-avatar')) document.getElementById('viewer-emp-avatar').src = empPhoto;
+
+      const canApprove = (type === 'leave') 
+        ? (currentUserRole !== 'Employee' && hasPermission('can_leave_approve')) 
+        : (currentUserRole !== 'Employee' && hasPermission('can_advance_approve'));
+
+      const decisionBox = document.getElementById('viewer-decision-box');
+      if (decisionBox) {
+        if (canApprove && item.status === 'Pending') {
+          decisionBox.classList.remove('hidden');
+        } else {
+          decisionBox.classList.add('hidden');
+        }
+      }
+
+      const typeBadge = document.getElementById('viewer-type-badge');
+      const labelPrimary = document.getElementById('viewer-label-primary');
+      const fieldPrimary = document.getElementById('viewer-field-primary');
+      const labelSecondary = document.getElementById('viewer-label-secondary');
+      const fieldSecondary = document.getElementById('viewer-field-secondary');
+      const fieldReason = document.getElementById('viewer-field-reason');
+      const fieldStatus = document.getElementById('viewer-field-status');
+      const fieldTime = document.getElementById('viewer-field-applied-time');
+
+      if (type === 'leave') {
+        if (typeBadge) {
+          typeBadge.innerText = 'LEAVE APPLICATION';
+          typeBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-950 dark:text-orange-300';
+        }
+        if (labelPrimary) labelPrimary.innerText = 'ছুটির ধরন (Leave Type)';
+        if (fieldPrimary) fieldPrimary.innerText = item.leaveType || 'General Leave';
+        if (labelSecondary) labelSecondary.innerText = 'ছুটির সময়কাল (Period)';
+        const days = calculateLeaveDays(item.startDate, item.endDate);
+        if (fieldSecondary) fieldSecondary.innerText = `${item.startDate} থেকে ${item.endDate} (${days} দিন)`;
+        if (fieldReason) fieldReason.innerText = item.reason || 'কোনো কারণ উল্লেখ করা হয়নি';
+        if (fieldStatus) fieldStatus.innerHTML = `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${getLeaveBadge(item.status)}">${item.status}</span>`;
+        if (fieldTime) fieldTime.innerText = item.appliedAt ? new Date(item.appliedAt).toLocaleString() : '--';
+      } else if (type === 'advance') {
+        if (typeBadge) {
+          typeBadge.innerText = 'ADVANCE SALARY';
+          typeBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300';
+        }
+        if (labelPrimary) labelPrimary.innerText = 'অগ্রিমের পরিমাণ (Advance Amount)';
+        if (fieldPrimary) fieldPrimary.innerText = `৳ ${(Number(item.amount) || 0).toLocaleString()}`;
+        if (labelSecondary) labelSecondary.innerText = 'বেতন মাস (Salary Month)';
+        if (fieldSecondary) fieldSecondary.innerText = `${item.month} (তারিখ: ${item.date || '-'})`;
+        if (fieldReason) fieldReason.innerText = item.note || 'ব্যক্তিগত প্রয়োজন';
+        if (fieldStatus) {
+          let stColor = 'bg-amber-50 text-amber-700 border border-amber-200';
+          if (item.status === 'Approved') stColor = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+          else if (item.status === 'Rejected') stColor = 'bg-rose-50 text-rose-700 border border-rose-200';
+          else if (item.status === 'Cleared') stColor = 'bg-blue-50 text-blue-700 border border-blue-200';
+          fieldStatus.innerHTML = `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${stColor}">${item.status}</span>`;
+        }
+        if (fieldTime) fieldTime.innerText = item.createdAt ? new Date(item.createdAt).toLocaleString() : '--';
+      }
+
+      // Document Attachment handling
+      const docFilename = document.getElementById('viewer-doc-filename');
+      const docImg = document.getElementById('viewer-doc-image');
+      const docFallback = document.getElementById('viewer-doc-fallback');
+      const docEmpty = document.getElementById('viewer-doc-empty');
+      const docActions = document.getElementById('viewer-doc-actions');
+      const openBtn = document.getElementById('viewer-doc-open-btn');
+      const downloadBtn = document.getElementById('viewer-doc-download-btn');
+      const fallbackDownloadBtn = document.getElementById('viewer-fallback-download-btn');
+      const fallbackName = document.getElementById('viewer-fallback-name');
+
+      const docUrl = item.documentUrl || item.fileUrl || '';
+      const docName = item.documentName || item.fileName || 'Attached_Document';
+      const docType = item.documentType || item.fileType || '';
+
+      if (docUrl) {
+        if (docFilename) docFilename.innerText = docName;
+        if (docActions) docActions.classList.remove('hidden');
+        if (docEmpty) docEmpty.classList.add('hidden');
+
+        const isImage = (docType && docType.startsWith('image/')) || docUrl.startsWith('data:image');
+
+        if (isImage) {
+          if (docImg) {
+            docImg.src = docUrl;
+            docImg.classList.remove('hidden');
+            docImg.onclick = () => window.open(docUrl, '_blank');
+          }
+          if (docFallback) docFallback.classList.add('hidden');
+        } else {
+          if (docImg) docImg.classList.add('hidden');
+          if (docFallback) {
+            docFallback.classList.remove('hidden');
+            if (fallbackName) fallbackName.innerText = docName;
+          }
+        }
+
+        const handleDownload = () => {
+          const a = document.createElement('a');
+          a.href = docUrl;
+          a.download = docName || 'document.png';
+          a.click();
+        };
+
+        if (openBtn) openBtn.onclick = () => window.open(docUrl, '_blank');
+        if (downloadBtn) downloadBtn.onclick = handleDownload;
+        if (fallbackDownloadBtn) fallbackDownloadBtn.onclick = handleDownload;
+      } else {
+        if (docFilename) docFilename.innerText = 'কোনো ডকুমেন্ট নেই';
+        if (docActions) docActions.classList.add('hidden');
+        if (docImg) docImg.classList.add('hidden');
+        if (docFallback) docFallback.classList.add('hidden');
+        if (docEmpty) docEmpty.classList.remove('hidden');
+      }
+
+      toggleModal('attached-doc-viewer-modal', true);
+    };
+
+    window.executeViewerDecision = async function(newStatus) {
+      const { type, id } = window.currentViewerState;
+      if (!type || !id) return;
+
+      if (type === 'leave') {
+        await updateLeaveStatus(id, newStatus);
+      } else if (type === 'advance') {
+        await updateAdvanceStatus(id, newStatus);
+      }
+
+      toggleModal('attached-doc-viewer-modal', false);
+      if (typeof updateNotificationCenter === 'function') updateNotificationCenter();
+    };
+
+    // ==========================================
+    // EXECUTIVE REALTIME NOTIFICATION CENTER ENGINE
+    // ==========================================
+    window.currentNotifTab = 'all';
+
+    window.toggleNotificationDropdown = function(e) {
+      if (e) e.stopPropagation();
+      const panel = document.getElementById('notif-dropdown-panel');
+      if (!panel) return;
+
+      const isClosed = panel.classList.contains('hidden');
+      if (isClosed) {
+        panel.classList.remove('hidden');
+        renderNotificationDropdownContent();
+      } else {
+        panel.classList.add('hidden');
+      }
+    };
+
+    window.closeNotificationDropdown = function() {
+      const panel = document.getElementById('notif-dropdown-panel');
+      if (panel) panel.classList.add('hidden');
+    };
+
+    // Close on outside click
+    document.addEventListener('click', function(e) {
+      const wrapper = document.getElementById('notif-bar-wrapper');
+      const panel = document.getElementById('notif-dropdown-panel');
+      if (panel && !panel.classList.contains('hidden')) {
+        if (wrapper && !wrapper.contains(e.target)) {
+          panel.classList.add('hidden');
+        }
+      }
+    });
+
+    window.switchNotifTab = function(tab) {
+      window.currentNotifTab = tab;
+      const tabs = ['all', 'leave', 'advance', 'docs'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`notif-tab-${t}`);
+        if (!btn) return;
+        if (t === tab) {
+          btn.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-2xs whitespace-nowrap font-bold';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap font-semibold';
+        }
+      });
+      renderNotificationDropdownContent();
+    };
+
+    window.updateNotificationCenter = function() {
+      const pendingLeaves = leaveList.filter(l => l.status === 'Pending' && isItemInActiveBranch(l.branch));
+      const pendingAdvances = advanceList.filter(a => a.status === 'Pending' && isItemInActiveBranch(a.branch));
+      
+      const totalPending = pendingLeaves.length + pendingAdvances.length;
+
+      const pulseBadge = document.getElementById('notif-badge-pulse');
+      const countBadge = document.getElementById('notif-badge-count');
+      const headerPill = document.getElementById('notif-header-pending-pill');
+
+      if (countBadge) countBadge.innerText = totalPending;
+      if (pulseBadge) {
+        if (totalPending > 0) pulseBadge.classList.remove('hidden');
+        else pulseBadge.classList.add('hidden');
+      }
+      if (headerPill) {
+        headerPill.innerText = `${totalPending}টি অপেক্ষমাণ`;
+        headerPill.className = totalPending > 0 
+          ? 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300'
+          : 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300';
+      }
+
+      // Re-render dropdown if open
+      const panel = document.getElementById('notif-dropdown-panel');
+      if (panel && !panel.classList.contains('hidden')) {
+        renderNotificationDropdownContent();
+      }
+    };
+
+    window.renderNotificationDropdownContent = function() {
+      const container = document.getElementById('notif-items-container');
+      if (!container) return;
+
+      const pendingLeaves = leaveList.filter(l => l.status === 'Pending' && isItemInActiveBranch(l.branch));
+      const pendingAdvances = advanceList.filter(a => a.status === 'Pending' && isItemInActiveBranch(a.branch));
+      const recentDocs = docList.slice(0, 10);
+
+      let items = [];
+
+      if (window.currentNotifTab === 'all' || window.currentNotifTab === 'leave') {
+        pendingLeaves.forEach(lv => {
+          items.push({
+            type: 'leave',
+            id: lv.id,
+            title: `ছুটির আবেদন: ${lv.leaveType || 'Leave'}`,
+            empName: lv.employeeName || 'Staff',
+            empCode: lv.customEmpCode || '',
+            branch: lv.branch || 'Head Office',
+            timeInfo: `${lv.startDate} to ${lv.endDate} (${calculateLeaveDays(lv.startDate, lv.endDate)} দিন)`,
+            reason: lv.reason || '',
+            hasDocument: !!lv.documentUrl,
+            docName: lv.documentName || '',
+            timestamp: lv.appliedAt || lv.createdAt || ''
+          });
+        });
+      }
+
+      if (window.currentNotifTab === 'all' || window.currentNotifTab === 'advance') {
+        pendingAdvances.forEach(adv => {
+          items.push({
+            type: 'advance',
+            id: adv.id,
+            title: `অগ্রিম বেতন: ৳ ${(Number(adv.amount) || 0).toLocaleString()}`,
+            empName: adv.employeeName || 'Staff',
+            empCode: adv.customEmpCode || '',
+            branch: adv.branch || 'Head Office',
+            timeInfo: `মাস: ${adv.month} (তারিখ: ${adv.date || '-'})`,
+            reason: adv.note || '',
+            hasDocument: !!adv.documentUrl,
+            docName: adv.documentName || '',
+            timestamp: adv.createdAt || ''
+          });
+        });
+      }
+
+      if (window.currentNotifTab === 'docs') {
+        recentDocs.forEach(d => {
+          items.push({
+            type: 'doc',
+            id: d.id,
+            title: `ডকুমেন্ট: ${d.title}`,
+            empName: d.targetEmployee || 'Company',
+            empCode: '',
+            branch: 'All',
+            timeInfo: `ক্যাটাগরি: ${d.category}`,
+            reason: d.fileName || '',
+            hasDocument: true,
+            docName: d.fileName || 'View File',
+            timestamp: d.uploadedAt || ''
+          });
+        });
+      }
+
+      // Sort by newest first
+      items.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      if (items.length === 0) {
+        container.innerHTML = `
+          <div class="py-10 px-4 text-center text-slate-400 space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 flex items-center justify-center mx-auto text-xl shadow-xs">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <p class="text-xs font-bold text-slate-700 dark:text-slate-300">কোনো অপেক্ষমাণ আবেদন নেই!</p>
+            <p class="text-[11px] text-slate-400 max-w-xs mx-auto">নতুন কোনো ছুটির আবেদন বা অগ্রিম বেতনের রিকুয়েস্ট আসলে সাথে সাথে এই বারে দেখা যাবে।</p>
+          </div>
+        `;
+        return;
+      }
+
+      const canApproveLeave = currentUserRole !== 'Employee' && hasPermission('can_leave_approve');
+      const canApproveAdv = currentUserRole !== 'Employee' && hasPermission('can_advance_approve');
+
+      let cardsHtml = '';
+      items.forEach(item => {
+        const isLeave = item.type === 'leave';
+        const isAdvance = item.type === 'advance';
+        const isDoc = item.type === 'doc';
+        const iconBg = isLeave ? 'bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-300' : (isAdvance ? 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-300' : 'bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-300');
+        const iconClass = isLeave ? 'fa-calendar-check' : (isAdvance ? 'fa-hand-holding-dollar' : 'fa-file-lines');
+        const canApprove = isLeave ? canApproveLeave : (isAdvance ? canApproveAdv : false);
+
+        const docPill = item.hasDocument ? `
+          <button onclick="openAttachedDocViewer('${item.type}', '${item.id}')" class="mt-1 px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 text-[10px] font-bold border border-indigo-200 dark:border-indigo-800 inline-flex items-center space-x-1 shadow-2xs transition cursor-pointer">
+            <i class="fa-solid fa-paperclip text-indigo-500"></i>
+            <span class="truncate max-w-[170px]">ডকুমেন্ট দেখুন: ${item.docName || 'ফাইল'}</span>
+          </button>
+        ` : '';
+
+        const actionButtons = canApprove ? `
+          <div class="flex items-center space-x-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
+            <button onclick="quickApproveNotification('${item.type}', '${item.id}')" class="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition flex items-center justify-center space-x-1 shadow-2xs cursor-pointer">
+              <i class="fa-solid fa-check text-[10px]"></i>
+              <span>অনুমোদন (Approve)</span>
+            </button>
+            <button onclick="quickRejectNotification('${item.type}', '${item.id}')" class="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 rounded-xl text-[11px] font-bold transition flex items-center justify-center space-x-1 border border-rose-200 dark:border-rose-800 cursor-pointer">
+              <i class="fa-solid fa-xmark text-[10px]"></i>
+              <span>বাতিল</span>
+            </button>
+            <button onclick="openAttachedDocViewer('${item.type}', '${item.id}')" class="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-xl text-[11px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer" title="আবেদন ও ডকুমেন্ট বিস্তারিত দেখুন">
+              <i class="fa-solid fa-eye text-[10px]"></i>
+            </button>
+          </div>
+        ` : (isDoc ? `
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 mt-2 text-[11px]">
+            <span class="text-slate-500 font-medium">কোম্পানি ডকুমেন্ট</span>
+            <button onclick="viewOrDownloadDoc('${item.id}')" class="text-indigo-600 font-bold hover:underline flex items-center space-x-1">
+              <span>ডাউনলোড / দেখুন</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </button>
+          </div>
+        ` : `
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 mt-2 text-[11px]">
+            <span class="text-amber-600 font-bold">⏳ অপেক্ষমাণ (Pending)</span>
+            <button onclick="openAttachedDocViewer('${item.type}', '${item.id}')" class="text-indigo-600 font-bold hover:underline flex items-center space-x-1">
+              <span>বিস্তারিত দেখুন</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </button>
+          </div>
+        `);
+
+        cardsHtml += `
+          <div class="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition shadow-2xs space-y-1.5">
+            <div class="flex items-start space-x-2.5">
+              <div class="w-8 h-8 rounded-xl ${iconBg} flex items-center justify-center text-xs shrink-0 mt-0.5">
+                <i class="fa-solid ${iconClass}"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold text-slate-800 dark:text-white truncate">${item.title}</h4>
+                  <span class="text-[9px] text-slate-400 shrink-0 font-mono ml-1">${item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                </div>
+                <div class="text-[11px] text-slate-600 dark:text-slate-300 font-semibold truncate">
+                  👤 ${item.empName} ${item.empCode ? `[ID: ${item.empCode}]` : ''} • <span class="text-indigo-600 dark:text-indigo-400">🏢 ${item.branch}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">${item.timeInfo}</p>
+                ${item.reason ? `<p class="text-[10px] text-slate-500 dark:text-slate-400 italic truncate mt-0.5">নোট: "${item.reason}"</p>` : ''}
+                ${docPill}
+              </div>
+            </div>
+            ${actionButtons}
+          </div>
+        `;
+      });
+
+      container.innerHTML = cardsHtml;
+    };
+
+    window.quickApproveNotification = async function(type, id) {
+      if (type === 'leave') {
+        await updateLeaveStatus(id, 'Approved');
+      } else if (type === 'advance') {
+        await updateAdvanceStatus(id, 'Approved');
+      }
+      showToast('success', 'আবেদনটি অনুমোদিত হয়েছে এবং নোটিফিকেশন বার থেকে আপডেট হয়েছে!');
+      updateNotificationCenter();
+    };
+
+    window.quickRejectNotification = async function(type, id) {
+      const confirmResult = await Swal.fire({
+        title: 'আবেদনটি বাতিল করতে চান?',
+        text: 'বাতিল করলে এটি নোটিফিকেশন বার থেকে সরিয়ে দেওয়া হবে।',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'হ্যাঁ, বাতিল করুন',
+        cancelButtonText: 'না'
+      });
+
+      if (confirmResult.isConfirmed) {
+        if (type === 'leave') {
+          await updateLeaveStatus(id, 'Rejected');
+        } else if (type === 'advance') {
+          await updateAdvanceStatus(id, 'Rejected');
+        }
+        showToast('info', 'আবেদনটি বাতিল করা হয়েছে');
+        updateNotificationCenter();
       }
     };
 
@@ -9972,6 +10628,9 @@ ${messageText}
           docList.push({ id: docSnap.id, ...docSnap.data() });
         });
         renderDocsTable();
+        if (typeof window.updateNotificationCenter === 'function') {
+          window.updateNotificationCenter();
+        }
       });
     }
 
@@ -11651,6 +12310,71 @@ ${messageText}
           <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle Dark/Light Mode (ডার্ক/লাইট মোড)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition shadow-xs flex items-center justify-center cursor-pointer shrink-0">
             <i id="theme-toggle-icon" class="fa-solid fa-moon text-sm"></i>
           </button>
+
+          <!-- Executive Notification Bar & Dropdown Center -->
+          <div id="notif-bar-wrapper" class="relative">
+            <button id="notif-bell-btn" onclick="toggleNotificationDropdown(event)" title="Notifications (নোটিফিকেশন বার)" class="relative w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition shadow-xs flex items-center justify-center cursor-pointer shrink-0">
+              <i class="fa-solid fa-bell text-sm"></i>
+              <span id="notif-badge-pulse" class="hidden absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span id="notif-badge-count" class="relative inline-flex rounded-full h-4 min-w-4 px-1 bg-rose-600 text-[9px] font-black text-white items-center justify-center shadow-xs">0</span>
+              </span>
+            </button>
+
+            <!-- Notification Dropdown Flyout Panel -->
+            <div id="notif-dropdown-panel" class="hidden absolute right-0 mt-2 w-80 sm:w-[420px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden transform transition-all duration-200">
+              <!-- Header -->
+              <div class="px-4 py-3 bg-slate-50 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <div class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs shadow-xs">
+                    <i class="fa-solid fa-bell"></i>
+                  </div>
+                  <div>
+                    <h3 class="text-xs font-bold text-slate-800 dark:text-white">নোটিফিকেশন বার (Notifications)</h3>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400">নতুন আবেদন ও সংযুক্ত ডকুমেন্টের তালিকা</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                  <span id="notif-header-pending-pill" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300">০টি অপেক্ষমাণ</span>
+                  <button onclick="closeNotificationDropdown()" class="w-6 h-6 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Filter Tabs -->
+              <div class="px-3 py-2 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center space-x-1 overflow-x-auto text-[11px] font-bold scrollbar-none">
+                <button id="notif-tab-all" onclick="switchNotifTab('all')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-2xs whitespace-nowrap">
+                  সকল (All)
+                </button>
+                <button id="notif-tab-leave" onclick="switchNotifTab('leave')" class="px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap">
+                  ছুটি (Leaves)
+                </button>
+                <button id="notif-tab-advance" onclick="switchNotifTab('advance')" class="px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap">
+                  অগ্রিম (Advance)
+                </button>
+                <button id="notif-tab-docs" onclick="switchNotifTab('docs')" class="px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap">
+                  ডকুমেন্টস (Docs)
+                </button>
+              </div>
+
+              <!-- Items List -->
+              <div id="notif-items-container" class="max-h-80 sm:max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 p-2 space-y-1.5">
+                <div class="p-6 text-center text-slate-400 text-xs">
+                  <i class="fa-solid fa-circle-check text-emerald-500 text-2xl mb-1 block"></i>
+                  কোনো অপেক্ষমাণ আবেদন নেই!
+                </div>
+              </div>
+
+              <!-- Footer Guidance -->
+              <div class="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200/80 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span class="truncate"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i>অনুমোদন করলে নোটিফিকেশন বার থেকে তাৎক্ষণিক মুছে যাবে</span>
+                <button onclick="updateNotificationCenter()" class="text-indigo-600 dark:text-indigo-400 font-bold hover:underline shrink-0 ml-2">
+                  <i class="fa-solid fa-arrows-rotate mr-0.5"></i> রিফ্রেশ
+                </button>
+              </div>
+            </div>
+          </div>
 
           <!-- Super Admin Branch Switcher Dropdown -->
           <div id="header-branch-switcher-box" class="flex items-center space-x-2 bg-indigo-50/70 border border-indigo-200 px-3 py-1.5 rounded-xl">
@@ -13590,8 +14314,42 @@ ${messageText}
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Note / Reason</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Note / Reason (অগ্রিম নেওয়ার কারণ)</label>
           <input type="text" id="adv-note" placeholder="জরুরি পারিবারিক প্রয়োজনেই অগ্রিম" class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <!-- Supporting Document / Requisition Slip Attachment -->
+        <div class="space-y-1.5 p-3 rounded-2xl bg-amber-50/60 border border-amber-200/70 dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+              <i class="fa-solid fa-paperclip text-amber-600 dark:text-amber-400"></i>
+              <span>Attach Requisition Slip / Proof (অগ্রিমের ভাউচার বা দরখাস্ত)</span>
+            </label>
+            <span class="text-[10px] text-amber-700 dark:text-amber-400 font-semibold lowercase">optional</span>
+          </div>
+          <div class="relative">
+            <input type="file" id="adv-doc-file" onchange="handleAdvDocFileSelect(event)" accept="image/*,.pdf,.doc,.docx" class="w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer">
+            <input type="hidden" id="adv-doc-url">
+            <input type="hidden" id="adv-doc-name">
+            <input type="hidden" id="adv-doc-type">
+          </div>
+          <!-- Preview Box -->
+          <div id="adv-doc-preview-box" class="hidden mt-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-amber-200 dark:border-slate-700 flex items-center justify-between shadow-2xs">
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <img id="adv-doc-preview-img" src="" class="hidden w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0">
+              <div id="adv-doc-preview-icon" class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-300 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-file-invoice-dollar text-base"></i>
+              </div>
+              <div class="min-w-0">
+                <p id="adv-doc-preview-name" class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">slip.pdf</p>
+                <span id="adv-doc-preview-size" class="text-[10px] text-slate-400 font-medium">0 KB</span>
+              </div>
+            </div>
+            <button type="button" onclick="removeAdvDocAttachment()" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs transition" title="Remove attachment">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">স্বাক্ষরিত রিক্যুইজিশন স্লিপ, আবেদনপত্র বা প্রমাণের ছবি/পিডিএফ সংযুক্ত করতে পারেন</p>
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
@@ -13721,8 +14479,42 @@ ${messageText}
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 mb-1">Reason</label>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Reason (ছুটি নেওয়ার কারণ)</label>
           <textarea id="leave-reason" rows="2" class="w-full p-2.5 border rounded-xl text-xs outline-none" placeholder="ছুটি নেওয়ার কারণ..."></textarea>
+        </div>
+
+        <!-- Supporting Document / Prescription / Application Attachment -->
+        <div class="space-y-1.5 p-3 rounded-2xl bg-indigo-50/60 border border-indigo-100 dark:bg-slate-800/60 dark:border-slate-700">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+              <i class="fa-solid fa-paperclip text-indigo-600 dark:text-indigo-400"></i>
+              <span>Attach Document / Proof (ছুটির প্রমাণপত্র বা দরখাস্ত)</span>
+            </label>
+            <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold lowercase">optional</span>
+          </div>
+          <div class="relative">
+            <input type="file" id="leave-doc-file" onchange="handleLeaveDocFileSelect(event)" accept="image/*,.pdf,.doc,.docx" class="w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
+            <input type="hidden" id="leave-doc-url">
+            <input type="hidden" id="leave-doc-name">
+            <input type="hidden" id="leave-doc-type">
+          </div>
+          <!-- Document Preview Box -->
+          <div id="leave-doc-preview-box" class="hidden mt-2 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-indigo-200 dark:border-slate-700 flex items-center justify-between shadow-2xs">
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <img id="leave-doc-preview-img" src="" class="hidden w-10 h-10 object-cover rounded-lg border border-slate-200 shrink-0">
+              <div id="leave-doc-preview-icon" class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-file-lines text-base"></i>
+              </div>
+              <div class="min-w-0">
+                <p id="leave-doc-preview-name" class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">document.pdf</p>
+                <span id="leave-doc-preview-size" class="text-[10px] text-slate-400 font-medium">0 KB</span>
+              </div>
+            </div>
+            <button type="button" onclick="removeLeaveDocAttachment()" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs transition" title="Remove attachment">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">মেডিকেল সার্টিফিকেট, প্রেসক্রিপশন বা ছুটির দরখাস্তের ছবি/পিডিএফ সংযুক্ত করতে পারেন</p>
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
@@ -14567,6 +15359,159 @@ ${messageText}
             বন্ধ করুন (Close)
           </button>
         </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 15. ATTACHED DOCUMENT & APPLICATION DETAIL VIEWER MODAL -->
+  <div id="attached-doc-viewer-modal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 z-50 overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 my-auto animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3.5">
+        <div class="flex items-center space-x-3">
+          <div id="viewer-module-icon" class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400 flex items-center justify-center text-lg font-bold shadow-xs">
+            <i class="fa-solid fa-file-shield"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 id="viewer-header-title" class="text-base font-black text-slate-900 dark:text-white">আবেদন ও সংযুক্ত ডকুমেন্ট বিবরণী</h3>
+              <span id="viewer-type-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300">LEAVE</span>
+            </div>
+            <p id="viewer-header-subtitle" class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">আবেদনের বিস্তারিত ও আপলোডকৃত প্রমাণপত্র একসাথে পর্যালোচনা করুন</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('attached-doc-viewer-modal', false)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center text-sm transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Main Split View: Application Data (Left) + Document Viewer (Right) -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+        
+        <!-- Left: Application Details & Employee Info (5 cols) -->
+        <div class="md:col-span-5 space-y-3.5 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+          <!-- Employee Card -->
+          <div class="flex items-center space-x-3 pb-3 border-b border-slate-200/80 dark:border-slate-700">
+            <img id="viewer-emp-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-400 shadow-xs shrink-0">
+            <div class="min-w-0 flex-1">
+              <h4 id="viewer-emp-name" class="text-sm font-black text-slate-900 dark:text-white truncate">কর্মচারীর নাম</h4>
+              <p id="viewer-emp-designation" class="text-xs text-slate-500 dark:text-slate-400 truncate">Designation</p>
+              <div class="flex items-center space-x-2 mt-1">
+                <span id="viewer-emp-code" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">ID: N/A</span>
+                <span id="viewer-emp-branch" class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">🏢 Head Office</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Specific Application Fields -->
+          <div class="space-y-2.5 text-xs">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider" id="viewer-label-primary">বিষয় / বিবরণ</span>
+              <p id="viewer-field-primary" class="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">--</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider" id="viewer-label-secondary">সময়কাল / মাস</span>
+                <p id="viewer-field-secondary" class="font-semibold text-slate-700 dark:text-slate-300 mt-0.5">--</p>
+              </div>
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">আবেদনের স্থিতি (Status)</span>
+                <div id="viewer-field-status" class="mt-0.5">--</div>
+              </div>
+            </div>
+
+            <div class="pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+              <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">আবেদনের কারণ ও নোট (Reason / Note)</span>
+              <p id="viewer-field-reason" class="text-xs text-slate-600 dark:text-slate-300 font-medium italic mt-1 leading-relaxed bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                --
+              </p>
+            </div>
+
+            <div class="text-[11px] text-slate-400 pt-1">
+              <span>আবেদনের সময়: <b id="viewer-field-applied-time" class="text-slate-600 dark:text-slate-300 font-mono">--</b></span>
+            </div>
+          </div>
+
+          <!-- Review Decision Controls (Approve / Reject) -->
+          <div id="viewer-decision-box" class="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+            <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">অনুমোদন সিদ্ধান্ত নিন (Review Action):</span>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="viewer-btn-approve" onclick="executeViewerDecision('Approved')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm">
+                <i class="fa-solid fa-check"></i>
+                <span>Approve (অনুমোদন)</span>
+              </button>
+              <button type="button" id="viewer-btn-reject" onclick="executeViewerDecision('Rejected')" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Reject (বাতিল)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Document Attachment Viewer Area (7 cols) -->
+        <div class="md:col-span-7 space-y-3 bg-white dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+          
+          <!-- Document Header Bar -->
+          <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-2.5">
+            <div class="flex items-center space-x-2 min-w-0">
+              <i class="fa-solid fa-paperclip text-indigo-600 dark:text-indigo-400"></i>
+              <h4 class="text-xs font-bold text-slate-800 dark:text-white truncate" id="viewer-doc-filename">Attached Document</h4>
+            </div>
+            <div class="flex items-center space-x-1.5 shrink-0" id="viewer-doc-actions">
+              <button id="viewer-doc-open-btn" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 transition flex items-center space-x-1">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                <span>Open Tab</span>
+              </button>
+              <button id="viewer-doc-download-btn" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 transition flex items-center space-x-1">
+                <i class="fa-solid fa-download"></i>
+                <span>Download</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Document Content Area (Image or PDF or Empty placeholder) -->
+          <div id="viewer-doc-content-box" class="min-h-[260px] max-h-[420px] flex items-center justify-center bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 relative">
+            <!-- Image View -->
+            <img id="viewer-doc-image" src="" alt="Attached Document" class="hidden max-h-[400px] w-auto max-w-full object-contain rounded-lg shadow-xs hover:scale-[1.02] transition cursor-zoom-in">
+
+            <!-- PDF / File Frame View -->
+            <div id="viewer-doc-fallback" class="hidden text-center p-6 space-y-3">
+              <div class="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-file-pdf"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-800 dark:text-slate-200" id="viewer-fallback-name">Document</p>
+                <p class="text-[11px] text-slate-400">এই ডকুমেন্টটি দেখতে বা ডাউনলোড করতে নিচের বাটনে ক্লিক করুন</p>
+              </div>
+              <button id="viewer-fallback-download-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center space-x-1.5 shadow-sm">
+                <i class="fa-solid fa-download"></i>
+                <span>ফাইলটি ডাউনলোড করে দেখুন</span>
+              </button>
+            </div>
+
+            <!-- Empty Placeholder -->
+            <div id="viewer-doc-empty" class="text-center p-8 space-y-2">
+              <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-regular fa-folder-open"></i>
+              </div>
+              <p class="text-xs font-bold text-slate-600 dark:text-slate-300">কোনো আলাদা ফাইল বা ডকুমেন্ট সংযুক্ত করা হয়নি</p>
+              <p class="text-[11px] text-slate-400">কর্মচারী শুধুমাত্র টেক্সট বিবরণী দিয়ে আবেদন জমা দিয়েছেন।</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
+        <span class="text-[11px] text-slate-400 font-medium">SANVEE'S Enterprise Unified Document & Application Review System</span>
+        <button type="button" onclick="toggleModal('attached-doc-viewer-modal', false)" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
+          বন্ধ করুন (Close)
+        </button>
       </div>
 
     </div>

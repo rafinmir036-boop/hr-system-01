@@ -64,6 +64,24 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+    /* Notice Banner Emerald Glow & Sliding Animations */
+    .notice-green-glow {
+      background: linear-gradient(135deg, #022c22 0%, #064e3b 45%, #065f46 75%, #022c22 100%) !important;
+      box-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.4), 0 8px 10px -6px rgba(6, 78, 59, 0.3) !important;
+    }
+    @keyframes noticeSlideIn {
+      0% {
+        opacity: 0;
+        transform: translateX(28px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    .notice-slide-anim {
+      animation: noticeSlideIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
     /* ========================================================
        EXECUTIVE DARK NAVY SIDEBAR (MATCHING USER SCREENSHOT)
        ======================================================== */
@@ -10527,6 +10545,55 @@ ${messageText}
       });
     }
 
+    let isNoticeSliderPaused = false;
+
+    window.pauseNoticeSlider = function() {
+      isNoticeSliderPaused = true;
+      const pauseIndicator = document.getElementById('notice-pause-indicator');
+      if (pauseIndicator) pauseIndicator.classList.remove('hidden');
+    };
+
+    window.resumeNoticeSlider = function() {
+      isNoticeSliderPaused = false;
+      const pauseIndicator = document.getElementById('notice-pause-indicator');
+      if (pauseIndicator) pauseIndicator.classList.add('hidden');
+    };
+
+    window.openCurrentNoticeDetail = function() {
+      const visibleNotices = noticeList.filter(isNoticeVisibleToCurrentUser);
+      if (!visibleNotices || visibleNotices.length === 0) return;
+      const n = visibleNotices[currentNoticeIndex];
+      if (n) window.openNoticeDetailModal(n);
+    };
+
+    window.openNoticeDetailModal = function(noticeData) {
+      if (!noticeData) return;
+      const n = typeof noticeData === 'string' ? noticeList.find(x => x.id === noticeData) : noticeData;
+      if (!n) return;
+
+      const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
+      const branchLabel = isGlobal ? '🌐 সকল ব্রাঞ্চ ও হেড অফিস (Global)' : (n.targetBranch === 'Head Office' ? '🏢 শুধুমাত্র হেড অফিস' : `📍 ব্রাঞ্চ: ${n.targetBranch}`);
+      
+      const badgeElem = document.getElementById('notice-modal-badge');
+      const dateElem = document.getElementById('notice-modal-date');
+      const titleElem = document.getElementById('notice-modal-title');
+      const descElem = document.getElementById('notice-modal-desc');
+      const authorElem = document.getElementById('notice-modal-author');
+      const branchElem = document.getElementById('notice-modal-branch');
+
+      if (badgeElem) badgeElem.innerText = isGlobal ? 'GLOBAL NOTICE' : 'BRANCH NOTICE';
+      if (dateElem) {
+        const d = new Date(n.postedDate);
+        dateElem.innerText = `পোস্টের তারিখ: ${isNaN(d.getTime()) ? n.postedDate : d.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`;
+      }
+      if (titleElem) titleElem.innerText = n.title || 'নোটিশ';
+      if (descElem) descElem.innerText = n.description || '';
+      if (authorElem) authorElem.innerText = n.postedBy || 'HR Management';
+      if (branchElem) branchElem.innerText = branchLabel;
+
+      toggleModal('notice-detail-modal', true);
+    };
+
     function renderNotices() {
       const topBanner = document.getElementById('top-notice-banner');
       const heroTitle = document.getElementById('notice-hero-title');
@@ -10553,8 +10620,9 @@ ${messageText}
 
       if (noticeInterval) clearInterval(noticeInterval);
       noticeInterval = setInterval(() => {
+        if (isNoticeSliderPaused) return; // Pause auto-advance on hover
         const currentVisibles = noticeList.filter(isNoticeVisibleToCurrentUser);
-        if (currentVisibles.length > 0) {
+        if (currentVisibles.length > 1) {
           currentNoticeIndex = (currentNoticeIndex + 1) % currentVisibles.length;
           updateNoticeSlider(currentVisibles);
         }
@@ -10566,29 +10634,37 @@ ${messageText}
           const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
           const isHeadOffice = n.targetBranch === 'Head Office';
           const badgeColor = isGlobal 
-            ? 'bg-blue-100 text-blue-800 border-blue-200' 
-            : (isHeadOffice ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200');
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+            : (isHeadOffice ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-blue-100 text-blue-800 border-blue-200');
           const branchLabel = isGlobal ? '🌐 All Branches & Head Office' : `🏢 ${n.targetBranch} Only`;
 
           noticesHtml += `
-            <div class="p-5 rounded-2xl border border-slate-200/80 bg-white space-y-2 shadow-2xs hover:shadow-xs transition">
-              <div class="flex justify-between items-start">
-                <div>
-                  <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${badgeColor} mb-1.5">
-                    ${branchLabel}
-                  </span>
-                  <h4 class="font-bold text-slate-800 text-sm">${n.title}</h4>
+            <div class="p-5 rounded-2xl border border-slate-200/80 bg-white space-y-2.5 shadow-2xs hover:shadow-xs transition flex flex-col justify-between">
+              <div>
+                <div class="flex justify-between items-start gap-2">
+                  <div>
+                    <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${badgeColor} mb-1.5">
+                      ${branchLabel}
+                    </span>
+                    <h4 class="font-bold text-slate-800 text-sm leading-snug">${n.title}</h4>
+                  </div>
+                  <div class="flex items-center space-x-1.5 shrink-0">
+                    <span class="text-[10px] text-slate-400 font-semibold">${new Date(n.postedDate).toLocaleDateString()}</span>
+                    ${currentUserRole !== 'Employee' ? `
+                      <button onclick="deleteNoticeRecord('${n.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition ml-1" title="Delete Notice">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                      </button>
+                    ` : ''}
+                  </div>
                 </div>
-                <div class="flex items-center space-x-1.5">
-                  <span class="text-[10px] text-slate-400 font-semibold">${new Date(n.postedDate).toLocaleDateString()}</span>
-                  ${currentUserRole !== 'Employee' ? `
-                    <button onclick="deleteNoticeRecord('${n.id}')" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition ml-1" title="Delete Notice">
-                      <i class="fa-solid fa-trash-can text-xs"></i>
-                    </button>
-                  ` : ''}
-                </div>
+                <p class="text-xs text-slate-600 leading-relaxed mt-1.5 whitespace-pre-line">${n.description}</p>
               </div>
-              <p class="text-xs text-slate-600 leading-relaxed">${n.description}</p>
+              <div class="pt-2 border-t border-slate-100 flex justify-end">
+                <button onclick="openNoticeDetailModal('${n.id}')" class="text-xs text-emerald-700 font-bold hover:text-emerald-800 inline-flex items-center gap-1">
+                  <span>সম্পূর্ণ নোটিশ দেখুন</span>
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                </button>
+              </div>
             </div>
           `;
         });
@@ -10605,14 +10681,35 @@ ${messageText}
       const heroDesc = document.getElementById('notice-hero-desc');
       const noticeDate = document.getElementById('notice-date');
       const noticeBadge = document.getElementById('notice-badge');
+      const slideContent = document.getElementById('notice-slide-content');
+      const progressBar = document.getElementById('notice-slide-progress');
 
       const isGlobal = (n.targetBranch || 'ALL') === 'ALL';
-      const branchLabel = isGlobal ? 'GLOBAL' : (n.targetBranch === 'Head Office' ? 'HEAD OFFICE ONLY' : n.targetBranch.toUpperCase());
+      const branchLabel = isGlobal ? 'GLOBAL' : (n.targetBranch === 'Head Office' ? 'HEAD OFFICE' : n.targetBranch.toUpperCase());
+
+      // Trigger smooth slide animation
+      if (slideContent) {
+        slideContent.classList.remove('notice-slide-anim');
+        void slideContent.offsetWidth; // Reflow to restart animation
+        slideContent.classList.add('notice-slide-anim');
+      }
 
       if (heroTitle) heroTitle.innerText = n.title;
       if (heroDesc) heroDesc.innerText = n.description;
       if (noticeDate) noticeDate.innerText = `${new Date(n.postedDate).toISOString().split('T')[0]} • ${branchLabel}`;
       if (noticeBadge) noticeBadge.innerText = `📢 NOTICE ${currentNoticeIndex + 1} OF ${visibleNotices.length} (${branchLabel})`;
+
+      // Animate progress bar across 5.8s
+      if (progressBar) {
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '0%';
+        setTimeout(() => {
+          if (progressBar) {
+            progressBar.style.transition = 'width 5.8s linear';
+            progressBar.style.width = '100%';
+          }
+        }, 40);
+      }
     }
 
     window.nextNotice = function() {
@@ -12496,30 +12593,64 @@ ${messageText}
       <!-- View Containers -->
       <div class="p-4 sm:p-6 space-y-5 flex-1">
 
-        <!-- Top Notice Slider Banner (Sleek Glassmorphic Announcement Bar) -->
-        <div id="top-notice-banner" class="hidden relative bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-2xl overflow-hidden shadow-md border border-indigo-500/20">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div class="flex items-center space-x-3 min-w-0">
-              <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center text-sm shrink-0">
-                <i class="fa-solid fa-bullhorn"></i>
+        <!-- Top Notice Slider Banner (Sleek Emerald Green Glassmorphic Announcement Bar) -->
+        <div id="top-notice-banner" onmouseenter="pauseNoticeSlider()" onmouseleave="resumeNoticeSlider()" class="hidden relative notice-green-glow text-white p-4 sm:p-4.5 rounded-2xl overflow-hidden border border-emerald-400/30 transition-all duration-300">
+          
+          <!-- Background decorative ambient emerald radial effect -->
+          <div class="absolute -right-10 -top-10 w-48 h-48 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div class="absolute -left-10 -bottom-10 w-48 h-48 bg-teal-400/10 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div class="relative z-1 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            
+            <!-- Left: Icon + Sliding Notice Content -->
+            <div class="flex items-start sm:items-center space-x-3.5 min-w-0 flex-1">
+              
+              <!-- Emerald Glowing Icon -->
+              <div class="w-10 h-10 rounded-2xl bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 flex items-center justify-center text-base shadow-sm shrink-0 mt-0.5 sm:mt-0">
+                <i class="fa-solid fa-bullhorn animate-pulse"></i>
               </div>
-              <div class="min-w-0">
-                <div class="flex items-center space-x-2">
-                  <span id="notice-badge" class="bg-indigo-500/30 text-indigo-200 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-indigo-400/30">📢 NOTICE</span>
-                  <span id="notice-date" class="text-[11px] text-indigo-300 font-medium">---</span>
+
+              <!-- Animated Sliding Notice Box -->
+              <div id="notice-slide-wrapper" class="min-w-0 flex-1 cursor-pointer group" onclick="openCurrentNoticeDetail()" title="সম্পূর্ণ নোটিশ বিস্তারিত দেখতে ক্লিক করুন">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span id="notice-badge" class="bg-emerald-500/30 text-emerald-200 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-emerald-400/40 shadow-2xs">📢 NOTICE</span>
+                  <span id="notice-date" class="text-[11px] text-emerald-300/90 font-medium">---</span>
+                  <span id="notice-pause-indicator" class="hidden text-[10px] text-emerald-300 bg-emerald-950/70 px-2 py-0.2 rounded-full border border-emerald-500/30 font-bold"><i class="fa-solid fa-pause mr-1 text-[9px]"></i>পজ করা হয়েছে</span>
                 </div>
-                <h3 id="notice-hero-title" class="text-xs sm:text-sm font-bold text-white tracking-wide truncate mt-0.5">---</h3>
-                <p id="notice-hero-desc" class="text-[11px] text-slate-300 truncate max-w-2xl">---</p>
+
+                <div id="notice-slide-content" class="notice-slide-anim mt-1">
+                  <h3 id="notice-hero-title" class="text-xs sm:text-sm font-black text-white tracking-wide group-hover:text-emerald-200 transition">---</h3>
+                  <div class="flex flex-col sm:flex-row sm:items-baseline gap-1.5 mt-0.5">
+                    <p id="notice-hero-desc" class="text-xs text-emerald-100/95 leading-relaxed line-clamp-2 md:line-clamp-3 select-text">---</p>
+                    <button type="button" onclick="event.stopPropagation(); openCurrentNoticeDetail();" class="self-start sm:self-auto shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 hover:text-white bg-emerald-800/60 hover:bg-emerald-700/80 px-2 py-0.5 rounded-md border border-emerald-500/30 transition shadow-2xs">
+                      <span>সম্পূর্ণ পড়ুন</span>
+                      <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
+
             </div>
-            <div class="flex items-center space-x-2 shrink-0 self-end md:self-center">
-              <button onclick="prevNotice()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-left"></i></button>
-              <button onclick="nextNotice()" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-xs text-white transition"><i class="fa-solid fa-chevron-right"></i></button>
-              <button onclick="switchNav('notice')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1">
+
+            <!-- Right: Navigation Controls & Button -->
+            <div class="flex items-center space-x-2 shrink-0 self-end md:self-center pt-1 md:pt-0">
+              <button onclick="prevNotice()" title="পূর্ববর্তী নোটিশ" class="w-8 h-8 rounded-xl bg-emerald-900/60 hover:bg-emerald-700/80 text-emerald-100 border border-emerald-500/30 flex items-center justify-center text-xs transition shadow-xs">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <button onclick="nextNotice()" title="পরবর্তী নোটিশ" class="w-8 h-8 rounded-xl bg-emerald-900/60 hover:bg-emerald-700/80 text-emerald-100 border border-emerald-500/30 flex items-center justify-center text-xs transition shadow-xs">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+              <button onclick="switchNav('notice')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-sm shadow-emerald-950/40">
                 <span>সকল নোটিশ</span>
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </button>
             </div>
+
+          </div>
+
+          <!-- Bottom Slide Timer Progress Bar -->
+          <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-950/50">
+            <div id="notice-slide-progress" class="h-full bg-emerald-400/80 transition-all duration-300" style="width: 0%;"></div>
           </div>
         </div>
 
@@ -15185,6 +15316,41 @@ ${messageText}
           <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">Publish Notice</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- NOTICE DETAIL MODAL (সম্পূর্ণ নোটিশ পড়ার পপআপ মডাল) -->
+  <div id="notice-detail-modal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 my-auto animate-in fade-in zoom-in-95 duration-200">
+      <div class="flex justify-between items-start border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center text-lg shadow-xs shrink-0">
+            <i class="fa-solid fa-bullhorn"></i>
+          </div>
+          <div>
+            <span id="notice-modal-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">NOTICE</span>
+            <div id="notice-modal-date" class="text-[11px] text-slate-400 font-semibold mt-0.5">--</div>
+          </div>
+        </div>
+        <button onclick="toggleModal('notice-detail-modal', false)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center text-sm transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <h3 id="notice-modal-title" class="text-base font-black text-slate-900 dark:text-white leading-snug select-text">--</h3>
+        <div class="p-4 rounded-2xl bg-emerald-50/50 dark:bg-slate-800/60 border border-emerald-100 dark:border-slate-700/80 max-h-80 overflow-y-auto">
+          <p id="notice-modal-desc" class="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line select-text">--</p>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+          <span>পোস্ট করেছেন: <b id="notice-modal-author" class="text-slate-700 dark:text-slate-300 font-bold">--</b></span>
+          <span>টার্গেট ব্রাঞ্চ: <b id="notice-modal-branch" class="text-emerald-700 dark:text-emerald-400 font-bold">--</b></span>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end space-x-2">
+        <button type="button" onclick="toggleModal('notice-detail-modal', false)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition">বন্ধ করুন (Close)</button>
+      </div>
     </div>
   </div>
 

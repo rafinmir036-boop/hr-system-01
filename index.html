@@ -1218,6 +1218,36 @@
       });
     }
 
+    window.isHeadOfficeBranch = function(branchName) {
+      if (!branchName) return true;
+      const b = String(branchName).trim().toLowerCase();
+      return b === 'head office' || b === 'headoffice' || b === 'head_office' || b === 'head-office' || b === 'প্রধান কার্যালয়' || b === 'হেড অফিস';
+    };
+
+    window.matchesBranchFilter = function(itemBranch, filterValue) {
+      const branchName = itemBranch || 'Head Office';
+      if (!filterValue || filterValue === 'ALL' || filterValue === 'GLOBAL') {
+        return true; // Global: Includes all branches and head office together
+      }
+      if (filterValue === 'ALL_BRANCHES' || filterValue === 'ALL_SHOPS') {
+        // All shop branches ONLY (excludes Head Office)
+        return !window.isHeadOfficeBranch(branchName);
+      }
+      if (filterValue === 'HEAD_OFFICE' || window.isHeadOfficeBranch(filterValue)) {
+        // Head Office ONLY
+        return window.isHeadOfficeBranch(branchName);
+      }
+      // Specific single branch match
+      return branchName.trim().toLowerCase() === filterValue.trim().toLowerCase();
+    };
+
+    window.getActiveBranchDisplayName = function(b) {
+      if (!b || b === 'ALL' || b === 'GLOBAL') return 'সকল ব্রাঞ্চ ও হেড অফিস (Global)';
+      if (b === 'ALL_BRANCHES' || b === 'ALL_SHOPS') return 'সকল শপ/ব্রাঞ্চ (All Branches)';
+      if (b === 'HEAD_OFFICE' || window.isHeadOfficeBranch(b)) return 'হেড অফিস (Head Office)';
+      return b;
+    };
+
     function populateBranchSelectDropdowns() {
       const headerSelect = document.getElementById('header-branch-select');
       const empBranchSelect = document.getElementById('emp-branch');
@@ -1226,50 +1256,88 @@
       const bulkBranchSelect = document.getElementById('bulk-default-branch');
 
       if (headerSelect) {
-        let opts = `<option value="ALL">🏢 All Branches (Global)</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">📍 ${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 Global (সকল ব্রাঞ্চ ও হেড অফিস)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
+          <optgroup label="── নির্দিষ্ট শপ/ব্রাঞ্চ (Single Branch) ──">
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
+        opts += `</optgroup>`;
         headerSelect.innerHTML = opts;
-        headerSelect.value = (branchList.includes(selectedActiveBranch) || selectedActiveBranch === 'ALL') ? selectedActiveBranch : 'ALL';
+
+        if (selectedActiveBranch === 'ALL' || selectedActiveBranch === 'ALL_BRANCHES' || selectedActiveBranch === 'HEAD_OFFICE') {
+          headerSelect.value = selectedActiveBranch;
+        } else if (window.isHeadOfficeBranch(selectedActiveBranch)) {
+          headerSelect.value = 'HEAD_OFFICE';
+        } else if (branchList.includes(selectedActiveBranch)) {
+          headerSelect.value = selectedActiveBranch;
+        } else {
+          headerSelect.value = 'ALL';
+        }
       }
 
       if (empBranchSelect) {
-        let opts = '';
-        if (branchList.length === 0) {
-          opts = `<option value="Main Branch">Main Branch</option>`;
-        } else {
-          branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
-        }
+        let opts = `<option value="Head Office">🏢 Head Office</option>`;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         empBranchSelect.innerHTML = opts;
       }
 
       if (permBranchSelect) {
-        let opts = `<option value="ALL">All Branches (Head Office / Super Admin)</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">Only: ${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 All Branches & Head Office (Super Admin / Global)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/আউটলেট - হেড অফিস ব্যতীত)</option>
+          <option value="HEAD_OFFICE">🏢 Only: Head Office</option>
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 Only: ${b}</option>`;
+          }
+        });
         permBranchSelect.innerHTML = opts;
       }
 
       if (repBranchSelect) {
-        let opts = `<option value="ALL">All Branches</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 All (Global - সব ব্রাঞ্চ ও হেড অফিস)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         repBranchSelect.innerHTML = opts;
       }
 
       if (bulkBranchSelect) {
-        let opts = '';
-        if (branchList.length === 0) {
-          opts = `<option value="Main Branch">Main Branch</option>`;
-        } else {
-          branchList.forEach(b => { opts += `<option value="${b}">${b}</option>`; });
-        }
+        let opts = `<option value="Head Office">🏢 Head Office</option>`;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         bulkBranchSelect.innerHTML = opts;
       }
 
       const noticeBranchSelect = document.getElementById('notice-target-branch');
       if (noticeBranchSelect) {
-        let opts = `<option value="ALL">🌐 All Branches & Head Office (সবার জন্য)</option>`;
-        opts += `<option value="Head Office">🏢 Head Office Only (শুধুমাত্র হেড অফিস)</option>`;
+        let opts = `
+          <option value="ALL">🌐 All Branches & Head Office (সবার জন্য)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office Only (শুধুমাত্র হেড অফিস)</option>
+        `;
         branchList.forEach(b => {
-          if (b !== 'Head Office') {
+          if (!window.isHeadOfficeBranch(b)) {
             opts += `<option value="${b}">📍 Only: ${b}</option>`;
           }
         });
@@ -1278,22 +1346,46 @@
 
       const payBranchSelect = document.getElementById('payroll-filter-branch');
       if (payBranchSelect) {
-        let opts = `<option value="ALL">🏢 All Branches (Global)</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">🏢 ${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 Global (সকল ব্রাঞ্চ ও হেড অফিস)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         payBranchSelect.innerHTML = opts;
       }
 
       const fineBranchSelect = document.getElementById('fine-filter-branch');
       if (fineBranchSelect) {
-        let opts = `<option value="ALL">🏢 All Branches (সকল ব্রাঞ্চ)</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">📍 ${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 Global (সকল ব্রাঞ্চ ও হেড অফিস)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         fineBranchSelect.innerHTML = opts;
       }
 
       const advBranchSelect = document.getElementById('adv-filter-branch');
       if (advBranchSelect) {
-        let opts = `<option value="ALL">🏢 All Branches (সকল ব্রাঞ্চ)</option>`;
-        branchList.forEach(b => { opts += `<option value="${b}">📍 ${b}</option>`; });
+        let opts = `
+          <option value="ALL">🌐 Global (সকল ব্রাঞ্চ ও হেড অফিস)</option>
+          <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+          <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
+        `;
+        branchList.forEach(b => {
+          if (!window.isHeadOfficeBranch(b)) {
+            opts += `<option value="${b}">📍 ${b}</option>`;
+          }
+        });
         advBranchSelect.innerHTML = opts;
       }
     }
@@ -1313,7 +1405,7 @@
       loadEmployeesRealtime();
       renderNotices();
       if (typeof updateNotificationCenter === 'function') updateNotificationCenter();
-      showToast('info', `ফিল্টার করা হয়েছে: ${selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch}`);
+      showToast('info', `ফিল্টার করা হয়েছে: ${window.getActiveBranchDisplayName(selectedActiveBranch)}`);
     };
 
     window.isItemInActiveBranch = function(itemBranch) {
@@ -1321,12 +1413,12 @@
       if (currentUserRole === 'Employee') return true;
       
       if (['Manager', 'Branch Manager'].includes(currentUserRole)) {
-        return currentUserBranch === 'ALL' || branchName === currentUserBranch;
+        if (!currentUserBranch || currentUserBranch === 'ALL' || currentUserBranch === 'GLOBAL') return true;
+        return window.matchesBranchFilter(branchName, currentUserBranch);
       }
 
       if (currentUserRole === 'Admin') {
-        if (!selectedActiveBranch || selectedActiveBranch === 'ALL') return true;
-        return branchName === selectedActiveBranch;
+        return window.matchesBranchFilter(branchName, selectedActiveBranch);
       }
 
       return true;
@@ -2364,7 +2456,7 @@
         iconElem.className = `w-8 h-8 rounded-xl flex items-center justify-center text-sm ${info.bg}`;
       }
       if (subElem) {
-        const branchTxt = selectedActiveBranch === 'ALL' ? '🏢 সকল ব্রাঞ্চ (Global)' : `🏢 ব্রাঞ্চ: ${selectedActiveBranch}`;
+        const branchTxt = `🏢 ফিল্টার: ${window.getActiveBranchDisplayName(selectedActiveBranch)}`;
         const dateTxt = new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
         subElem.innerText = `${dateTxt} • ${branchTxt}`;
       }
@@ -4455,7 +4547,7 @@
         return;
       }
 
-      const branchTitle = selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch;
+      const branchTitle = window.getActiveBranchDisplayName(selectedActiveBranch);
       const result = await Swal.fire({
         title: `${branchTitle}-এর সকল কর্মচারীকে ${status} করবেন?`,
         text: `মোট ${targetList.length} জন কর্মচারীর উপস্থিতি "${status}" হিসেবে সংরক্ষিত হবে।`,
@@ -4517,7 +4609,7 @@
         return;
       }
 
-      const branchTitle = selectedActiveBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : selectedActiveBranch;
+      const branchTitle = window.getActiveBranchDisplayName(selectedActiveBranch);
       const result = await Swal.fire({
         title: `${selectedDate} তারিখের হাজিরা রিসেট করবেন?`,
         html: `আপনি কি নিশ্চিতভাবে <b>${branchTitle}</b>-এর সংরক্ষিত সকল হাজিরা ডাটা মুছে ফেলতে চান?<br><br><span class="text-xs text-rose-600 font-semibold">⚠️ এটি ডাটাবেজ থেকে মুছে যাবে এবং কর্মচারীদের হাজিরা প্রেজেন্ট ০ হয়ে সবাই Absent হয়ে যাবে।</span>`,
@@ -5719,7 +5811,7 @@
       listToRender.forEach((adv) => {
         if (!isItemInActiveBranch(adv.branch)) return;
 
-        if (filterBranch && filterBranch !== 'ALL' && (adv.branch || 'Head Office') !== filterBranch) return;
+        if (filterBranch && !window.matchesBranchFilter(adv.branch, filterBranch)) return;
         if (filterMonth && adv.month !== filterMonth) return;
         if (filterStatus !== 'ALL' && adv.status !== filterStatus) return;
 
@@ -6024,7 +6116,7 @@
       listToRender.forEach((fn) => {
         if (!isItemInActiveBranch(fn.branch)) return;
 
-        if (filterBranch && filterBranch !== 'ALL' && (fn.branch || 'Head Office') !== filterBranch) return;
+        if (filterBranch && !window.matchesBranchFilter(fn.branch, filterBranch)) return;
         if (filterMonth && fn.month !== filterMonth) return;
         if (filterStatus !== 'ALL' && fn.status !== filterStatus) return;
 
@@ -7939,7 +8031,7 @@ ${messageText}
         if (!isItemInActiveBranch(p.branch)) return;
 
         // Apply Branch Filter
-        if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) return;
+        if (filterBranch && !window.matchesBranchFilter(p.branch, filterBranch)) return;
 
         // Apply Month Filter
         if (filterMonth && p.month !== filterMonth) return;
@@ -8613,7 +8705,7 @@ ${messageText}
       // Filter target employees
       const targetEmployees = employeeList.filter(emp => {
         if (!isItemInActiveBranch(emp.branch)) return false;
-        if (filterBranch !== 'ALL' && (emp.branch || 'Head Office') !== filterBranch) return false;
+        if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
         return true;
       });
 
@@ -8621,12 +8713,12 @@ ${messageText}
         Swal.fire({
           icon: 'warning',
           title: 'কোনো কর্মচারী পাওয়া যায়নি',
-          text: `ব্রাঞ্চ: ${filterBranch} তে কোনো সক্রিয় কর্মচারী পাওয়া যায়নি।`
+          text: `ব্রাঞ্চ: ${window.getActiveBranchDisplayName(filterBranch)} তে কোনো সক্রিয় কর্মচারী পাওয়া যায়নি।`
         });
         return;
       }
 
-      const branchDisplay = filterBranch === 'ALL' ? 'সকল ব্রাঞ্চ' : filterBranch;
+      const branchDisplay = window.getActiveBranchDisplayName(filterBranch);
 
       const confirmResult = await Swal.fire({
         title: 'ব্যাচ পে-রোল তৈরি করবেন?',
@@ -8842,7 +8934,7 @@ ${messageText}
 
       try {
         for (const p of payrollList) {
-          if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) continue;
+          if (filterBranch && !window.matchesBranchFilter(p.branch, filterBranch)) continue;
           if (filterMonth && p.month !== filterMonth) continue;
 
           const emp = employeeList.find(e => isItemForEmployee(p, e)) || { id: p.employeeId, customEmpCode: p.customEmpCode, name: p.employeeName, branch: p.branch };
@@ -9024,7 +9116,7 @@ ${messageText}
 
       return listToRender.filter((p) => {
         if (!isItemInActiveBranch(p.branch)) return false;
-        if (filterBranch !== 'ALL' && (p.branch || 'Head Office') !== filterBranch) return false;
+        if (filterBranch && !window.matchesBranchFilter(p.branch, filterBranch)) return false;
         if (filterMonth && p.month !== filterMonth) return false;
         if (searchTxt) {
           const emp = employeeList.find(e => e.id === p.employeeId);
@@ -9736,7 +9828,7 @@ ${messageText}
 
       const filtered = listToRender.filter(fn => {
         if (!isItemInActiveBranch(fn.branch)) return false;
-        if (filterBranch !== 'ALL' && (fn.branch || 'Head Office') !== filterBranch) return false;
+        if (filterBranch && !window.matchesBranchFilter(fn.branch, filterBranch)) return false;
         if (filterMonth && fn.month !== filterMonth) return false;
         if (filterStatus !== 'ALL' && fn.status !== filterStatus) return false;
 
@@ -9759,7 +9851,7 @@ ${messageText}
         return;
       }
 
-      const branchVal = filterBranch === 'ALL' ? 'সকল ব্রাঞ্চ (Global)' : filterBranch;
+      const branchVal = window.getActiveBranchDisplayName(filterBranch);
       const monthVal = filterMonth || 'Selected Month';
 
       let totalAmount = 0;
@@ -10016,7 +10108,7 @@ ${messageText}
 
       const filtered = listToRender.filter(adv => {
         if (!isItemInActiveBranch(adv.branch)) return false;
-        if (filterBranch !== 'ALL' && (adv.branch || 'Head Office') !== filterBranch) return false;
+        if (filterBranch && !window.matchesBranchFilter(adv.branch, filterBranch)) return false;
         if (filterMonth && adv.month !== filterMonth) return false;
         if (filterStatus !== 'ALL' && adv.status !== filterStatus) return false;
 
@@ -10038,7 +10130,7 @@ ${messageText}
         return;
       }
 
-      const branchVal = filterBranch === 'ALL' ? 'সকল ব্রাঞ্চ (Global)' : filterBranch;
+      const branchVal = window.getActiveBranchDisplayName(filterBranch);
       const monthVal = filterMonth || 'Selected Month';
 
       let totalAmount = 0;
@@ -11094,7 +11186,7 @@ ${messageText}
 
         // 3. Filter target employees
         const targetEmployees = employeeList.filter(emp => {
-          if (filterBranch !== 'ALL' && emp.branch !== filterBranch) return false;
+          if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
           if (!isItemInActiveBranch(emp.branch)) return false;
           if (filterEmpId !== 'ALL' && emp.id !== filterEmpId) return false;
           return true;
@@ -11235,7 +11327,7 @@ ${messageText}
         } catch(e) {}
 
         const targetEmployees = employeeList.filter(emp => {
-          if (filterBranch !== 'ALL' && emp.branch !== filterBranch) return false;
+          if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
           if (!isItemInActiveBranch(emp.branch)) return false;
           if (filterEmpId !== 'ALL' && emp.id !== filterEmpId) return false;
           return true;
@@ -11335,7 +11427,7 @@ ${messageText}
         tableBody.innerHTML = '';
         payrollList.forEach(p => {
           if(month && p.month !== month) return;
-          if (filterBranch !== 'ALL' && p.branch !== filterBranch) return;
+          if (filterBranch && !window.matchesBranchFilter(p.branch, filterBranch)) return;
           if (!isItemInActiveBranch(p.branch)) return;
           if (filterEmpId !== 'ALL' && p.employeeId !== filterEmpId) return;
 
@@ -11368,7 +11460,7 @@ ${messageText}
         tableBody.innerHTML = '';
         advanceList.forEach(a => {
           if(month && a.month !== month) return;
-          if (filterBranch !== 'ALL' && a.branch !== filterBranch) return;
+          if (filterBranch && !window.matchesBranchFilter(a.branch, filterBranch)) return;
           if (!isItemInActiveBranch(a.branch)) return;
           if (filterEmpId !== 'ALL' && a.employeeId !== filterEmpId) return;
 
@@ -11401,7 +11493,7 @@ ${messageText}
         tableBody.innerHTML = '';
         fineList.forEach(fn => {
           if(month && fn.month !== month) return;
-          if (filterBranch !== 'ALL' && fn.branch !== filterBranch) return;
+          if (filterBranch && !window.matchesBranchFilter(fn.branch, filterBranch)) return;
           if (!isItemInActiveBranch(fn.branch)) return;
           if (filterEmpId !== 'ALL' && fn.employeeId !== filterEmpId) return;
 
@@ -12380,7 +12472,9 @@ ${messageText}
           <div id="header-branch-switcher-box" class="flex items-center space-x-2 bg-indigo-50/70 border border-indigo-200 px-3 py-1.5 rounded-xl">
             <span class="text-[11px] font-bold text-indigo-900"><i class="fa-solid fa-building mr-1"></i>Branch:</span>
             <select id="header-branch-select" onchange="onHeaderBranchChange()" class="bg-white text-xs font-bold text-indigo-800 border border-indigo-200 rounded-lg px-2 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500">
-              <option value="ALL">🏢 All Branches (Global)</option>
+              <option value="ALL">🌐 Global (সকল ব্রাঞ্চ ও হেড অফিস)</option>
+              <option value="ALL_BRANCHES">🛍️ All Branches (সকল শপ/ব্রাঞ্চ - হেড অফিস ছাড়া)</option>
+              <option value="HEAD_OFFICE">🏢 Head Office (শুধুমাত্র হেড অফিস)</option>
             </select>
           </div>
 

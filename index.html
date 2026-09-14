@@ -2075,6 +2075,7 @@
         'payroll': 'can_payroll',
         'increment': 'can_increment',
         'documents': 'can_documents',
+        'papers': 'can_documents',
         'performance': 'can_performance',
         'notice': 'can_notices',
         'reports': 'can_reports',
@@ -2091,6 +2092,8 @@
           isVisible = true;
         } else if (navId === 'settings') {
           isVisible = true;
+        } else if (navId === 'papers') {
+          isVisible = currentUserRole === 'Admin' || hasPermission('can_documents') || hasPermission('can_employees');
         } else if (navId === 'attendance') {
           isVisible = currentUserRole === 'Employee' || hasPermission('can_attendance');
         } else if (navId === 'advance') {
@@ -3067,6 +3070,12 @@
         if (docEmpSelect) docEmpSelect.innerHTML = docOptions;
         if (repEmpSelect) repEmpSelect.innerHTML = repOptions;
         if (monthAttEmpSelect) monthAttEmpSelect.innerHTML = monthAttOptions;
+        const papersEmpSelect = document.getElementById('papers-emp-select');
+        if (papersEmpSelect) {
+          const savedPaperVal = papersEmpSelect.value;
+          papersEmpSelect.innerHTML = '<option value="">-- Choose Employee (কর্মচারী নির্বাচন করুন) --</option>' + genOptions;
+          if (savedPaperVal) papersEmpSelect.value = savedPaperVal;
+        }
         if (permEmpSelect) {
           permEmpSelect.innerHTML = permOptions;
           if (savedPermEmpVal) permEmpSelect.value = savedPermEmpVal;
@@ -11062,6 +11071,666 @@ ${messageText}
       }
     };
 
+    // =========================================================================
+    // 8.5 OFFICIAL PAPERS & CERTIFICATES SUITE (NOC, RESIGNATION, TERMINATION, EXP)
+    // =========================================================================
+    window.currentPaperDocType = 'noc';
+
+    const PAPER_PURPOSE_PRESETS = {
+      noc: [
+        'International Passport & Visa Application',
+        'Higher Studies & University Admission',
+        'Personal Banking & Credit / Loan Facility',
+        'Foreign Travel & Vacation Leave',
+        'Outside Professional Training & Certification',
+        'Official Identification & Verification',
+        'Other (কাস্টম কারণ লিখুন)'
+      ],
+      resignation: [
+        'Personal & Family Commitments',
+        'Career Advancement & Alternative Opportunity',
+        'Relocation to Another City / Country',
+        'Higher Academic Pursuits',
+        'Personal Health & Medical Reasons',
+        'Mutual Agreement & Completion of Project',
+        'Other (কাস্টম কারণ লিখুন)'
+      ],
+      termination: [
+        'Contract Expiration & Non-Renewal',
+        'Organizational Restructuring & Position Redundancy',
+        'Prolonged Unsatisfactory Performance',
+        'Violation of Company Code of Conduct & Policies',
+        'Unexcused Chronic Absenteeism',
+        'Mutual Separation & Business Downsizing',
+        'Other (কাস্টম কারণ লিখুন)'
+      ],
+      experience: [
+        'Successful Completion of Tenure & Resignation',
+        'Career Progression & Professional Reference',
+        'Higher Education & Immigration Evaluation',
+        'Project Completion & Mutual Separation',
+        'Other (কাস্টম কারণ লিখুন)'
+      ]
+    };
+
+    window.initPapersModule = function() {
+      // Set today's date if empty
+      const today = new Date().toISOString().split('T')[0];
+      const issueDateInput = document.getElementById('paper-issue-date');
+      if (issueDateInput && !issueDateInput.value) {
+        issueDateInput.value = today;
+      }
+
+      const effDateInput = document.getElementById('paper-effective-date');
+      if (effDateInput && !effDateInput.value) {
+        effDateInput.value = today;
+      }
+
+      window.populatePapersEmployeeDropdown();
+
+      const refInput = document.getElementById('paper-ref-no');
+      if (refInput && !refInput.value) {
+        window.generateRandomPaperRef();
+      }
+
+      window.setPaperDocType(window.currentPaperDocType || 'noc');
+    };
+
+    window.populatePapersEmployeeDropdown = function() {
+      const select = document.getElementById('papers-emp-select');
+      if (!select) return;
+
+      const currentVal = select.value;
+      let opts = '<option value="">-- Choose Employee (কর্মচারী নির্বাচন করুন) --</option>';
+
+      const activeList = Array.isArray(employeeList) ? employeeList : [];
+      activeList.forEach(emp => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+        const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
+        const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : (emp.id ? ` [ID: ${emp.id.slice(-4)}]` : '');
+        opts += `<option value="${emp.id}">${emp.name || 'Unnamed'} (${emp.designation || 'Staff'})${codeTag}${branchTag}</option>`;
+      });
+
+      select.innerHTML = opts;
+      if (currentVal) select.value = currentVal;
+    };
+
+    window.filterPaperEmployeeOptions = function() {
+      const query = (document.getElementById('paper-emp-search')?.value || '').trim().toLowerCase();
+      const select = document.getElementById('papers-emp-select');
+      if (!select) return;
+
+      const currentVal = select.value;
+      let opts = '<option value="">-- Choose Employee (কর্মচারী নির্বাচন করুন) --</option>';
+
+      const activeList = Array.isArray(employeeList) ? employeeList : [];
+      activeList.forEach(emp => {
+        if (!isItemInActiveBranch(emp.branch)) return;
+        const name = (emp.name || '').toLowerCase();
+        const code = (emp.customEmpCode || emp.id || '').toLowerCase();
+        const desig = (emp.designation || '').toLowerCase();
+        const branch = (emp.branch || '').toLowerCase();
+
+        if (!query || name.includes(query) || code.includes(query) || desig.includes(query) || branch.includes(query)) {
+          const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
+          const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : (emp.id ? ` [ID: ${emp.id.slice(-4)}]` : '');
+          opts += `<option value="${emp.id}">${emp.name || 'Unnamed'} (${emp.designation || 'Staff'})${codeTag}${branchTag}</option>`;
+        }
+      });
+
+      select.innerHTML = opts;
+      if (currentVal) select.value = currentVal;
+    };
+
+    window.setPaperDocType = function(type) {
+      window.currentPaperDocType = type;
+
+      // Update Tab button active visual styles
+      ['noc', 'resignation', 'termination', 'experience'].forEach(t => {
+        const btn = document.getElementById(`paper-tab-${t}`);
+        if (!btn) return;
+        if (t === type) {
+          btn.className = 'paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer';
+        } else {
+          btn.className = 'paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer';
+        }
+      });
+
+      // Update Purpose Presets
+      const purposeSelect = document.getElementById('paper-purpose-select');
+      const customInput = document.getElementById('paper-purpose-custom');
+      const effRow = document.getElementById('paper-effective-date-row');
+      const effLabel = document.getElementById('paper-effective-date-label');
+      const purposeLabel = document.getElementById('paper-purpose-label');
+
+      if (effRow) {
+        if (type === 'noc') {
+          effRow.classList.add('hidden');
+        } else {
+          effRow.classList.remove('hidden');
+          if (effLabel) {
+            if (type === 'resignation') effLabel.innerText = 'Last Working Day (সর্বশেষ কর্মদিবস)';
+            else if (type === 'termination') effLabel.innerText = 'Termination Effective Date (চাকরি সমাপ্তির তারিখ)';
+            else effLabel.innerText = 'Service End Date (চাকরির সমাপ্তি তারিখ)';
+          }
+        }
+      }
+
+      if (purposeLabel) {
+        if (type === 'noc') purposeLabel.innerText = 'NOC Required For / Purpose (অনাপত্তির উদ্দেশ্য)';
+        else if (type === 'resignation') purposeLabel.innerText = 'Reason for Resignation (পদত্যাগের কারণ)';
+        else if (type === 'termination') purposeLabel.innerText = 'Grounds for Termination (সমাপ্তির কারণ)';
+        else purposeLabel.innerText = 'Reason for Separation (চাকরি সমাপ্তির কারণ)';
+      }
+
+      if (purposeSelect) {
+        const presets = PAPER_PURPOSE_PRESETS[type] || [];
+        let pOpts = '';
+        presets.forEach((p, idx) => {
+          pOpts += `<option value="${p}" ${idx === 0 ? 'selected' : ''}>${p}</option>`;
+        });
+        purposeSelect.innerHTML = pOpts;
+        if (customInput) customInput.value = presets[0] || '';
+      }
+
+      window.generateRandomPaperRef();
+      window.renderPaperLetterPreview();
+    };
+
+    window.onPaperPurposeSelectChange = function() {
+      const select = document.getElementById('paper-purpose-select');
+      const customInput = document.getElementById('paper-purpose-custom');
+      if (select && customInput) {
+        if (select.value.includes('কাস্টম')) {
+          customInput.value = '';
+          customInput.focus();
+        } else {
+          customInput.value = select.value;
+        }
+      }
+      window.renderPaperLetterPreview();
+    };
+
+    window.generateRandomPaperRef = function() {
+      const refInput = document.getElementById('paper-ref-no');
+      if (!refInput) return;
+
+      const year = new Date().getFullYear();
+      const codeMap = {
+        noc: 'NOC',
+        resignation: 'RES',
+        termination: 'TRM',
+        experience: 'EXP'
+      };
+      const prefix = codeMap[window.currentPaperDocType || 'noc'] || 'DOC';
+      const randNum = String(Math.floor(1000 + Math.random() * 9000));
+      refInput.value = `SAN/HR/${prefix}/${year}/${randNum}`;
+      window.renderPaperLetterPreview();
+    };
+
+    window.onPaperEmployeeChange = function() {
+      const select = document.getElementById('papers-emp-select');
+      const empId = select ? select.value : '';
+      const emp = Array.isArray(employeeList) ? employeeList.find(e => e.id === empId) : null;
+
+      const nameDisplay = document.getElementById('paper-emp-name-display');
+      const metaDisplay = document.getElementById('paper-emp-meta-display');
+      const avatarBox = document.getElementById('paper-emp-avatar');
+
+      if (emp) {
+        if (nameDisplay) nameDisplay.innerText = emp.name || 'Unnamed Employee';
+        if (metaDisplay) {
+          const codeStr = emp.customEmpCode ? `ID: ${emp.customEmpCode} • ` : '';
+          const branchStr = emp.branch ? `🏢 ${emp.branch}` : '🏢 Head Office';
+          metaDisplay.innerText = `${codeStr}${emp.designation || 'Staff'} • ${emp.department || 'General'} • ${branchStr}`;
+        }
+        if (avatarBox) {
+          if (emp.photoUrl) {
+            avatarBox.innerHTML = `<img src="${emp.photoUrl}" class="w-full h-full object-cover" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\\'fa-solid fa-user\\'></i>';">`;
+          } else {
+            const initial = (emp.name && emp.name.trim().length > 0) ? emp.name.trim().charAt(0).toUpperCase() : 'U';
+            avatarBox.innerHTML = `<span class="font-black">${initial}</span>`;
+          }
+        }
+      } else {
+        if (nameDisplay) nameDisplay.innerText = 'কোনো কর্মচারী নির্বাচন করা হয়নি';
+        if (metaDisplay) metaDisplay.innerText = 'ড্রপডাউন থেকে যেকোনো কর্মচারীকে বাছাই করুন';
+        if (avatarBox) avatarBox.innerHTML = '<i class="fa-solid fa-user"></i>';
+      }
+
+      window.renderPaperLetterPreview();
+    };
+
+    window.renderPaperLetterPreview = function() {
+      const container = document.getElementById('paper-letter-body-rendered');
+      if (!container) return;
+
+      const docType = window.currentPaperDocType || 'noc';
+      const select = document.getElementById('papers-emp-select');
+      const empId = select ? select.value : '';
+      const emp = Array.isArray(employeeList) ? employeeList.find(e => e.id === empId) : null;
+
+      const refNo = document.getElementById('paper-ref-no')?.value || 'SAN/HR/DOC/2026/0001';
+      const rawIssueDate = document.getElementById('paper-issue-date')?.value || new Date().toISOString().split('T')[0];
+      const rawEffDate = document.getElementById('paper-effective-date')?.value || new Date().toISOString().split('T')[0];
+      const customPurpose = document.getElementById('paper-purpose-custom')?.value?.trim() ||
+                            document.getElementById('paper-purpose-select')?.value ||
+                            'Official Process';
+      const signatoryName = document.getElementById('paper-signatory-name')?.value || 'Managing Director / HR Head';
+      const signatoryTitle = document.getElementById('paper-signatory-title')?.value || "SANVEE'S MANAGEMENT SUITE";
+      const customRemarks = document.getElementById('paper-custom-remarks')?.value?.trim() || '';
+
+      // Format Dates
+      const formatDateStr = (dStr) => {
+        if (!dStr) return 'N/A';
+        try {
+          const d = new Date(dStr);
+          return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        } catch(e) {
+          return dStr;
+        }
+      };
+
+      const issueDateFormatted = formatDateStr(rawIssueDate);
+      const effDateFormatted = formatDateStr(rawEffDate);
+
+      // Fallback Employee Info
+      const empName = emp ? (emp.name || 'Full Name') : '[Employee Full Name]';
+      const empCode = emp ? (emp.customEmpCode || emp.id || 'SAN-000') : '[Employee ID]';
+      const designation = emp ? (emp.designation || 'Executive') : '[Designation]';
+      const department = emp ? (emp.department || 'Operations') : '[Department]';
+      const branch = emp ? (emp.branch || 'Head Office') : '[Branch / Location]';
+      const joiningDate = emp && emp.joiningDate ? formatDateStr(emp.joiningDate) : '[Joining Date]';
+
+      let letterTitle = '';
+      let recipientHtml = '';
+      let subjectHtml = '';
+      let bodyParagraphsHtml = '';
+
+      if (docType === 'noc') {
+        letterTitle = 'NO OBJECTION CERTIFICATE';
+        recipientHtml = `
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
+              TO WHOM IT MAY CONCERN
+            </h2>
+          </div>
+        `;
+        subjectHtml = `
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
+            <strong>SUBJECT:</strong> NO OBJECTION CERTIFICATE (NOC) FOR ${empName.toUpperCase()}
+          </div>
+        `;
+        bodyParagraphsHtml = `
+          <p class="mb-4 text-justify leading-relaxed">
+            This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, is a permanent, full-time employee of <strong>SANVEE'S MANAGEMENT SUITE</strong>, currently serving in the capacity of <strong>${designation}</strong> within the Department of <strong>${department}</strong> at our <strong>${branch}</strong> location since <strong>${joiningDate}</strong>.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            During the tenure of employment with us, <strong>${empName}</strong> has proven to be a diligent, responsible, and competent professional with commendable work ethics and conduct. The Management of SANVEE'S hereby confirms that we have <strong>NO OBJECTION</strong> whatsoever to ${empName} applying for or undertaking:
+          </p>
+          <div class="my-4 p-4 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800 text-center tracking-wide">
+            "${customPurpose}"
+          </div>
+          <p class="mb-4 text-justify leading-relaxed">
+            There are no outstanding liabilities, adverse administrative records, or financial obligations against ${empName} with our organization. We certify this document in good faith and extend our sincere best wishes for all future personal and professional endeavors.
+          </p>
+          ${customRemarks ? `
+            <div class="my-4 p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950">
+              <strong>Special Remarks:</strong> ${customRemarks}
+            </div>
+          ` : ''}
+        `;
+      } else if (docType === 'resignation') {
+        letterTitle = 'RESIGNATION ACCEPTANCE & RELIEVING ORDER';
+        recipientHtml = `
+          <div class="my-6 text-xs leading-relaxed space-y-0.5">
+            <p class="font-bold text-slate-900">To,</p>
+            <p class="font-bold text-sm text-slate-950">${empName}</p>
+            <p class="text-slate-700 font-medium">${designation}, Department of ${department}</p>
+            <p class="text-slate-600">Employee ID: <span class="font-mono font-bold">${empCode}</span></p>
+            <p class="text-slate-600">SANVEE'S MANAGEMENT SUITE — 🏢 ${branch}</p>
+          </div>
+        `;
+        subjectHtml = `
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900 bg-slate-100 p-2.5 rounded-lg border border-slate-200">
+            <strong>SUBJECT:</strong> ACCEPTANCE OF RESIGNATION & FORMAL RELIEVING INTIMATION
+          </div>
+        `;
+        bodyParagraphsHtml = `
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
+            With reference to your formal resignation letter submitted regarding <strong>${customPurpose}</strong>, we wish to officially inform you that the Management of <strong>SANVEE'S MANAGEMENT SUITE</strong> has accepted your resignation from the position of <strong>${designation}</strong>.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            In accordance with company policy and formal consultation, your final working day with the organization shall be <strong>${effDateFormatted}</strong>, following which you will stand formally relieved from all organizational duties and responsibilities.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            You are kindly requested to complete the standard organizational exit clearance protocol, including the comprehensive handover of all official files, digital credentials, hardware, company identification cards, and related assets to your Department Head on or before your last working day.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            Your final settlement and applicable dues (if any) will be processed through the payroll department and disbursed in accordance with company settlement policies. We take this opportunity to convey our heartfelt gratitude for your valuable contributions during your tenure with SANVEE'S and wish you the very best in all your future professional pursuits.
+          </p>
+          ${customRemarks ? `
+            <div class="my-4 p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/80 text-xs text-purple-950">
+              <strong>Additional Terms:</strong> ${customRemarks}
+            </div>
+          ` : ''}
+        `;
+      } else if (docType === 'termination') {
+        letterTitle = 'NOTICE OF EMPLOYMENT TERMINATION';
+        recipientHtml = `
+          <div class="my-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div class="text-xs leading-relaxed space-y-0.5">
+              <p class="font-bold text-slate-900">To,</p>
+              <p class="font-bold text-sm text-slate-950">${empName}</p>
+              <p class="text-slate-700 font-medium">${designation}, Department of ${department}</p>
+              <p class="text-slate-600">Employee ID: <span class="font-mono font-bold">${empCode}</span></p>
+              <p class="text-slate-600">SANVEE'S MANAGEMENT SUITE — 🏢 ${branch}</p>
+            </div>
+            <div class="text-right">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                STRICTLY PRIVATE & CONFIDENTIAL
+              </span>
+            </div>
+          </div>
+        `;
+        subjectHtml = `
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
+            <strong>SUBJECT:</strong> FORMAL NOTICE OF EMPLOYMENT CONTRACT TERMINATION
+          </div>
+        `;
+        bodyParagraphsHtml = `
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
+            This letter serves as formal notification that your employment contract with <strong>SANVEE'S MANAGEMENT SUITE</strong> in the capacity of <strong>${designation}</strong> is hereby terminated, effective from the close of business hours on <strong>${effDateFormatted}</strong>.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            This administrative decision has been finalized following thorough internal evaluation and review in light of:
+          </p>
+          <div class="my-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 font-bold text-rose-900 text-xs text-center">
+            ${customPurpose}
+          </div>
+          <p class="mb-4 text-justify leading-relaxed">
+            Effective from <strong>${effDateFormatted}</strong>, your authorization to represent SANVEE'S or access company premises, proprietary data, digital systems, communications, and customer records stands revoked.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            You are strictly directed to surrender all company-owned property, equipment, identification tokens, documentation, and office keys in your possession to the Human Resources Department on or before your effective termination date. Upon full clearance and verification, your final settlement and statutory dues will be calculated and remitted to your bank account in accordance with organizational policies.
+          </p>
+          ${customRemarks ? `
+            <div class="my-4 p-3.5 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-800">
+              <strong>Specific Administrative Note:</strong> ${customRemarks}
+            </div>
+          ` : ''}
+        `;
+      } else if (docType === 'experience') {
+        letterTitle = 'EXPERIENCE & SERVICE CERTIFICATE';
+        recipientHtml = `
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
+              TO WHOM IT MAY CONCERN
+            </h2>
+            <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">EXPERIENCE & SERVICE RECORD CERTIFICATE</p>
+          </div>
+        `;
+        subjectHtml = `
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
+            <strong>SUBJECT:</strong> CERTIFICATE OF SERVICE FOR ${empName.toUpperCase()}
+          </div>
+        `;
+        bodyParagraphsHtml = `
+          <p class="mb-4 text-justify leading-relaxed">
+            This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, was employed with <strong>SANVEE'S MANAGEMENT SUITE</strong> as a full-time staff member from <strong>${joiningDate}</strong> to <strong>${effDateFormatted}</strong>. During this period, ${empName} performed their duties as <strong>${designation}</strong> in the Department of <strong>${department}</strong> at our <strong>${branch}</strong> branch.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            Throughout their tenure, <strong>${empName}</strong> consistently exhibited professional dedication, sound technical skills, punctuality, and a strong sense of responsibility. Their conduct and interaction with colleagues, clients, and senior management remained exemplary.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            Reason for separation: <strong>${customPurpose}</strong>. Prior to departure, <strong>${empName}</strong> fulfilled all handover requirements and organizational responsibilities with a spotless track record.
+          </p>
+          <p class="mb-4 text-justify leading-relaxed">
+            We place on record our genuine appreciation for the valuable contributions made by <strong>${empName}</strong> during their time with us, and we wholeheartedly wish them every success and prosperity in all future career undertakings.
+          </p>
+          ${customRemarks ? `
+            <div class="my-4 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-950">
+              <strong>Commendation / Remarks:</strong> ${customRemarks}
+            </div>
+          ` : ''}
+        `;
+      }
+
+      // Assemble Full Luxury Corporate Letterhead Preview
+      const renderedHtml = `
+        <div class="letterhead-document text-xs text-slate-800 leading-relaxed font-sans select-text">
+          
+          <!-- Corporate Letterhead Header -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+            <div class="flex items-center space-x-3.5">
+              <div class="w-13 h-13 rounded-xl bg-white p-1 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center">
+                <svg class="w-full h-full" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="lpw1" x1="485" y1="90" x2="310" y2="380" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#E91E63"/><stop offset="25%" stop-color="#9C27B0"/><stop offset="60%" stop-color="#FF5722"/><stop offset="100%" stop-color="#FFB300"/></linearGradient>
+                    <linearGradient id="lpw2" x1="470" y1="90" x2="330" y2="280" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FF3366"/><stop offset="30%" stop-color="#FF9100"/><stop offset="65%" stop-color="#FFD600"/><stop offset="100%" stop-color="#FF6D00"/></linearGradient>
+                    <linearGradient id="lplg" x1="160" y1="100" x2="320" y2="300" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#00C853"/><stop offset="35%" stop-color="#00B0FF"/><stop offset="65%" stop-color="#00E676"/><stop offset="100%" stop-color="#FFD600"/></linearGradient>
+                    <linearGradient id="lpic" x1="200" y1="120" x2="330" y2="250" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FF1744"/><stop offset="50%" stop-color="#F50057"/><stop offset="85%" stop-color="#FF9100"/><stop offset="100%" stop-color="#FFEA00"/></linearGradient>
+                    <linearGradient id="lpbw" x1="110" y1="240" x2="340" y2="450" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#00B0FF"/><stop offset="30%" stop-color="#651FFF"/><stop offset="65%" stop-color="#D500F9"/><stop offset="85%" stop-color="#FF3D00"/><stop offset="100%" stop-color="#FFAB00"/></linearGradient>
+                    <linearGradient id="lpct" x1="180" y1="230" x2="340" y2="390" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#00BFA5"/><stop offset="40%" stop-color="#AEEA00"/><stop offset="70%" stop-color="#FFD600"/><stop offset="100%" stop-color="#FF6D00"/></linearGradient>
+                  </defs>
+                  <g transform="translate(15, 15) scale(0.94)">
+                    <path d="M 485 92 C 450 140 375 250 330 345 C 318 368 305 380 295 388 C 300 375 315 340 340 280 C 375 195 440 125 485 92 Z" fill="url(#lpw1)" />
+                    <path d="M 485 92 C 420 160 350 250 310 325 C 290 295 270 260 255 235 C 290 240 340 220 395 160 C 440 115 470 95 485 92 Z" fill="url(#lpw2)" opacity="0.95" />
+                    <path d="M 120 235 C 112 280 135 345 175 390 C 215 435 270 455 310 445 C 265 440 215 405 185 365 C 155 325 140 275 120 235 Z" fill="url(#lpbw)" />
+                    <path d="M 175 390 C 215 435 275 450 325 425 C 345 415 355 395 350 380 C 340 355 295 340 245 310 C 195 280 170 340 175 390 Z" fill="url(#lpbw)" />
+                    <path d="M 235 105 C 180 115 135 165 140 230 C 145 285 185 330 235 355 C 290 380 340 370 348 350 C 340 320 285 295 235 270 C 180 245 175 165 235 125 C 248 115 258 110 265 108 C 255 106 245 105 235 105 Z" fill="url(#lplg)" />
+                    <path d="M 175 220 C 180 275 225 315 275 345 C 320 370 350 365 352 355 C 340 330 295 305 250 280 C 205 255 190 205 225 155 C 205 170 175 190 175 220 Z" fill="url(#lpct)" />
+                    <path d="M 245 118 C 285 130 325 165 328 205 C 330 235 310 255 298 250 C 285 245 285 220 290 200 C 295 175 275 150 240 140 C 220 135 208 140 205 142 C 215 130 230 122 245 118 Z" fill="url(#lpic)" />
+                    <path d="M 298 250 C 315 245 325 225 322 195 C 318 165 285 135 245 125 C 270 140 290 170 285 200 C 280 230 290 248 298 250 Z" fill="url(#lpic)" />
+                  </g>
+                </svg>
+              </div>
+              <div>
+                <h1 class="font-black text-xl text-slate-950 tracking-wider">SANVEE'S</h1>
+                <p class="text-[11px] font-bold text-slate-600 uppercase tracking-widest">MANAGEMENT SUITE</p>
+                <p class="text-[9px] text-slate-400 font-medium">Corporate Human Resources & People Operations</p>
+              </div>
+            </div>
+            <div class="text-right text-[11px] text-slate-600 space-y-0.5">
+              <p class="font-bold text-slate-900">Corporate HQ • People Ops</p>
+              <p>Registered Enterprise Tower</p>
+              <p>Email: hr@sanvees.com</p>
+              <p>Web: www.sanvees.com</p>
+            </div>
+          </div>
+
+          <!-- Memo Ref & Date Header -->
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 py-2.5 border-b border-slate-200/80 mb-5">
+            <div><span class="text-slate-400 font-normal">Memo Reference:</span> <span class="font-bold font-mono text-slate-900">${refNo}</span></div>
+            <div><span class="text-slate-400 font-normal">Date of Issue:</span> <span class="font-bold text-slate-900">${issueDateFormatted}</span></div>
+          </div>
+
+          <!-- Recipient Section -->
+          ${recipientHtml}
+
+          <!-- Subject Line -->
+          ${subjectHtml}
+
+          <!-- Body Content (Editable live) -->
+          <div class="paper-editable-body focus:outline-dashed focus:outline-1 focus:outline-amber-500 rounded p-1 transition" contenteditable="true" spellcheck="false" title="Click anywhere to edit or customize text directly">
+            ${bodyParagraphsHtml}
+          </div>
+
+          <!-- Signatory & Stamp Block -->
+          <div class="mt-12 pt-6 flex items-end justify-between border-t border-slate-100">
+            
+            <!-- Corporate Verified Seal Graphic -->
+            <div class="flex items-center space-x-3 select-none">
+              <div class="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 flex flex-col items-center justify-center text-center p-1 relative opacity-85">
+                <div class="text-[8px] font-black tracking-widest text-indigo-900 uppercase">SANVEE'S</div>
+                <div class="text-[7px] font-extrabold text-indigo-700 tracking-wider">OFFICIAL SEAL</div>
+                <div class="w-8 h-0.5 bg-indigo-500/40 my-0.5"></div>
+                <div class="text-[6px] font-bold text-slate-500 uppercase">HR DEPT • VERIFIED</div>
+              </div>
+              <div class="text-[10px] text-slate-400 hidden sm:block">
+                <p class="font-bold text-slate-700">Digital Seal & Verification</p>
+                <p>Authentic Corporate Record</p>
+              </div>
+            </div>
+
+            <!-- Signatory Signature Block -->
+            <div class="text-right space-y-1">
+              <p class="text-xs text-slate-500 mb-6 font-serif italic">Sincerely,</p>
+              <div class="w-48 border-b border-slate-800 ml-auto mb-1"></div>
+              <p class="font-bold text-xs text-slate-950">${signatoryName}</p>
+              <p class="text-[10px] text-slate-600 font-semibold">${signatoryTitle}</p>
+              <p class="text-[9px] text-slate-400 uppercase tracking-widest font-semibold">Authorized Signatory</p>
+            </div>
+
+          </div>
+
+        </div>
+      `;
+
+      container.innerHTML = renderedHtml;
+    };
+
+    window.printPaperDocument = function() {
+      const canvas = document.getElementById('paper-letterhead-canvas');
+      if (!canvas) return;
+
+      const select = document.getElementById('papers-emp-select');
+      const empId = select ? select.value : '';
+      const emp = Array.isArray(employeeList) ? employeeList.find(e => e.id === empId) : null;
+      const empName = emp ? emp.name : 'Employee';
+      const docType = window.currentPaperDocType || 'noc';
+      const typeNames = {
+        noc: 'NOC Certificate',
+        resignation: 'Resignation Acceptance Letter',
+        termination: 'Termination Letter',
+        experience: 'Experience Certificate'
+      };
+      const docTitle = typeNames[docType] || 'Official Document';
+
+      const printWin = window.open('', '_blank', 'width=900,height=1000');
+      if (!printWin) {
+        Swal.fire('Popup Blocked', 'অনুগ্রহ করে ব্রাউজারের পপ-আপ অনুমোদন করুন যাতে প্রিন্ট উইন্ডো খুলতে পারে।', 'warning');
+        return;
+      }
+
+      printWin.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${empName} - ${docTitle} (SANVEE'S)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 15mm 20mm 15mm 20mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.65;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .no-print-bar {
+      background: #0f172a;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: sans-serif;
+      font-size: 13px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .print-btn {
+      background: #f59e0b;
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+      transition: 0.2s;
+    }
+    .print-btn:hover { background: #d97706; }
+    .print-wrapper {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 30px;
+      background: #ffffff;
+    }
+    @media print {
+      .no-print-bar { display: none !important; }
+      .print-wrapper { margin: 0; padding: 0; max-width: 100%; border: none !important; box-shadow: none !important; }
+      body { padding: 0; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div><strong>SANVEE'S MANAGEMENT SUITE</strong> • Official Document Print Preview</div>
+    <div>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+  <div class="print-wrapper">
+    ${canvas.innerHTML}
+  </div>
+</body>
+</html>`);
+
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => {
+        printWin.print();
+      }, 500);
+    };
+
+    window.copyPaperLetterText = function() {
+      const container = document.getElementById('paper-letter-body-rendered');
+      if (!container) return;
+
+      const text = container.innerText || container.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('success', 'চিঠির সম্পূর্ণ টেক্সট ক্লিপবোর্ডে কপি করা হয়েছে!');
+      }).catch(err => {
+        showToast('info', 'টেক্সট নির্বাচন করে কপি করুন');
+      });
+    };
+
+    window.resetPaperForm = function() {
+      const search = document.getElementById('paper-emp-search');
+      if (search) search.value = '';
+      window.filterPaperEmployeeOptions();
+
+      const today = new Date().toISOString().split('T')[0];
+      const issueDate = document.getElementById('paper-issue-date');
+      if (issueDate) issueDate.value = today;
+
+      const effDate = document.getElementById('paper-effective-date');
+      if (effDate) effDate.value = today;
+
+      const remarks = document.getElementById('paper-custom-remarks');
+      if (remarks) remarks.value = '';
+
+      window.generateRandomPaperRef();
+      window.setPaperDocType(window.currentPaperDocType || 'noc');
+      showToast('info', 'ফর্ম রিসেট করা হয়েছে');
+    };
+
     // Performance Reviews Realtime
     function loadPerformanceRealtime() {
       onSnapshot(collection(db, "performance_reviews"), (snapshot) => {
@@ -12046,7 +12715,15 @@ ${messageText}
 
       const pageTitle = document.getElementById('page-title');
       if (pageTitle) {
-        pageTitle.innerText = secId.charAt(0).toUpperCase() + secId.slice(1);
+        if (secId === 'papers') {
+          pageTitle.innerText = 'Official Papers';
+        } else {
+          pageTitle.innerText = secId.charAt(0).toUpperCase() + secId.slice(1);
+        }
+      }
+
+      if(secId === 'papers' && typeof initPapersModule === 'function') {
+        initPapersModule();
       }
 
       if(secId === 'dashboard') {
@@ -12535,6 +13212,9 @@ ${messageText}
           </button>
           <button id="nav-documents" onclick="switchNav('documents')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-folder-closed text-sky-400 w-4"></i><span>Documents</span>
+          </button>
+          <button id="nav-papers" onclick="switchNav('papers')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
+            <i class="fa-solid fa-file-signature text-amber-400 w-4"></i><span>Papers</span>
           </button>
           <button id="nav-performance" onclick="switchNav('performance')" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl">
             <i class="fa-solid fa-star text-pink-400 w-4"></i><span>Performance</span>
@@ -13766,6 +14446,232 @@ ${messageText}
               </table>
             </div>
           </div>
+        </section>
+
+        <!-- 8.5 OFFICIAL PAPERS & CERTIFICATES SUITE -->
+        <section id="sec-papers" class="hidden space-y-6">
+          
+          <!-- Top Header Card -->
+          <div class="bg-white dark:bg-[#0f172a] p-6 rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 flex items-center space-x-1">
+                  <i class="fa-solid fa-file-contract text-amber-500"></i>
+                  <span>Corporate Documents Suite</span>
+                </span>
+                <span class="text-[11px] text-slate-400 font-semibold">• Automated Letters</span>
+              </div>
+              <h2 class="text-lg md:text-xl font-black text-slate-800 dark:text-white mt-1">Official Papers & Certificates (অফিসিয়াল পত্র ও সনদপত্র)</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">কর্মচারীর নাম নির্বাচন করলেই স্বয়ংক্রিয়ভাবে অফিসিয়াল প্যাডে NOC, পদত্যাগপত্র গ্রহণ, চাকরি সমাপ্তি ও অভিজ্ঞতা সনদ তৈরি হবে।</p>
+            </div>
+            
+            <!-- Quick Document Type Selector Tabs -->
+            <div class="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <button type="button" id="paper-tab-noc" onclick="setPaperDocType('noc')" class="paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm border border-slate-200 dark:border-slate-700 cursor-pointer">
+                <i class="fa-solid fa-shield-halved text-amber-500"></i>
+                <span>NOC Certificate</span>
+              </button>
+              <button type="button" id="paper-tab-resignation" onclick="setPaperDocType('resignation')" class="paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                <i class="fa-solid fa-file-signature text-purple-500"></i>
+                <span>Resignation Acceptance</span>
+              </button>
+              <button type="button" id="paper-tab-termination" onclick="setPaperDocType('termination')" class="paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                <i class="fa-solid fa-user-xmark text-rose-500"></i>
+                <span>Termination Letter</span>
+              </button>
+              <button type="button" id="paper-tab-experience" onclick="setPaperDocType('experience')" class="paper-type-btn px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                <i class="fa-solid fa-award text-emerald-500"></i>
+                <span>Experience Certificate</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Layout Grid (Left: Config & Selector, Right: Live A4 Letterhead Preview) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- LEFT CONTROLS (lg:col-span-5 space-y-5) -->
+            <div class="lg:col-span-5 space-y-5">
+              
+              <!-- 1. Employee Selector Card -->
+              <div class="bg-white dark:bg-[#0f172a] p-5 rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <h3 class="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-user-check text-amber-500"></i>
+                    <span>Step 1: Choose Employee (কর্মচারী নির্বাচন করুন)</span>
+                  </h3>
+                  <span class="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full font-bold border border-emerald-200 dark:border-emerald-800">Auto-Populate</span>
+                </div>
+
+                <!-- Quick Filter Input -->
+                <div class="relative">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs pointer-events-none"></i>
+                  <input type="text" id="paper-emp-search" placeholder="Type employee name, ID or branch to filter..." oninput="filterPaperEmployeeOptions()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                </div>
+
+                <!-- Main Employee Dropdown Selector -->
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">
+                    Select Target Employee (কর্মচারী বাছাই করুন) *
+                  </label>
+                  <div class="relative">
+                    <select id="papers-emp-select" onchange="onPaperEmployeeChange()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-white font-semibold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition cursor-pointer">
+                      <option value="">-- তালিকা থেকে কর্মচারী নির্বাচন করুন --</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Selected Employee Mini Preview Box -->
+                <div id="paper-selected-emp-box" class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center space-x-3 transition">
+                  <div id="paper-emp-avatar" class="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 font-black text-sm shrink-0 overflow-hidden">
+                    <i class="fa-solid fa-user"></i>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div id="paper-emp-name-display" class="font-black text-xs text-slate-800 dark:text-white truncate">কোনো কর্মচারী নির্বাচন করা হয়নি</div>
+                    <div id="paper-emp-meta-display" class="text-[11px] text-slate-500 dark:text-slate-400 truncate">ড্রপডাউন থেকে যেকোনো কর্মচারীকে বাছাই করুন</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Paper Details & Customization Card -->
+              <div class="bg-white dark:bg-[#0f172a] p-5 rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <h3 class="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-amber-500"></i>
+                    <span>Step 2: Document Details (তথ্য ও কাস্টমাইজেশন)</span>
+                  </h3>
+                  <button type="button" onclick="generateRandomPaperRef()" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold" title="Generate New Memo Ref">
+                    <i class="fa-solid fa-arrows-rotate mr-0.5"></i> New Ref
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <!-- Memo / Ref No -->
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Memo / Reference No (স্মারক নং)
+                    </label>
+                    <input type="text" id="paper-ref-no" oninput="renderPaperLetterPreview()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-mono font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+                  </div>
+
+                  <!-- Issue Date -->
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Issue Date (ইস্যু তারিখ)
+                    </label>
+                    <input type="date" id="paper-issue-date" onchange="renderPaperLetterPreview()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+                  </div>
+                </div>
+
+                <!-- Effective / Relieving Date (shown for resignation, termination, experience) -->
+                <div id="paper-effective-date-row">
+                  <label id="paper-effective-date-label" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Effective / Relieving Date (কার্যকর / অব্যাহতির তারিখ)
+                  </label>
+                  <input type="date" id="paper-effective-date" onchange="renderPaperLetterPreview()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+                </div>
+
+                <!-- Purpose / Subject Reason -->
+                <div>
+                  <label id="paper-purpose-label" class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Purpose / Category (উদ্দেশ্য বা কারণ)
+                  </label>
+                  <div class="space-y-2">
+                    <select id="paper-purpose-select" onchange="onPaperPurposeSelectChange()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer">
+                      <!-- Populated dynamically based on doc type -->
+                    </select>
+                    <input type="text" id="paper-purpose-custom" oninput="renderPaperLetterPreview()" placeholder="অথবা সরাসরি কাস্টম কারণ লিখুন..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+                  </div>
+                </div>
+
+                <!-- Signatory Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Signatory Name (স্বাক্ষরকারীর নাম)
+                    </label>
+                    <input type="text" id="paper-signatory-name" value="Managing Director / HR Head" oninput="renderPaperLetterPreview()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                      Signatory Title (পদবি ও প্রতিষ্ঠান)
+                    </label>
+                    <input type="text" id="paper-signatory-title" value="SANVEE'S MANAGEMENT SUITE" oninput="renderPaperLetterPreview()" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+                  </div>
+                </div>
+
+                <!-- Custom Remarks / Notes (Optional) -->
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Special Remarks / Extra Paragraph (ঐচ্ছিক অতিরিক্ত নোট)
+                  </label>
+                  <textarea id="paper-custom-remarks" rows="2" oninput="renderPaperLetterPreview()" placeholder="চিঠিতে কোনো বিশেষ শর্ত বা অতিরিক্ত অনুচ্ছেদ যোগ করতে চাইলে এখানে লিখুন..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-800 dark:text-white font-medium focus:ring-2 focus:ring-amber-500 outline-none resize-none"></textarea>
+                </div>
+              </div>
+
+              <!-- 3. Actions Card -->
+              <div class="bg-white dark:bg-[#0f172a] p-5 rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2.5">
+                <button type="button" onclick="printPaperDocument()" class="w-full py-3 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-bold rounded-xl shadow-lg shadow-amber-500/25 flex items-center justify-center space-x-2 transition cursor-pointer hover:scale-[1.01] active:scale-[0.99]">
+                  <i class="fa-solid fa-print text-sm"></i>
+                  <span>Print Official Letterhead / Save PDF (প্রিন্ট বা PDF)</span>
+                </button>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" onclick="copyPaperLetterText()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <i class="fa-solid fa-copy text-amber-500"></i>
+                    <span>Copy Text</span>
+                  </button>
+                  <button type="button" onclick="resetPaperForm()" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <i class="fa-solid fa-rotate-left text-slate-400"></i>
+                    <span>Reset Form</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: LIVE A4 CORPORATE LETTERHEAD PREVIEW (lg:col-span-7) -->
+            <div class="lg:col-span-7">
+              <div class="sticky top-6">
+                
+                <!-- Preview Header Bar -->
+                <div class="bg-slate-900 text-white px-5 py-3 rounded-t-2xl flex items-center justify-between text-xs font-bold shadow-md">
+                  <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-eye text-amber-400"></i>
+                    <span>Live A4 Letterhead Preview (রিয়েলটাইম প্রিন্ট ভিউ)</span>
+                  </div>
+                  <div class="flex items-center space-x-3 text-[11px] text-slate-400 font-normal">
+                    <span class="hidden sm:inline"><i class="fa-solid fa-pen-nib text-amber-400/80 mr-1"></i>Editable Live Text</span>
+                    <button type="button" onclick="printPaperDocument()" class="text-amber-400 hover:text-amber-300 font-bold flex items-center space-x-1 cursor-pointer">
+                      <i class="fa-solid fa-print"></i> <span>Print</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- A4 Letter Canvas (Pure White Crisp Letterhead) -->
+                <div id="paper-letterhead-canvas" class="bg-white text-slate-900 p-8 sm:p-12 rounded-b-2xl shadow-2xl border-x border-b border-slate-300/80 min-h-[780px] flex flex-col justify-between font-sans relative select-text">
+                  
+                  <!-- Top Accent Stripe -->
+                  <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-500"></div>
+
+                  <!-- Inner Letter Content (Injected dynamically) -->
+                  <div id="paper-letter-body-rendered">
+                    <!-- Populated by renderPaperLetterPreview() -->
+                  </div>
+
+                  <!-- Letterhead Footer -->
+                  <div class="pt-8 mt-12 border-t border-slate-200 text-center text-[10px] text-slate-400 space-y-1">
+                    <p class="font-semibold text-slate-500 uppercase tracking-wider">SANVEE'S MANAGEMENT SUITE • PEOPLE OPERATIONS & HR ARCHIVE</p>
+                    <p>Corporate Office: Registered Enterprise Tower • Contact: hr@sanvees.com • Web: https://sanvees.com</p>
+                    <p class="text-[9px] text-slate-400 italic">This is an authorized corporate letter generated through SANVEE'S HRMS Suite. Any alterations render it invalid.</p>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
         </section>
 
         <!-- 9. PERFORMANCE REVIEWS -->

@@ -11350,32 +11350,32 @@ ${messageText}
       if (docType === 'noc') {
         letterTitle = 'NO OBJECTION CERTIFICATE';
         recipientHtml = `
-          <div class="text-center my-2.5">
-            <h2 class="text-sm font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-0.5">
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
               TO WHOM IT MAY CONCERN
             </h2>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-2.5 font-bold text-[11px] uppercase tracking-wide text-slate-900 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
             <strong>SUBJECT:</strong> NO OBJECTION CERTIFICATE (NOC) FOR ${empName.toUpperCase()}
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, is a permanent, full-time employee of <strong>SANVEE'S BY TONY</strong>, currently serving in the capacity of <strong>${designation}</strong> within the Department of <strong>${department}</strong> at our <strong>${branch}</strong> location since <strong>${joiningDate}</strong>.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             During the tenure of employment with us, <strong>${empName}</strong> has proven to be a diligent, responsible, and competent professional with commendable work ethics and conduct. The Management of SANVEE'S BY TONY hereby confirms that we have <strong>NO OBJECTION</strong> whatsoever to ${empName} applying for or undertaking:
           </p>
-          <div class="my-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800 text-center tracking-wide text-[11px]">
+          <div class="my-4 p-4 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800 text-center tracking-wide">
             "${customPurpose}"
           </div>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             There are no outstanding liabilities, adverse administrative records, or financial obligations against ${empName} with our organization. We certify this document in good faith and extend our sincere best wishes for all future personal and professional endeavors.
           </p>
           ${customRemarks ? `
-            <div class="my-2 p-2 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[10px] text-amber-950">
+            <div class="my-4 p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950">
               <strong>Special Remarks:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11383,35 +11383,35 @@ ${messageText}
       } else if (docType === 'resignation') {
         letterTitle = 'RESIGNATION ACCEPTANCE & RELIEVING ORDER';
         recipientHtml = `
-          <div class="my-2.5 text-[11px] leading-snug space-y-0.5">
+          <div class="my-6 text-xs leading-relaxed space-y-0.5">
             <p class="font-bold text-slate-900">To,</p>
-            <p class="font-bold text-xs text-slate-950">${empName}</p>
+            <p class="font-bold text-sm text-slate-950">${empName}</p>
             <p class="text-slate-700 font-medium">${designation}, Department of ${department}</p>
             <p class="text-slate-600">Employee ID: <span class="font-mono font-bold">${empCode}</span></p>
             <p class="text-slate-600">SANVEE'S BY TONY — 🏢 ${branch}</p>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-2.5 font-bold text-[11px] uppercase tracking-wide text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900 bg-slate-100 p-2.5 rounded-lg border border-slate-200">
             <strong>SUBJECT:</strong> ACCEPTANCE OF RESIGNATION & FORMAL RELIEVING INTIMATION
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-2 leading-relaxed">Dear <strong>${empName}</strong>,</p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
             With reference to your formal resignation letter submitted regarding <strong>${customPurpose}</strong>, we wish to officially inform you that the Management of <strong>SANVEE'S BY TONY</strong> has accepted your resignation from the position of <strong>${designation}</strong>.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             In accordance with company policy and formal consultation, your final working day with the organization shall be <strong>${effDateFormatted}</strong>, following which you will stand formally relieved from all organizational duties and responsibilities.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             You are kindly requested to complete the standard organizational exit clearance protocol, including the comprehensive handover of all official files, digital credentials, hardware, company identification cards, and related assets to your Department Head on or before your last working day.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Your final settlement and applicable dues (if any) will be processed through the payroll department and disbursed in accordance with company settlement policies. We take this opportunity to convey our heartfelt gratitude for your valuable contributions during your tenure with SANVEE'S BY TONY and wish you the very best in all your future professional pursuits.
           </p>
           ${customRemarks ? `
-            <div class="my-2 p-2 rounded-xl bg-purple-50/70 border border-purple-200/80 text-[10px] text-purple-950">
+            <div class="my-4 p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/80 text-xs text-purple-950">
               <strong>Additional Terms:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11419,45 +11419,45 @@ ${messageText}
       } else if (docType === 'termination') {
         letterTitle = 'NOTICE OF EMPLOYMENT TERMINATION';
         recipientHtml = `
-          <div class="my-2.5 flex items-start justify-between gap-2">
-            <div class="text-[11px] leading-snug space-y-0.5">
+          <div class="my-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div class="text-xs leading-relaxed space-y-0.5">
               <p class="font-bold text-slate-900">To,</p>
-              <p class="font-bold text-xs text-slate-950">${empName}</p>
+              <p class="font-bold text-sm text-slate-950">${empName}</p>
               <p class="text-slate-700 font-medium">${designation}, Department of ${department}</p>
               <p class="text-slate-600">Employee ID: <span class="font-mono font-bold">${empCode}</span></p>
               <p class="text-slate-600">SANVEE'S BY TONY — 🏢 ${branch}</p>
             </div>
-            <div class="text-right shrink-0">
-              <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+            <div class="text-right">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
                 STRICTLY PRIVATE & CONFIDENTIAL
               </span>
             </div>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-2.5 font-bold text-[11px] uppercase tracking-wide text-rose-900 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
             <strong>SUBJECT:</strong> FORMAL NOTICE OF EMPLOYMENT CONTRACT TERMINATION
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-2 leading-relaxed">Dear <strong>${empName}</strong>,</p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
             This letter serves as formal notification that your employment contract with <strong>SANVEE'S BY TONY</strong> in the capacity of <strong>${designation}</strong> is hereby terminated, effective from the close of business hours on <strong>${effDateFormatted}</strong>.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This administrative decision has been finalized following thorough internal evaluation and review in light of:
           </p>
-          <div class="my-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 font-bold text-rose-900 text-[11px] text-center">
+          <div class="my-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 font-bold text-rose-900 text-xs text-center">
             ${customPurpose}
           </div>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Effective from <strong>${effDateFormatted}</strong>, your authorization to represent SANVEE'S BY TONY or access company premises, proprietary data, digital systems, communications, and customer records stands revoked.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             You are strictly directed to surrender all company-owned property, equipment, identification tokens, documentation, and office keys in your possession to the Human Resources Department on or before your effective termination date. Upon full clearance and verification, your final settlement and statutory dues will be calculated and remitted to your bank account in accordance with organizational policies.
           </p>
           ${customRemarks ? `
-            <div class="my-2 p-2 rounded-xl bg-slate-100 border border-slate-300 text-[10px] text-slate-800">
+            <div class="my-4 p-3.5 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-800">
               <strong>Specific Administrative Note:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11465,33 +11465,33 @@ ${messageText}
       } else if (docType === 'experience') {
         letterTitle = 'EXPERIENCE & SERVICE CERTIFICATE';
         recipientHtml = `
-          <div class="text-center my-2.5">
-            <h2 class="text-sm font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-0.5">
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
               TO WHOM IT MAY CONCERN
             </h2>
-            <p class="text-[10px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">EXPERIENCE & SERVICE RECORD CERTIFICATE</p>
+            <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">EXPERIENCE & SERVICE RECORD CERTIFICATE</p>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-2.5 font-bold text-[11px] uppercase tracking-wide text-slate-900 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
             <strong>SUBJECT:</strong> CERTIFICATE OF SERVICE FOR ${empName.toUpperCase()}
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, was employed with <strong>SANVEE'S BY TONY</strong> as a full-time staff member from <strong>${joiningDate}</strong> to <strong>${effDateFormatted}</strong>. During this period, ${empName} performed their duties as <strong>${designation}</strong> in the Department of <strong>${department}</strong> at our <strong>${branch}</strong> branch.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Throughout their tenure, <strong>${empName}</strong> consistently exhibited professional dedication, sound technical skills, punctuality, and a strong sense of responsibility. Their conduct and interaction with colleagues, clients, and senior management remained exemplary.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Reason for separation: <strong>${customPurpose}</strong>. Prior to departure, <strong>${empName}</strong> fulfilled all handover requirements and organizational responsibilities with a spotless track record.
           </p>
-          <p class="mb-2 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             We place on record our genuine appreciation for the valuable contributions made by <strong>${empName}</strong> during their time with us, and we wholeheartedly wish them every success and prosperity in all future career undertakings.
           </p>
           ${customRemarks ? `
-            <div class="my-2 p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-[10px] text-emerald-950">
+            <div class="my-4 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-950">
               <strong>Commendation / Remarks:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11500,13 +11500,13 @@ ${messageText}
 
       // Assemble Full Luxury Corporate Letterhead Preview
       const renderedHtml = `
-        <div class="letterhead-document text-[11px] text-slate-800 leading-normal font-sans select-text">
+        <div class="letterhead-document text-xs text-slate-800 leading-relaxed font-sans select-text">
           
           <!-- Corporate Letterhead Header -->
-          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-2.5 mb-2.5">
-            <div class="flex items-center space-x-3">
-              <div class="rounded-xl bg-white p-0.5 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center" style="width: 42px; height: 42px; min-width: 42px; max-width: 42px;">
-                <svg style="width: 42px; height: 42px; max-width: 42px; max-height: 42px; display: block;" width="42" height="42" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+            <div class="flex items-center space-x-3.5">
+              <div class="rounded-xl bg-white p-1 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center" style="width: 56px; height: 56px; min-width: 56px; max-width: 56px;">
+                <svg style="width: 100%; height: 100%; display: block;" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <linearGradient id="lpw1" x1="485" y1="90" x2="310" y2="380" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#E91E63"/><stop offset="25%" stop-color="#9C27B0"/><stop offset="60%" stop-color="#FF5722"/><stop offset="100%" stop-color="#FFB300"/></linearGradient>
                     <linearGradient id="lpw2" x1="470" y1="90" x2="330" y2="280" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#FF3366"/><stop offset="30%" stop-color="#FF9100"/><stop offset="65%" stop-color="#FFD600"/><stop offset="100%" stop-color="#FF6D00"/></linearGradient>
@@ -11528,12 +11528,12 @@ ${messageText}
                 </svg>
               </div>
               <div>
-                <h1 class="font-black text-lg text-slate-950 tracking-wider leading-none">SANVEE'S</h1>
-                <p class="text-[11px] font-black text-amber-600 uppercase tracking-widest mt-0.5">BY TONY</p>
-                <p class="text-[8.5px] text-slate-400 font-medium">Corporate Human Resources & People Operations</p>
+                <h1 class="font-black text-xl text-slate-950 tracking-wider leading-none">SANVEE'S</h1>
+                <p class="text-xs font-black text-amber-600 uppercase tracking-widest mt-1">BY TONY</p>
+                <p class="text-[9px] text-slate-400 font-medium mt-0.5">Corporate Human Resources & People Operations</p>
               </div>
             </div>
-            <div class="text-right text-[10px] text-slate-600 space-y-0.5">
+            <div class="text-right text-[11px] text-slate-600 space-y-0.5">
               <p class="font-bold text-slate-900">Corporate HQ • People Ops</p>
               <p>Registered Enterprise Tower</p>
               <p>Email: hr@sanvees.com</p>
@@ -11542,7 +11542,7 @@ ${messageText}
           </div>
 
           <!-- Memo Ref & Date Header -->
-          <div class="flex items-center justify-between text-[11px] font-semibold text-slate-700 py-1.5 border-b border-slate-200/80 mb-3">
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 py-2.5 border-b border-slate-200/80 mb-5">
             <div><span class="text-slate-400 font-normal">Memo Reference:</span> <span class="font-bold font-mono text-slate-900">${refNo}</span></div>
             <div><span class="text-slate-400 font-normal">Date of Issue:</span> <span class="font-bold text-slate-900">${issueDateFormatted}</span></div>
           </div>
@@ -11559,29 +11559,29 @@ ${messageText}
           </div>
 
           <!-- Signatory & Stamp Block -->
-          <div class="mt-4 pt-3 flex items-end justify-between border-t border-slate-100">
+          <div class="mt-12 pt-6 flex items-end justify-between border-t border-slate-100">
             
             <!-- Corporate Verified Seal Graphic -->
-            <div class="flex items-center space-x-2.5 select-none">
-              <div class="w-14 h-14 rounded-full border-2 border-dashed border-indigo-700/60 flex flex-col items-center justify-center text-center p-1 relative opacity-90 shrink-0">
-                <div class="text-[7px] font-black tracking-widest text-indigo-900 uppercase leading-none">SANVEE'S</div>
-                <div class="text-[6.5px] font-extrabold text-amber-600 tracking-wider leading-none mt-0.5">BY TONY</div>
-                <div class="w-6 h-0.5 bg-indigo-500/40 my-0.5"></div>
-                <div class="text-[5.5px] font-bold text-slate-500 uppercase leading-none">OFFICIAL SEAL</div>
+            <div class="flex items-center space-x-3 select-none">
+              <div class="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 flex flex-col items-center justify-center text-center p-1 relative opacity-85">
+                <div class="text-[8px] font-black tracking-widest text-indigo-900 uppercase">SANVEE'S</div>
+                <div class="text-[7px] font-extrabold text-amber-600 tracking-wider">BY TONY</div>
+                <div class="w-8 h-0.5 bg-indigo-500/40 my-0.5"></div>
+                <div class="text-[6px] font-bold text-slate-500 uppercase">OFFICIAL SEAL</div>
               </div>
-              <div class="text-[9px] text-slate-400 hidden sm:block">
+              <div class="text-[10px] text-slate-400 hidden sm:block">
                 <p class="font-bold text-slate-700">Digital Seal & Verification</p>
                 <p>Authentic Corporate Record</p>
               </div>
             </div>
 
             <!-- Signatory Signature Block -->
-            <div class="text-right space-y-0.5">
-              <p class="text-[11px] text-slate-500 mb-3 font-serif italic">Sincerely,</p>
-              <div class="w-40 border-b border-slate-800 ml-auto mb-1"></div>
+            <div class="text-right space-y-1">
+              <p class="text-xs text-slate-500 mb-6 font-serif italic">Sincerely,</p>
+              <div class="w-48 border-b border-slate-800 ml-auto mb-1"></div>
               <p class="font-bold text-xs text-slate-950">${signatoryName}</p>
               <p class="text-[10px] text-slate-600 font-semibold">${signatoryTitle}</p>
-              <p class="text-[8.5px] text-slate-400 uppercase tracking-widest font-semibold">Authorized Signatory • SANVEE'S BY TONY</p>
+              <p class="text-[9px] text-slate-400 uppercase tracking-widest font-semibold">Authorized Signatory • SANVEE'S BY TONY</p>
             </div>
 
           </div>
@@ -11619,39 +11619,36 @@ ${messageText}
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${empName} - ${docTitle} (SANVEE'S BY TONY)</title>
+  <title>${empName} - ${docTitle} (SANVEE'S)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @page {
       size: A4 portrait;
-      margin: 8mm 12mm 8mm 12mm;
+      margin: 15mm 20mm 15mm 20mm;
     }
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      background: #ffffff !important;
-      color: #0f172a !important;
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
-      font-size: 11px !important;
-      line-height: 1.45 !important;
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1.65;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .no-print-bar {
       background: #0f172a;
       color: white;
-      padding: 8px 18px;
+      padding: 12px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-family: sans-serif;
-      font-size: 12px;
+      font-size: 13px;
       position: sticky;
       top: 0;
       z-index: 1000;
@@ -11661,76 +11658,25 @@ ${messageText}
       background: #f59e0b;
       color: #ffffff;
       border: none;
-      padding: 6px 16px;
-      border-radius: 6px;
+      padding: 8px 18px;
+      border-radius: 8px;
       font-weight: bold;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
       transition: 0.2s;
     }
     .print-btn:hover { background: #d97706; }
     .print-wrapper {
-      max-width: 740px;
-      margin: 10px auto;
-      padding: 10px 15px;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 30px;
       background: #ffffff;
     }
     @media print {
       .no-print-bar { display: none !important; }
-      html, body {
-        width: 100% !important;
-        height: 100% !important;
-        overflow: hidden !important;
-      }
-      .print-wrapper {
-        margin: 0 !important;
-        padding: 0 !important;
-        max-width: 100% !important;
-        border: none !important;
-        box-shadow: none !important;
-      }
-      .letterhead-document {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-        page-break-after: avoid !important;
-        break-after: avoid !important;
-      }
+      .print-wrapper { margin: 0; padding: 0; max-width: 100%; border: none !important; box-shadow: none !important; }
+      body { padding: 0; margin: 0; }
     }
-    /* Fallback Standalone Styling in case CDN takes time */
-    .letterhead-document {
-      width: 100% !important;
-      font-size: 11px !important;
-      line-height: 1.45 !important;
-    }
-    .letterhead-document svg {
-      width: 42px !important;
-      height: 42px !important;
-      max-width: 42px !important;
-      max-height: 42px !important;
-      display: block !important;
-    }
-    .flex { display: flex !important; }
-    .items-center { align-items: center !important; }
-    .items-end { align-items: flex-end !important; }
-    .items-start { align-items: flex-start !important; }
-    .justify-between { justify-content: space-between !important; }
-    .justify-center { justify-content: center !important; }
-    .text-right { text-align: right !important; }
-    .text-center { text-align: center !important; }
-    .text-justify { text-align: justify !important; }
-    .border-b-2 { border-bottom: 2px solid #0f172a !important; }
-    .border-b { border-bottom: 1px solid #cbd5e1 !important; }
-    .border-t { border-top: 1px solid #e2e8f0 !important; }
-    .border { border: 1px solid #e2e8f0 !important; }
-    .rounded-full { border-radius: 9999px !important; }
-    .rounded-xl { border-radius: 0.75rem !important; }
-    .rounded-lg { border-radius: 0.5rem !important; }
-    .font-bold { font-weight: 700 !important; }
-    .font-black { font-weight: 900 !important; }
-    .font-semibold { font-weight: 600 !important; }
-    .uppercase { text-transform: uppercase !important; }
-    .tracking-wider { letter-spacing: 0.05em !important; }
-    .tracking-widest { letter-spacing: 0.1em !important; }
   </style>
 </head>
 <body>
@@ -11748,16 +11694,9 @@ ${messageText}
 
       printWin.document.close();
       printWin.focus();
-      printWin.onload = function() {
-        setTimeout(() => {
-          printWin.print();
-        }, 400);
-      };
       setTimeout(() => {
-        if (!printWin.closed) {
-          printWin.print();
-        }
-      }, 700);
+        printWin.print();
+      }, 500);
     };
 
     window.copyPaperLetterText = function() {
@@ -14709,7 +14648,7 @@ ${messageText}
                 </div>
 
                 <!-- A4 Letter Canvas (Pure White Crisp Letterhead) -->
-                <div id="paper-letterhead-canvas" class="bg-white text-slate-900 p-6 sm:p-8 rounded-b-2xl shadow-2xl border-x border-b border-slate-300/80 min-h-[680px] flex flex-col justify-between font-sans relative select-text">
+                <div id="paper-letterhead-canvas" class="bg-white text-slate-900 p-8 sm:p-12 rounded-b-2xl shadow-2xl border-x border-b border-slate-300/80 min-h-[780px] flex flex-col justify-between font-sans relative select-text">
                   
                   <!-- Top Accent Stripe -->
                   <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-500"></div>
@@ -14720,10 +14659,10 @@ ${messageText}
                   </div>
 
                   <!-- Letterhead Footer -->
-                  <div class="pt-3 mt-4 border-t border-slate-200 text-center text-[9px] text-slate-400 space-y-0.5">
+                  <div class="pt-8 mt-12 border-t border-slate-200 text-center text-[10px] text-slate-400 space-y-1">
                     <p class="font-semibold text-slate-500 uppercase tracking-wider">SANVEE'S BY TONY • PEOPLE OPERATIONS & HR ARCHIVE</p>
                     <p>Corporate Office: Registered Enterprise Tower • Contact: hr@sanvees.com • Web: https://sanvees.com</p>
-                    <p class="text-[8.5px] text-slate-400 italic">This is an authorized corporate letter generated through SANVEE'S BY TONY. Any alterations render it invalid.</p>
+                    <p class="text-[9px] text-slate-400 italic">This is an authorized corporate letter generated through SANVEE'S BY TONY. Any alterations render it invalid.</p>
                   </div>
 
                 </div>

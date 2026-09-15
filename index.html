@@ -672,33 +672,6 @@
       color: #f8fafc;
       padding: 8px 12px;
     }
-
-    /* Corporate Paper Letterhead Typography & Exact Flex Alignment */
-    .doc-header {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: center !important;
-    }
-    .doc-header-left {
-      display: flex !important;
-      align-items: center !important;
-      gap: 14px !important;
-    }
-    .doc-meta-bar {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: center !important;
-    }
-    .doc-sign-section {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: flex-end !important;
-    }
-    .doc-seal-container {
-      display: flex !important;
-      align-items: center !important;
-      gap: 12px !important;
-    }
   </style>
 
   <!-- Firebase SDKs -->
@@ -11377,32 +11350,32 @@ ${messageText}
       if (docType === 'noc') {
         letterTitle = 'NO OBJECTION CERTIFICATE';
         recipientHtml = `
-          <div class="text-center my-4 doc-title-box">
-            <h2 class="text-base sm:text-lg font-black uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1 doc-title-text">
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
               TO WHOM IT MAY CONCERN
             </h2>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-3.5 font-bold text-xs uppercase tracking-wide text-slate-900 doc-subject">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
             <strong>SUBJECT:</strong> NO OBJECTION CERTIFICATE (NOC) FOR ${empName.toUpperCase()}
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, is a permanent, full-time employee of <strong>SANVEE'S BY TONY</strong>, currently serving in the capacity of <strong>${designation}</strong> within the Department of <strong>${department}</strong> at our <strong>${branch}</strong> location since <strong>${joiningDate}</strong>.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             During the tenure of employment with us, <strong>${empName}</strong> has proven to be a diligent, responsible, and competent professional with commendable work ethics and conduct. The Management of SANVEE'S BY TONY hereby confirms that we have <strong>NO OBJECTION</strong> whatsoever to ${empName} applying for or undertaking:
           </p>
-          <div class="my-3.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800 text-center tracking-wide doc-purpose-card">
+          <div class="my-4 p-4 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800 text-center tracking-wide">
             "${customPurpose}"
           </div>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             There are no outstanding liabilities, adverse administrative records, or financial obligations against ${empName} with our organization. We certify this document in good faith and extend our sincere best wishes for all future personal and professional endeavors.
           </p>
           ${customRemarks ? `
-            <div class="my-3 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950 doc-remarks-card">
+            <div class="my-4 p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs text-amber-950">
               <strong>Special Remarks:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11410,7 +11383,7 @@ ${messageText}
       } else if (docType === 'resignation') {
         letterTitle = 'RESIGNATION ACCEPTANCE & RELIEVING ORDER';
         recipientHtml = `
-          <div class="my-4 text-xs leading-relaxed space-y-0.5 doc-recipient-box">
+          <div class="my-6 text-xs leading-relaxed space-y-0.5">
             <p class="font-bold text-slate-900">To,</p>
             <p class="font-bold text-sm text-slate-950">${empName}</p>
             <p class="text-slate-700 font-medium">${designation}, Department of ${department}</p>
@@ -11419,26 +11392,26 @@ ${messageText}
           </div>
         `;
         subjectHtml = `
-          <div class="mb-3.5 font-bold text-xs uppercase tracking-wide text-slate-900 bg-slate-100 p-2.5 rounded-lg border border-slate-200 doc-subject">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900 bg-slate-100 p-2.5 rounded-lg border border-slate-200">
             <strong>SUBJECT:</strong> ACCEPTANCE OF RESIGNATION & FORMAL RELIEVING INTIMATION
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-3 leading-relaxed">Dear <strong>${empName}</strong>,</p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
             With reference to your formal resignation letter submitted regarding <strong>${customPurpose}</strong>, we wish to officially inform you that the Management of <strong>SANVEE'S BY TONY</strong> has accepted your resignation from the position of <strong>${designation}</strong>.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             In accordance with company policy and formal consultation, your final working day with the organization shall be <strong>${effDateFormatted}</strong>, following which you will stand formally relieved from all organizational duties and responsibilities.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             You are kindly requested to complete the standard organizational exit clearance protocol, including the comprehensive handover of all official files, digital credentials, hardware, company identification cards, and related assets to your Department Head on or before your last working day.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Your final settlement and applicable dues (if any) will be processed through the payroll department and disbursed in accordance with company settlement policies. We take this opportunity to convey our heartfelt gratitude for your valuable contributions during your tenure with SANVEE'S BY TONY and wish you the very best in all your future professional pursuits.
           </p>
           ${customRemarks ? `
-            <div class="my-3 p-3 rounded-xl bg-purple-50/70 border border-purple-200/80 text-xs text-purple-950 doc-remarks-card">
+            <div class="my-4 p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/80 text-xs text-purple-950">
               <strong>Additional Terms:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11446,7 +11419,7 @@ ${messageText}
       } else if (docType === 'termination') {
         letterTitle = 'NOTICE OF EMPLOYMENT TERMINATION';
         recipientHtml = `
-          <div class="my-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 doc-recipient-box">
+          <div class="my-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div class="text-xs leading-relaxed space-y-0.5">
               <p class="font-bold text-slate-900">To,</p>
               <p class="font-bold text-sm text-slate-950">${empName}</p>
@@ -11462,29 +11435,29 @@ ${messageText}
           </div>
         `;
         subjectHtml = `
-          <div class="mb-3.5 font-bold text-xs uppercase tracking-wide text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200 doc-subject">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-rose-900 bg-rose-50 p-2.5 rounded-lg border border-rose-200">
             <strong>SUBJECT:</strong> FORMAL NOTICE OF EMPLOYMENT CONTRACT TERMINATION
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-3 leading-relaxed">Dear <strong>${empName}</strong>,</p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 leading-relaxed">Dear <strong>${empName}</strong>,</p>
+          <p class="mb-4 text-justify leading-relaxed">
             This letter serves as formal notification that your employment contract with <strong>SANVEE'S BY TONY</strong> in the capacity of <strong>${designation}</strong> is hereby terminated, effective from the close of business hours on <strong>${effDateFormatted}</strong>.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This administrative decision has been finalized following thorough internal evaluation and review in light of:
           </p>
-          <div class="my-3 p-3 rounded-xl bg-rose-50 border border-rose-200 font-bold text-rose-900 text-xs text-center doc-purpose-card">
+          <div class="my-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 font-bold text-rose-900 text-xs text-center">
             ${customPurpose}
           </div>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Effective from <strong>${effDateFormatted}</strong>, your authorization to represent SANVEE'S BY TONY or access company premises, proprietary data, digital systems, communications, and customer records stands revoked.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             You are strictly directed to surrender all company-owned property, equipment, identification tokens, documentation, and office keys in your possession to the Human Resources Department on or before your effective termination date. Upon full clearance and verification, your final settlement and statutory dues will be calculated and remitted to your bank account in accordance with organizational policies.
           </p>
           ${customRemarks ? `
-            <div class="my-3 p-3 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-800 doc-remarks-card">
+            <div class="my-4 p-3.5 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-800">
               <strong>Specific Administrative Note:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11492,33 +11465,33 @@ ${messageText}
       } else if (docType === 'experience') {
         letterTitle = 'EXPERIENCE & SERVICE CERTIFICATE';
         recipientHtml = `
-          <div class="text-center my-4 doc-title-box">
-            <h2 class="text-base sm:text-lg font-black uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1 doc-title-text">
+          <div class="text-center my-6">
+            <h2 class="text-base sm:text-lg font-extrabold uppercase tracking-widest text-slate-900 border-b-2 border-slate-900 inline-block pb-1">
               TO WHOM IT MAY CONCERN
             </h2>
             <p class="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">EXPERIENCE & SERVICE RECORD CERTIFICATE</p>
           </div>
         `;
         subjectHtml = `
-          <div class="mb-3.5 font-bold text-xs uppercase tracking-wide text-slate-900 doc-subject">
+          <div class="mb-5 font-bold text-xs uppercase tracking-wide text-slate-900">
             <strong>SUBJECT:</strong> CERTIFICATE OF SERVICE FOR ${empName.toUpperCase()}
           </div>
         `;
         bodyParagraphsHtml = `
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             This is to certify that <strong>${empName}</strong>, bearing Employee ID: <strong>${empCode}</strong>, was employed with <strong>SANVEE'S BY TONY</strong> as a full-time staff member from <strong>${joiningDate}</strong> to <strong>${effDateFormatted}</strong>. During this period, ${empName} performed their duties as <strong>${designation}</strong> in the Department of <strong>${department}</strong> at our <strong>${branch}</strong> branch.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Throughout their tenure, <strong>${empName}</strong> consistently exhibited professional dedication, sound technical skills, punctuality, and a strong sense of responsibility. Their conduct and interaction with colleagues, clients, and senior management remained exemplary.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             Reason for separation: <strong>${customPurpose}</strong>. Prior to departure, <strong>${empName}</strong> fulfilled all handover requirements and organizational responsibilities with a spotless track record.
           </p>
-          <p class="mb-3 text-justify leading-relaxed">
+          <p class="mb-4 text-justify leading-relaxed">
             We place on record our genuine appreciation for the valuable contributions made by <strong>${empName}</strong> during their time with us, and we wholeheartedly wish them every success and prosperity in all future career undertakings.
           </p>
           ${customRemarks ? `
-            <div class="my-3 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-950 doc-remarks-card">
+            <div class="my-4 p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-950">
               <strong>Commendation / Remarks:</strong> ${customRemarks}
             </div>
           ` : ''}
@@ -11530,9 +11503,9 @@ ${messageText}
         <div class="letterhead-document text-xs text-slate-800 leading-relaxed font-sans select-text">
           
           <!-- Corporate Letterhead Header -->
-          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-3 doc-header">
-            <div class="flex items-center space-x-3.5 doc-header-left">
-              <div class="rounded-xl bg-white p-1 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center doc-logo-box" style="width: 56px; height: 56px; min-width: 56px; max-width: 56px;">
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+            <div class="flex items-center space-x-3.5">
+              <div class="rounded-xl bg-white p-1 border border-slate-200 shadow-sm shrink-0 flex items-center justify-center" style="width: 56px; height: 56px; min-width: 56px; max-width: 56px;">
                 <svg style="width: 100%; height: 100%; display: block;" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <linearGradient id="lpw1" x1="485" y1="90" x2="310" y2="380" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#E91E63"/><stop offset="25%" stop-color="#9C27B0"/><stop offset="60%" stop-color="#FF5722"/><stop offset="100%" stop-color="#FFB300"/></linearGradient>
@@ -11555,13 +11528,13 @@ ${messageText}
                 </svg>
               </div>
               <div>
-                <h1 class="font-black text-xl text-slate-950 tracking-wider leading-none doc-brand-title">SANVEE'S</h1>
-                <p class="text-xs font-black text-amber-600 uppercase tracking-widest mt-1 doc-brand-sub">BY TONY</p>
-                <p class="text-[9px] text-slate-400 font-medium mt-0.5 doc-brand-tag">Corporate Human Resources & People Operations</p>
+                <h1 class="font-black text-xl text-slate-950 tracking-wider leading-none">SANVEE'S</h1>
+                <p class="text-xs font-black text-amber-600 uppercase tracking-widest mt-1">BY TONY</p>
+                <p class="text-[9px] text-slate-400 font-medium mt-0.5">Corporate Human Resources & People Operations</p>
               </div>
             </div>
-            <div class="text-right text-[11px] text-slate-600 space-y-0.5 doc-header-right">
-              <p class="font-bold text-slate-900 hq-title">Corporate HQ • People Ops</p>
+            <div class="text-right text-[11px] text-slate-600 space-y-0.5">
+              <p class="font-bold text-slate-900">Corporate HQ • People Ops</p>
               <p>Registered Enterprise Tower</p>
               <p>Email: hr@sanvees.com</p>
               <p>Web: www.sanvees.com</p>
@@ -11569,9 +11542,9 @@ ${messageText}
           </div>
 
           <!-- Memo Ref & Date Header -->
-          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 py-2 border-b border-slate-200/80 mb-4 doc-meta-bar">
-            <div><span class="text-slate-400 font-normal">Memo Reference:</span> <span class="font-bold font-mono text-slate-900 mono-val">${refNo}</span></div>
-            <div><span class="text-slate-400 font-normal">Date of Issue:</span> <span class="font-bold text-slate-900 val">${issueDateFormatted}</span></div>
+          <div class="flex items-center justify-between text-xs font-semibold text-slate-700 py-2.5 border-b border-slate-200/80 mb-5">
+            <div><span class="text-slate-400 font-normal">Memo Reference:</span> <span class="font-bold font-mono text-slate-900">${refNo}</span></div>
+            <div><span class="text-slate-400 font-normal">Date of Issue:</span> <span class="font-bold text-slate-900">${issueDateFormatted}</span></div>
           </div>
 
           <!-- Recipient Section -->
@@ -11581,34 +11554,34 @@ ${messageText}
           ${subjectHtml}
 
           <!-- Body Content (Editable live) -->
-          <div class="paper-editable-body focus:outline-dashed focus:outline-1 focus:outline-amber-500 rounded p-1 transition doc-body" contenteditable="true" spellcheck="false" title="Click anywhere to edit or customize text directly">
+          <div class="paper-editable-body focus:outline-dashed focus:outline-1 focus:outline-amber-500 rounded p-1 transition" contenteditable="true" spellcheck="false" title="Click anywhere to edit or customize text directly">
             ${bodyParagraphsHtml}
           </div>
 
           <!-- Signatory & Stamp Block -->
-          <div class="mt-8 pt-4 flex items-end justify-between border-t border-slate-100 doc-sign-section">
+          <div class="mt-12 pt-6 flex items-end justify-between border-t border-slate-100">
             
             <!-- Corporate Verified Seal Graphic -->
-            <div class="flex items-center space-x-3 select-none doc-seal-container">
-              <div class="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 flex flex-col items-center justify-center text-center p-1 relative opacity-85 doc-seal-circle">
-                <div class="text-[8px] font-black tracking-widest text-indigo-900 uppercase seal-txt-main">SANVEE'S</div>
-                <div class="text-[7px] font-extrabold text-amber-600 tracking-wider seal-txt-sub">BY TONY</div>
-                <div class="w-8 h-0.5 bg-indigo-500/40 my-0.5 seal-divider"></div>
-                <div class="text-[6px] font-bold text-slate-500 uppercase seal-txt-tag">OFFICIAL SEAL</div>
+            <div class="flex items-center space-x-3 select-none">
+              <div class="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 flex flex-col items-center justify-center text-center p-1 relative opacity-85">
+                <div class="text-[8px] font-black tracking-widest text-indigo-900 uppercase">SANVEE'S</div>
+                <div class="text-[7px] font-extrabold text-amber-600 tracking-wider">BY TONY</div>
+                <div class="w-8 h-0.5 bg-indigo-500/40 my-0.5"></div>
+                <div class="text-[6px] font-bold text-slate-500 uppercase">OFFICIAL SEAL</div>
               </div>
-              <div class="text-[10px] text-slate-500 block doc-seal-meta">
-                <p class="font-bold text-slate-700 seal-title">Digital Seal & Verification</p>
+              <div class="text-[10px] text-slate-400 hidden sm:block">
+                <p class="font-bold text-slate-700">Digital Seal & Verification</p>
                 <p>Authentic Corporate Record</p>
               </div>
             </div>
 
             <!-- Signatory Signature Block -->
-            <div class="text-right space-y-1 doc-sign-block">
-              <p class="text-xs text-slate-500 mb-6 font-serif italic doc-sincerely">Sincerely,</p>
-              <div class="w-48 border-b border-slate-800 ml-auto mb-1 doc-sign-line"></div>
-              <p class="font-bold text-xs text-slate-950 doc-signatory-name">${signatoryName}</p>
-              <p class="text-[10px] text-slate-600 font-semibold doc-signatory-title">${signatoryTitle}</p>
-              <p class="text-[9px] text-slate-400 uppercase tracking-widest font-semibold doc-signatory-auth">AUTHORIZED SIGNATORY • SANVEE'S BY TONY</p>
+            <div class="text-right space-y-1">
+              <p class="text-xs text-slate-500 mb-6 font-serif italic">Sincerely,</p>
+              <div class="w-48 border-b border-slate-800 ml-auto mb-1"></div>
+              <p class="font-bold text-xs text-slate-950">${signatoryName}</p>
+              <p class="text-[10px] text-slate-600 font-semibold">${signatoryTitle}</p>
+              <p class="text-[9px] text-slate-400 uppercase tracking-widest font-semibold">Authorized Signatory • SANVEE'S BY TONY</p>
             </div>
 
           </div>
@@ -11620,6 +11593,9 @@ ${messageText}
     };
 
     window.printPaperDocument = function() {
+      const canvas = document.getElementById('paper-letterhead-canvas');
+      if (!canvas) return;
+
       const select = document.getElementById('papers-emp-select');
       const empId = select ? select.value : '';
       const emp = Array.isArray(employeeList) ? employeeList.find(e => e.id === empId) : null;
@@ -11632,10 +11608,6 @@ ${messageText}
         experience: 'Experience Certificate'
       };
       const docTitle = typeNames[docType] || 'Official Document';
-
-      const renderedBodyElem = document.getElementById('paper-letter-body-rendered');
-      if (!renderedBodyElem) return;
-      const letterHtml = renderedBodyElem.innerHTML;
 
       const printWin = window.open('', '_blank', 'width=900,height=1000');
       if (!printWin) {
@@ -11650,36 +11622,32 @@ ${messageText}
   <title>${empName} - ${docTitle} (SANVEE'S)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 15mm 10mm 15mm;
+      margin: 15mm 20mm 15mm 20mm;
     }
-    * {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    html, body {
+    * { box-sizing: border-box; }
+    body {
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #0f172a;
       background: #ffffff;
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
-      font-size: 12px;
-      line-height: 1.55;
+      font-size: 13px;
+      line-height: 1.65;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .no-print-bar {
       background: #0f172a;
       color: white;
-      padding: 10px 24px;
+      padding: 12px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      font-family: sans-serif;
       font-size: 13px;
       position: sticky;
       top: 0;
@@ -11690,328 +11658,24 @@ ${messageText}
       background: #f59e0b;
       color: #ffffff;
       border: none;
-      padding: 7px 18px;
+      padding: 8px 18px;
       border-radius: 8px;
-      font-weight: 700;
+      font-weight: bold;
       cursor: pointer;
       font-size: 13px;
       transition: 0.2s;
     }
     .print-btn:hover { background: #d97706; }
-
-    /* Single Page Document Wrapper */
-    .doc-sheet {
-      width: 100%;
-      max-width: 190mm;
-      margin: 15px auto;
-      padding: 24px 28px;
+    .print-wrapper {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 30px;
       background: #ffffff;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      min-height: calc(297mm - 28mm);
-      box-sizing: border-box;
-      position: relative;
-      box-shadow: 0 0 20px rgba(0,0,0,0.08);
-      border: 1px solid #e2e8f0;
     }
-
     @media print {
       .no-print-bar { display: none !important; }
-      html, body {
-        width: 100% !important;
-        height: 100% !important;
-        overflow: hidden !important;
-        background: #ffffff !important;
-      }
-      .doc-sheet {
-        margin: 0 !important;
-        padding: 0 !important;
-        max-width: 100% !important;
-        width: 100% !important;
-        height: 100% !important;
-        min-height: auto !important;
-        max-height: calc(297mm - 20mm) !important;
-        border: none !important;
-        box-shadow: none !important;
-        page-break-inside: avoid !important;
-        page-break-before: avoid !important;
-        page-break-after: avoid !important;
-      }
-    }
-
-    /* Header Layout */
-    .doc-header {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: center !important;
-      border-bottom: 2.5px solid #0f172a !important;
-      padding-bottom: 12px !important;
-      margin-bottom: 12px !important;
-    }
-    .doc-header-left {
-      display: flex !important;
-      align-items: center !important;
-      gap: 14px !important;
-    }
-    .doc-logo-box {
-      width: 54px !important;
-      height: 54px !important;
-      min-width: 54px !important;
-      border-radius: 12px !important;
-      border: 1px solid #cbd5e1 !important;
-      background: #ffffff !important;
-      padding: 3px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-    }
-    .doc-brand-title {
-      font-size: 20px !important;
-      font-weight: 900 !important;
-      color: #020617 !important;
-      letter-spacing: 0.05em !important;
-      line-height: 1 !important;
-      margin: 0 !important;
-    }
-    .doc-brand-sub {
-      font-size: 11px !important;
-      font-weight: 800 !important;
-      color: #d97706 !important;
-      letter-spacing: 0.12em !important;
-      margin-top: 3px !important;
-      margin-bottom: 2px !important;
-      text-transform: uppercase !important;
-    }
-    .doc-brand-tag {
-      font-size: 9px !important;
-      font-weight: 500 !important;
-      color: #64748b !important;
-      margin: 0 !important;
-    }
-    .doc-header-right {
-      text-align: right !important;
-      font-size: 10.5px !important;
-      color: #475569 !important;
-      line-height: 1.4 !important;
-    }
-    .doc-header-right p { margin: 1px 0 !important; }
-    .doc-header-right .hq-title {
-      font-weight: 700 !important;
-      color: #0f172a !important;
-    }
-
-    /* Meta / Ref Bar */
-    .doc-meta-bar {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: center !important;
-      font-size: 11px !important;
-      color: #475569 !important;
-      padding-bottom: 7px !important;
-      border-bottom: 1px solid #e2e8f0 !important;
-      margin-bottom: 14px !important;
-    }
-    .doc-meta-bar .val { font-weight: 700 !important; color: #0f172a !important; }
-    .doc-meta-bar .mono-val {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-      font-weight: 700 !important;
-      color: #0f172a !important;
-    }
-
-    /* Document Title */
-    .doc-title-box {
-      text-align: center !important;
-      margin: 12px 0 14px 0 !important;
-    }
-    .doc-title-text {
-      font-size: 16px !important;
-      font-weight: 900 !important;
-      letter-spacing: 0.12em !important;
-      text-transform: uppercase !important;
-      color: #0f172a !important;
-      border-bottom: 2.5px solid #0f172a !important;
-      display: inline-block !important;
-      padding-bottom: 3px !important;
-    }
-
-    /* Subject Line */
-    .doc-subject {
-      font-size: 11.5px !important;
-      font-weight: 700 !important;
-      text-transform: uppercase !important;
-      letter-spacing: 0.03em !important;
-      color: #0f172a !important;
-      margin-bottom: 12px !important;
-      line-height: 1.45 !important;
-    }
-
-    /* Body Paragraphs */
-    .doc-body { flex: 1 1 auto !important; }
-    .doc-body p {
-      font-size: 11.5px !important;
-      line-height: 1.62 !important;
-      color: #1e293b !important;
-      text-align: justify !important;
-      margin: 0 0 9px 0 !important;
-    }
-    .doc-body p strong, .doc-body strong {
-      font-weight: 700 !important;
-      color: #0f172a !important;
-    }
-
-    /* Purpose Box */
-    .doc-purpose-card {
-      background-color: #f8fafc !important;
-      border: 1px solid #e2e8f0 !important;
-      border-radius: 12px !important;
-      padding: 12px 20px !important;
-      text-align: center !important;
-      font-weight: 600 !important;
-      font-size: 13px !important;
-      color: #0f172a !important;
-      margin: 12px 0 !important;
-      letter-spacing: 0.02em !important;
-    }
-
-    /* Special Remarks */
-    .doc-remarks-card {
-      background-color: #fefce8 !important;
-      border: 1px solid #fef08a !important;
-      border-radius: 10px !important;
-      padding: 8px 14px !important;
-      font-size: 11px !important;
-      color: #713f12 !important;
-      margin: 10px 0 !important;
-    }
-
-    /* Seal & Signature Row */
-    .doc-sign-section {
-      display: flex !important;
-      justify-content: space-between !important;
-      align-items: flex-end !important;
-      border-top: 1px solid #f1f5f9 !important;
-      padding-top: 14px !important;
-      margin-top: 16px !important;
-    }
-    .doc-seal-container {
-      display: flex !important;
-      align-items: center !important;
-      gap: 12px !important;
-    }
-    .doc-seal-circle {
-      width: 74px !important;
-      height: 74px !important;
-      min-width: 74px !important;
-      border-radius: 50% !important;
-      border: 2px dashed #4338ca !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-      text-align: center !important;
-      padding: 4px !important;
-      background: rgba(238, 242, 255, 0.2) !important;
-    }
-    .seal-txt-main {
-      font-size: 8px !important;
-      font-weight: 900 !important;
-      letter-spacing: 0.12em !important;
-      color: #312e81 !important;
-      text-transform: uppercase !important;
-      line-height: 1.1 !important;
-    }
-    .seal-txt-sub {
-      font-size: 7px !important;
-      font-weight: 800 !important;
-      letter-spacing: 0.08em !important;
-      color: #d97706 !important;
-      margin-top: 1px !important;
-      line-height: 1.1 !important;
-    }
-    .seal-divider {
-      width: 30px !important;
-      height: 1px !important;
-      background: rgba(99, 102, 241, 0.45) !important;
-      margin: 2px 0 !important;
-    }
-    .seal-txt-tag {
-      font-size: 6px !important;
-      font-weight: 700 !important;
-      letter-spacing: 0.06em !important;
-      color: #64748b !important;
-      text-transform: uppercase !important;
-    }
-    .doc-seal-meta {
-      font-size: 10px !important;
-      color: #64748b !important;
-      line-height: 1.35 !important;
-    }
-    .doc-seal-meta .seal-title {
-      font-weight: 700 !important;
-      color: #334155 !important;
-    }
-
-    /* Signature Block */
-    .doc-sign-block {
-      text-align: right !important;
-      line-height: 1.35 !important;
-    }
-    .doc-sincerely {
-      font-family: Georgia, Cambria, 'Times New Roman', Times, serif !important;
-      font-style: italic !important;
-      font-size: 12px !important;
-      color: #64748b !important;
-      margin: 0 0 28px 0 !important;
-    }
-    .doc-sign-line {
-      width: 190px !important;
-      border-bottom: 1.5px solid #0f172a !important;
-      margin-left: auto !important;
-      margin-bottom: 4px !important;
-    }
-    .doc-signatory-name {
-      font-size: 11.5px !important;
-      font-weight: 700 !important;
-      color: #020617 !important;
-      margin: 0 !important;
-    }
-    .doc-signatory-title {
-      font-size: 10px !important;
-      font-weight: 600 !important;
-      color: #475569 !important;
-      margin: 0 !important;
-    }
-    .doc-signatory-auth {
-      font-size: 8.5px !important;
-      font-weight: 600 !important;
-      letter-spacing: 0.08em !important;
-      text-transform: uppercase !important;
-      color: #94a3b8 !important;
-      margin: 1px 0 0 0 !important;
-    }
-
-    /* Bottom Footer */
-    .doc-footer {
-      border-top: 1px solid #e2e8f0 !important;
-      padding-top: 10px !important;
-      margin-top: 16px !important;
-      text-align: center !important;
-      font-size: 9px !important;
-      color: #64748b !important;
-      line-height: 1.45 !important;
-    }
-    .doc-footer p { margin: 1.5px 0 !important; }
-    .doc-footer .footer-brand {
-      font-weight: 700 !important;
-      color: #475569 !important;
-      letter-spacing: 0.06em !important;
-      text-transform: uppercase !important;
-    }
-    .doc-footer .footer-disclaimer {
-      font-size: 8px !important;
-      font-style: italic !important;
-      color: #94a3b8 !important;
+      .print-wrapper { margin: 0; padding: 0; max-width: 100%; border: none !important; box-shadow: none !important; }
+      body { padding: 0; margin: 0; }
     }
   </style>
 </head>
@@ -12022,15 +11686,8 @@ ${messageText}
       <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
     </div>
   </div>
-  <div class="doc-sheet">
-    <div class="doc-content-wrap">
-      ${letterHtml}
-    </div>
-    <div class="doc-footer">
-      <p class="footer-brand">SANVEE'S BY TONY • PEOPLE OPERATIONS & HR ARCHIVE</p>
-      <p>Corporate Office: Registered Enterprise Tower • Contact: hr@sanvees.com • Web: https://sanvees.com</p>
-      <p class="footer-disclaimer">This is an authorized corporate letter generated through SANVEE'S BY TONY. Any alterations render it invalid.</p>
-    </div>
+  <div class="print-wrapper">
+    ${canvas.innerHTML}
   </div>
 </body>
 </html>`);
@@ -12039,7 +11696,7 @@ ${messageText}
       printWin.focus();
       setTimeout(() => {
         printWin.print();
-      }, 400);
+      }, 500);
     };
 
     window.copyPaperLetterText = function() {

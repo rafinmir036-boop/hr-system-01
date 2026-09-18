@@ -170,6 +170,11 @@
             text-shadow: none !important;
         }
 
+        #sidebar-nav button.hidden,
+        #sidebar-nav button[hidden] {
+            display: none !important;
+        }
+
         #sidebar-nav button i {
             color: #65809e !important;
             font-size: 0.95rem !important;
@@ -2281,6 +2286,16 @@
                 renderFineTable();
                 renderLeaveTable();
                 calculateMyPersonalSummary();
+
+                // If currently active section is restricted for this user, auto-switch to dashboard
+                try {
+                    const activeSec = document.querySelector('main > section:not(.hidden)');
+                    const activeNavId = activeSec ? activeSec.id.replace('sec-', '') : 'dashboard';
+                    const activeNavBtn = document.getElementById(`nav-${activeNavId}`);
+                    if (currentUserRole !== 'Admin' && (!activeNavBtn || activeNavBtn.classList.contains('hidden') || activeNavBtn.style.display === 'none')) {
+                        if (typeof switchNav === 'function') switchNav('dashboard');
+                    }
+                } catch (e) { }
             });
         }
 
@@ -2320,9 +2335,9 @@
                 if (currentUserRole === 'Admin') {
                     isVisible = true;
                 } else if (navId === 'settings') {
-                    isVisible = true;
+                    isVisible = hasPermission('can_settings');
                 } else if (navId === 'papers') {
-                    isVisible = currentUserRole === 'Admin' || hasPermission('can_documents') || hasPermission('can_employees');
+                    isVisible = currentUserRole === 'Admin' || hasPermission('can_documents');
                 } else if (navId === 'attendance') {
                     isVisible = currentUserRole === 'Employee' || hasPermission('can_attendance');
                 } else if (navId === 'advance') {
@@ -2337,8 +2352,13 @@
                     isVisible = hasPermission(navMapping[navId]);
                 }
 
-                if (isVisible) navElem.classList.remove('hidden');
-                else navElem.classList.add('hidden');
+                if (isVisible) {
+                    navElem.classList.remove('hidden');
+                    navElem.style.removeProperty('display');
+                } else {
+                    navElem.classList.add('hidden');
+                    navElem.style.setProperty('display', 'none', 'important');
+                }
             });
 
             const DEFAULT_SANVEES_FAVICON_DATA_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cdefs%3E%3ClinearGradient id='w1' x1='485' y1='90' x2='310' y2='380' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23E91E63'/%3E%3Cstop offset='25%25' stop-color='%239C27B0'/%3E%3Cstop offset='60%25' stop-color='%23FF5722'/%3E%3Cstop offset='100%25' stop-color='%23FFB300'/%3E%3C/linearGradient%3E%3ClinearGradient id='w2' x1='470' y1='90' x2='330' y2='280' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23FF3366'/%3E%3Cstop offset='30%25' stop-color='%23FF9100'/%3E%3Cstop offset='65%25' stop-color='%23FFD600'/%3E%3Cstop offset='100%25' stop-color='%23FF6D00'/%3E%3C/linearGradient%3E%3ClinearGradient id='lg' x1='160' y1='100' x2='320' y2='300' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2300C853'/%3E%3Cstop offset='35%25' stop-color='%2300B0FF'/%3E%3Cstop offset='65%25' stop-color='%2300E676'/%3E%3Cstop offset='100%25' stop-color='%23FFD600'/%3E%3C/linearGradient%3E%3ClinearGradient id='ic' x1='200' y1='120' x2='330' y2='250' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23FF1744'/%3E%3Cstop offset='50%25' stop-color='%23F50057'/%3E%3Cstop offset='85%25' stop-color='%23FF9100'/%3E%3Cstop offset='100%25' stop-color='%23FFEA00'/%3E%3C/linearGradient%3E%3ClinearGradient id='bw' x1='110' y1='240' x2='340' y2='450' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2300B0FF'/%3E%3Cstop offset='30%25' stop-color='%23651FFF'/%3E%3Cstop offset='65%25' stop-color='%23D500F9'/%3E%3Cstop offset='85%25' stop-color='%23FF3D00'/%3E%3Cstop offset='100%25' stop-color='%23FFAB00'/%3E%3C/linearGradient%3E%3ClinearGradient id='ct' x1='180' y1='230' x2='340' y2='390' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2300BFA5'/%3E%3Cstop offset='40%25' stop-color='%23AEEA00'/%3E%3Cstop offset='70%25' stop-color='%23FFD600'/%3E%3Cstop offset='100%25' stop-color='%23FF6D00'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='500' height='500' rx='120' fill='%23ffffff'/%3E%3Crect x='6' y='6' width='488' height='488' rx='114' fill='none' stroke='%23e2e8f0' stroke-width='8'/%3E%3Cg transform='translate(25, 25) scale(0.9)'%3E%3Cpath d='M 485 92 C 450 140 375 250 330 345 C 318 368 305 380 295 388 C 300 375 315 340 340 280 C 375 195 440 125 485 92 Z' fill='url(%23w1)'/%3E%3Cpath d='M 485 92 C 420 160 350 250 310 325 C 290 295 270 260 255 235 C 290 240 340 220 395 160 C 440 115 470 95 485 92 Z' fill='url(%23w2)' opacity='0.95'/%3E%3Cpath d='M 120 235 C 112 280 135 345 175 390 C 215 435 270 455 310 445 C 265 440 215 405 185 365 C 155 325 140 275 120 235 Z' fill='url(%23bw)'/%3E%3Cpath d='M 175 390 C 215 435 275 450 325 425 C 345 415 355 395 350 380 C 340 355 295 340 245 310 C 195 280 170 340 175 390 Z' fill='url(%23bw)'/%3E%3Cpath d='M 235 105 C 180 115 135 165 140 230 C 145 285 185 330 235 355 C 290 380 340 370 348 350 C 340 320 285 295 235 270 C 180 245 175 165 235 125 C 248 115 258 110 265 108 C 255 106 245 105 235 105 Z' fill='url(%23lg)'/%3E%3Cpath d='M 175 220 C 180 275 225 315 275 345 C 320 370 350 365 352 355 C 340 330 295 305 250 280 C 205 255 190 205 225 155 C 205 170 175 190 175 220 Z' fill='url(%23ct)'/%3E%3Cpath d='M 245 118 C 285 130 325 165 328 205 C 330 235 310 255 298 250 C 285 245 285 220 290 200 C 295 175 275 150 240 140 C 220 135 208 140 205 142 C 215 130 230 122 245 118 Z' fill='url(%23ic)'/%3E%3Cpath d='M 298 250 C 315 245 325 225 322 195 C 318 165 285 135 245 125 C 270 140 290 170 285 200 C 280 230 290 248 298 250 Z' fill='url(%23ic)'/%3E%3C/g%3E%3C/svg%3E";
@@ -2435,6 +2455,12 @@
                 if (headerBranchContainer) headerBranchContainer.classList.remove('hidden');
             } else {
                 if (headerBranchContainer) headerBranchContainer.classList.add('hidden');
+            }
+
+            const brandLogoSettings = document.getElementById('sec-settings-brand-logo');
+            if (brandLogoSettings) {
+                if (currentUserRole === 'Admin') brandLogoSettings.classList.remove('hidden');
+                else brandLogoSettings.classList.add('hidden');
             }
 
             if (currentUserRole === 'Admin' || (currentUserRole !== 'Employee' && hasPermission('can_settings'))) {
@@ -2580,12 +2606,30 @@
                 const payBranchSelect = document.getElementById('payroll-filter-branch');
                 const payBranchBox = payBranchSelect ? payBranchSelect.closest('div') : null;
 
-                if (payBatchBtn && hasPermission('can_payroll')) payBatchBtn.classList.remove('hidden');
-                if (paySyncBtn && hasPermission('can_payroll')) paySyncBtn.classList.remove('hidden');
-                if (payAddBtn && hasPermission('can_payroll')) payAddBtn.classList.remove('hidden');
-                if (payBulkPdfBtn && hasPermission('can_payroll')) payBulkPdfBtn.classList.remove('hidden');
-                if (paySheetBtn && hasPermission('can_payroll')) paySheetBtn.classList.remove('hidden');
-                if (payBranchBox) payBranchBox.classList.remove('hidden');
+                if (payBatchBtn) {
+                    if (hasPermission('can_payroll')) payBatchBtn.classList.remove('hidden');
+                    else payBatchBtn.classList.add('hidden');
+                }
+                if (paySyncBtn) {
+                    if (hasPermission('can_payroll')) paySyncBtn.classList.remove('hidden');
+                    else paySyncBtn.classList.add('hidden');
+                }
+                if (payAddBtn) {
+                    if (hasPermission('can_payroll')) payAddBtn.classList.remove('hidden');
+                    else payAddBtn.classList.add('hidden');
+                }
+                if (payBulkPdfBtn) {
+                    if (hasPermission('can_payroll')) payBulkPdfBtn.classList.remove('hidden');
+                    else payBulkPdfBtn.classList.add('hidden');
+                }
+                if (paySheetBtn) {
+                    if (hasPermission('can_payroll')) paySheetBtn.classList.remove('hidden');
+                    else paySheetBtn.classList.add('hidden');
+                }
+                if (payBranchBox) {
+                    if (hasPermission('can_payroll')) payBranchBox.classList.remove('hidden');
+                    else payBranchBox.classList.add('hidden');
+                }
 
                 const payHeading = document.getElementById('payroll-section-heading');
                 if (payHeading) payHeading.innerText = ['Manager', 'Branch Manager'].includes(currentUserRole) ? `Payroll Management (${currentUserBranch})` : 'Payroll & Salary Management';
@@ -12930,6 +12974,52 @@ ${messageText}
         };
 
         window.switchNav = function (secId) {
+            // Role Permission Guard: Block unauthorized navigation
+            const navMapping = {
+                'dashboard': 'can_dashboard',
+                'employees': 'can_employees',
+                'attendance': 'can_attendance',
+                'advance': 'can_advance_apply',
+                'fine': 'can_fines',
+                'leave': 'can_leave_apply',
+                'payroll': 'can_payroll',
+                'increment': 'can_increment',
+                'documents': 'can_documents',
+                'papers': 'can_documents',
+                'performance': 'can_performance',
+                'notice': 'can_notices',
+                'reports': 'can_reports',
+                'settings': 'can_settings',
+                'activity': 'can_activity'
+            };
+
+            if (currentUserRole !== 'Admin' && secId !== 'dashboard') {
+                const requiredPerm = navMapping[secId];
+                let isAllowed = false;
+                if (secId === 'attendance') {
+                    isAllowed = currentUserRole === 'Employee' || hasPermission('can_attendance');
+                } else if (secId === 'advance') {
+                    isAllowed = hasPermission('can_advance_apply') || hasPermission('can_advance_approve');
+                } else if (secId === 'fine') {
+                    isAllowed = hasPermission('can_fines');
+                } else if (secId === 'leave') {
+                    isAllowed = hasPermission('can_leave_apply') || hasPermission('can_leave_approve');
+                } else if (secId === 'payroll') {
+                    isAllowed = currentUserRole === 'Employee' || hasPermission('can_payroll');
+                } else if (requiredPerm) {
+                    isAllowed = hasPermission(requiredPerm);
+                } else {
+                    isAllowed = true;
+                }
+
+                if (!isAllowed) {
+                    if (typeof showToast === 'function') {
+                        showToast('warning', 'আপনার এই মডিউলে প্রবেশের অনুমতি নেই (Access Restricted)');
+                    }
+                    secId = 'dashboard';
+                }
+            }
+
             const sections = document.querySelectorAll('section');
             sections.forEach(s => s.classList.add('hidden'));
 

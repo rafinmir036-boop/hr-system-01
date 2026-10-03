@@ -3146,6 +3146,7 @@
 
                 let permOptions = '<option value="">-- Select from Employee List (কর্মচারী তালিকা থেকে বেছে নিন) --</option>';
                 let genOptions = '<option value="">Select Employee</option>';
+                let payOptions = '<option value="">-- সক্রিয় কর্মচারী নির্বাচন করুন (Select Active Employee) --</option>';
                 let fineOptions = '<option value="">Select Employee</option>';
                 let docOptions = '<option value="General">General / All Employees</option>';
                 let repOptions = '<option value="ALL">All Employees</option>';
@@ -3184,11 +3185,17 @@
 
                     if (!isItemInActiveBranch(emp.branch)) return;
 
+                    const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
+                    const empStatus = isEmpActive ? 'Active' : 'Inactive';
+
                     const branchTag = emp.branch ? ` - 🏢 ${emp.branch}` : ' - 🏢 Head Office';
                     const codeTag = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : ' [ID: N/A]';
                     const salaryTag = emp.salary ? ` (৳${Number(emp.salary).toLocaleString()})` : '';
 
                     genOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
+                    if (isEmpActive) {
+                        payOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
+                    }
                     fineOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
                     docOptions += `<option value="${emp.name}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
                     repOptions += `<option value="${id}">${emp.name} (${emp.designation})${codeTag}${branchTag}</option>`;
@@ -3224,7 +3231,7 @@
 
                     // 1. Modern Card Item matching screenshot
                     cardItems += `
-            <div class="emp-card-item relative bg-white dark:bg-[#0f172a] rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group" data-emp-id="${id}" data-name="${(emp.name || '').toLowerCase()}" data-code="${(emp.customEmpCode || '').toLowerCase()}" data-dept="${(emp.department || '').toLowerCase()}">
+            <div class="emp-card-item relative bg-white dark:bg-[#0f172a] rounded-2xl md:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group ${!isEmpActive ? 'opacity-80 ring-1 ring-rose-400/40' : ''}" data-emp-id="${id}" data-name="${(emp.name || '').toLowerCase()}" data-code="${(emp.customEmpCode || '').toLowerCase()}" data-dept="${(emp.department || '').toLowerCase()}" data-status="${empStatus.toLowerCase()}">
               
               <!-- Curved Top Banner -->
               <div class="emp-card-banner h-28 relative overflow-hidden bg-gradient-to-r ${bannerGradClass} p-4 flex justify-between items-start transition-all duration-300">
@@ -3236,10 +3243,13 @@
                   <input type="checkbox" class="emp-row-select w-4 h-4 rounded border-white/40 text-sky-600 focus:ring-sky-400 cursor-pointer transition accent-sky-500 bg-white/20 backdrop-blur-sm" value="${id}" data-name="${emp.name ? emp.name.replace(/"/g, '&quot;') : ''}" onchange="onEmployeeSelectChange()" title="Select ${emp.name}">
                 </div>
                 
-                <!-- Role Pill Badge (Admin / Employee) -->
-                <div class="relative z-10">
-                  <span class="px-3 py-1 text-[11px] font-bold rounded-full bg-white/20 text-white backdrop-blur-md border border-white/25 shadow-2xs tracking-wide">
+                <!-- Role Pill & Status Badge -->
+                <div class="relative z-10 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 text-[11px] font-bold rounded-full bg-white/20 text-white backdrop-blur-md border border-white/25 shadow-2xs tracking-wide">
                     ${roleDisplay}
+                  </span>
+                  <span class="px-2.5 py-1 text-[10px] font-extrabold rounded-full ${isEmpActive ? 'bg-emerald-500/85 text-white border-emerald-300/40' : 'bg-rose-500/85 text-white border-rose-300/40'} backdrop-blur-md border shadow-2xs tracking-wide flex items-center">
+                    <i class="fa-solid ${isEmpActive ? 'fa-circle-check text-emerald-200' : 'fa-circle-xmark text-rose-200'} text-[9px] mr-1"></i>${empStatus}
                   </span>
                 </div>
               </div>
@@ -3278,10 +3288,23 @@
                       <span class="font-bold">৳${Number(emp.salary || 0).toLocaleString()}<span class="text-[11px] font-normal text-slate-400 dark:text-purple-300/60">/month</span></span>
                     </div>
                   </div>
+
+                  <!-- Active / Inactive Toggle Buttons Requested by User -->
+                  <div class="mt-4 pt-3 border-t border-slate-100 dark:border-purple-500/20 flex items-center justify-between">
+                    <span class="text-[11px] font-bold text-slate-500 dark:text-purple-300/80">Status:</span>
+                    <div class="inline-flex rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/90 shadow-2xs">
+                      <button type="button" onclick="setEmployeeStatus('${id}', 'Active')" title="Set Active (সক্রিয় করুন)" class="px-2.5 py-1 text-[10px] font-extrabold rounded-md transition cursor-pointer flex items-center ${isEmpActive ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-400 hover:text-emerald-600'}">
+                        <i class="fa-solid fa-check mr-1 text-[9px]"></i>Active
+                      </button>
+                      <button type="button" onclick="setEmployeeStatus('${id}', 'Inactive')" title="Set Inactive (নিষ্ক্রিয় করুন)" class="px-2.5 py-1 text-[10px] font-extrabold rounded-md transition cursor-pointer flex items-center ${!isEmpActive ? 'bg-rose-500 text-white shadow-xs' : 'text-slate-400 hover:text-rose-600'}">
+                        <i class="fa-solid fa-ban mr-1 text-[9px]"></i>Inactive
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Bottom Actions: Edit & Delete matching screenshot -->
-                <div class="mt-5 pt-3.5 border-t border-slate-100 dark:border-purple-500/20 flex items-center justify-between">
+                <div class="mt-4 pt-3.5 border-t border-slate-100 dark:border-purple-500/20 flex items-center justify-between">
                   <button onclick="openEmployeeModal('${id}')" class="text-xs font-bold text-sky-600 hover:text-sky-700 dark:text-purple-400 dark:hover:text-purple-300 transition flex items-center space-x-1 cursor-pointer">
                     <span>Edit</span>
                   </button>
@@ -3299,14 +3322,17 @@
 
                     // 2. Table Rows (preserved for table view)
                     tableRows += `
-            <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50/70 dark:hover:bg-purple-950/40 transition text-xs group" data-emp-id="${id}">
+            <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50/70 dark:hover:bg-purple-950/40 transition text-xs group ${!isEmpActive ? 'bg-rose-50/25 dark:bg-rose-950/10' : ''}" data-emp-id="${id}" data-name="${(emp.name || '').toLowerCase()}" data-code="${(emp.customEmpCode || '').toLowerCase()}" data-dept="${(emp.department || '').toLowerCase()}" data-status="${empStatus.toLowerCase()}">
               <td class="pl-5 pr-2 py-4 w-10 text-center">
                 <input type="checkbox" class="emp-row-select w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer transition accent-purple-600" value="${id}" data-name="${emp.name ? emp.name.replace(/"/g, '&quot;') : ''}" onchange="onEmployeeSelectChange()">
               </td>
               <td class="px-6 py-4 flex items-center space-x-3">
                 <img src="${emp.photoUrl}" alt="Photo" class="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-purple-500/40 shadow-xs" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=7c3aed&color=fff'">
                 <div>
-                  <div class="font-bold text-slate-800 dark:text-white text-sm">${emp.name}</div>
+                  <div class="font-bold text-slate-800 dark:text-white text-sm flex items-center gap-1.5">
+                    ${emp.name}
+                    <span class="inline-block w-2 h-2 rounded-full ${isEmpActive ? 'bg-emerald-500' : 'bg-rose-500'}" title="${empStatus}"></span>
+                  </div>
                   <div class="text-[11px] text-purple-600 dark:text-purple-300 font-semibold">ID: <span class="bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-200 px-1.5 py-0.5 rounded font-bold">${emp.customEmpCode || 'N/A'}</span> • ${emp.designation}</div>
                 </div>
               </td>
@@ -3316,6 +3342,16 @@
               <td class="px-6 py-4"><span class="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full text-[11px] font-bold">🏢 ${emp.branch || 'Head Office'}</span></td>
               <td class="px-6 py-4 text-slate-600 dark:text-purple-200/90">${emp.joiningDate || 'N/A'}</td>
               <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">৳ ${emp.salary ? emp.salary.toLocaleString() : 0}</td>
+              <td class="px-6 py-4 text-center whitespace-nowrap">
+                <div class="inline-flex rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shadow-2xs">
+                  <button type="button" onclick="setEmployeeStatus('${id}', 'Active')" title="Set Active (সক্রিয় করুন)" class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer flex items-center ${isEmpActive ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-400 hover:text-emerald-600'}">
+                    <i class="fa-solid fa-circle-check text-[10px] mr-1"></i>Active
+                  </button>
+                  <button type="button" onclick="setEmployeeStatus('${id}', 'Inactive')" title="Set Inactive (নিষ্ক্রিয় করুন)" class="px-2.5 py-1 text-[11px] font-bold rounded-md transition cursor-pointer flex items-center ${!isEmpActive ? 'bg-rose-500 text-white shadow-xs' : 'text-slate-400 hover:text-rose-600'}">
+                    <i class="fa-solid fa-circle-xmark text-[10px] mr-1"></i>Inactive
+                  </button>
+                </div>
+              </td>
               <td class="px-6 py-4 text-right space-x-1">
                 <button onclick="viewEmployeeDetails('${id}')" title="View Details" class="p-2 bg-slate-100 dark:bg-purple-900/40 hover:bg-slate-200 dark:hover:bg-purple-800 text-slate-700 dark:text-purple-200 rounded-lg text-xs transition"><i class="fa-solid fa-eye"></i></button>
                 <button onclick="openEmployeeModal('${id}')" title="Edit Employee" class="p-2 bg-purple-50 dark:bg-purple-900/50 hover:bg-purple-100 dark:hover:bg-purple-800 text-purple-700 dark:text-purple-200 rounded-lg text-xs transition"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -3338,12 +3374,12 @@
           `;
                 }
                 if (tbody) {
-                    tbody.innerHTML = tableRows || '<tr><td colspan="9" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারী পাওয়া যায়নি</td></tr>';
+                    tbody.innerHTML = tableRows || '<tr><td colspan="10" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারী পাওয়া যায়নি</td></tr>';
                 }
                 updateEmployeeBulkDeleteState();
                 if (typeof filterEmployeeCards === 'function') filterEmployeeCards();
                 if (leaveSelect) leaveSelect.innerHTML = genOptions;
-                if (payEmpSelect) payEmpSelect.innerHTML = genOptions;
+                if (payEmpSelect) payEmpSelect.innerHTML = payOptions;
                 if (advEmpSelect) advEmpSelect.innerHTML = genOptions;
                 if (perfEmpSelect) perfEmpSelect.innerHTML = genOptions;
                 if (fineEmpSelect) fineEmpSelect.innerHTML = fineOptions;
@@ -3725,12 +3761,16 @@
                     document.getElementById('emp-branch').value = emp.branch || 'Head Office';
                     document.getElementById('emp-joining').value = emp.joiningDate || '';
                     document.getElementById('emp-salary').value = emp.salary || 0;
+                    const statusInput = document.getElementById('emp-status');
+                    if (statusInput) statusInput.value = emp.status || 'Active';
                     document.getElementById('emp-photo').value = emp.photoUrl || '';
                     if (previewImg) previewImg.src = emp.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=6366f1&color=fff`;
                 }
             } else {
                 document.getElementById('emp-custom-code').value = '';
                 document.getElementById('emp-photo').value = '';
+                const statusInput = document.getElementById('emp-status');
+                if (statusInput) statusInput.value = 'Active';
                 if (previewImg) previewImg.src = 'https://ui-avatars.com/api/?name=User&background=6366f1&color=fff';
                 if (['Manager', 'Branch Manager'].includes(currentUserRole) && currentUserBranch !== 'ALL') {
                     const bSelect = document.getElementById('emp-branch');
@@ -3752,6 +3792,7 @@
             const branch = document.getElementById('emp-branch').value;
             const joiningDate = document.getElementById('emp-joining').value;
             const salary = Number(document.getElementById('emp-salary').value) || 0;
+            const status = document.getElementById('emp-status')?.value || 'Active';
             let photoUrl = document.getElementById('emp-photo').value;
 
             if (!photoUrl) {
@@ -3770,9 +3811,10 @@
                         branch: branch || 'Head Office',
                         joiningDate,
                         salary,
+                        status,
                         photoUrl
                     });
-                    await logSystemActivity('UPDATE', 'Employee', `${currentUserEmail} updated employee "${name}" (ID: ${customEmpCode}, Branch: ${branch || 'Head Office'})`, { employeeId: id, employeeName: name, customEmpCode });
+                    await logSystemActivity('UPDATE', 'Employee', `${currentUserEmail} updated employee "${name}" (ID: ${customEmpCode}, Status: ${status}, Branch: ${branch || 'Head Office'})`, { employeeId: id, employeeName: name, customEmpCode, status });
                     showToast('success', `কর্মচারী "${name}" এর তথ্য সফলভাবে আপডেট হয়েছে!`);
                 } else {
                     await addDoc(collection(db, "employees"), {
@@ -3786,11 +3828,12 @@
                         joiningDate,
                         lastIncrementDate: joiningDate,
                         salary,
+                        status,
                         photoUrl,
                         docUrl: '#',
                         createdAt: new Date().toISOString()
                     });
-                    await logSystemActivity('CREATE', 'Employee', `${currentUserEmail} created new employee "${name}" (ID: ${customEmpCode}, Branch: ${branch || 'Head Office'})`, { employeeName: name, customEmpCode });
+                    await logSystemActivity('CREATE', 'Employee', `${currentUserEmail} created new employee "${name}" (ID: ${customEmpCode}, Status: ${status}, Branch: ${branch || 'Head Office'})`, { employeeName: name, customEmpCode, status });
                     showToast('success', `নতুন কর্মচারী "${name}" সফলভাবে যুক্ত হয়েছে!`);
                 }
                 toggleModal('employee-modal', false);
@@ -3855,18 +3898,74 @@
             window.updateEmployeeBulkDeleteState();
         };
 
+        window.setEmployeeStatus = async function (empId, newStatus) {
+            try {
+                const emp = employeeList.find(e => e.id === empId);
+                const empName = emp?.name || 'Employee';
+                const currentStatus = emp ? (emp.status || 'Active') : 'Active';
+
+                if (currentStatus.toLowerCase() === newStatus.toLowerCase()) {
+                    return;
+                }
+
+                await updateDoc(doc(db, "employees", empId), {
+                    status: newStatus,
+                    updatedAt: new Date().toISOString()
+                });
+
+                await logSystemActivity(
+                    'UPDATE',
+                    'Employee',
+                    `${currentUserEmail} changed status of "${empName}" to ${newStatus}`,
+                    { employeeId: empId, employeeName: empName, status: newStatus }
+                );
+
+                showToast('success', `"${empName}" এর স্ট্যাটাস সফলভাবে "${newStatus}" করা হয়েছে!`);
+            } catch (err) {
+                console.error('Error changing employee status:', err);
+                showToast('error', 'স্ট্যাটাস পরিবর্তন ব্যর্থ: ' + err.message);
+            }
+        };
+
+        window.toggleEmployeeStatus = function (empId, currentStatus) {
+            const nextStatus = (currentStatus || 'Active').toLowerCase() === 'inactive' ? 'Active' : 'Inactive';
+            window.setEmployeeStatus(empId, nextStatus);
+        };
+
         window.filterEmployeeCards = function () {
             const query = (document.getElementById('emp-search-input')?.value || '').toLowerCase().trim();
+            const statusFilter = (document.getElementById('emp-status-filter')?.value || 'ALL').toLowerCase();
             const cards = document.querySelectorAll('.emp-card-item');
+            const tableRows = document.querySelectorAll('#emp-table-body tr[data-emp-id]');
             let visibleCount = 0;
+
             cards.forEach(card => {
                 const name = card.getAttribute('data-name') || '';
                 const code = card.getAttribute('data-code') || '';
                 const dept = card.getAttribute('data-dept') || '';
-                const match = !query || name.includes(query) || code.includes(query) || dept.includes(query);
+                const status = (card.getAttribute('data-status') || 'active').toLowerCase();
+
+                const matchQuery = !query || name.includes(query) || code.includes(query) || dept.includes(query);
+                const matchStatus = statusFilter === 'all' || status === statusFilter;
+                const match = matchQuery && matchStatus;
+
                 card.style.display = match ? '' : 'none';
                 if (match) visibleCount++;
             });
+
+            tableRows.forEach(row => {
+                const name = row.getAttribute('data-name') || '';
+                const code = row.getAttribute('data-code') || '';
+                const dept = row.getAttribute('data-dept') || '';
+                const status = (row.getAttribute('data-status') || 'active').toLowerCase();
+
+                const matchQuery = !query || name.includes(query) || code.includes(query) || dept.includes(query);
+                const matchStatus = statusFilter === 'all' || status === statusFilter;
+                const match = matchQuery && matchStatus;
+
+                row.style.display = match ? '' : 'none';
+            });
+
             const noMatch = document.getElementById('emp-no-search-results');
             if (noMatch) {
                 noMatch.classList.toggle('hidden', visibleCount > 0 || cards.length === 0);
@@ -5200,22 +5299,22 @@
             reader.readAsText(file);
         };
 
-        // ==========================================
-        // BULK CSV EMPLOYEE IMPORT SYSTEM (WITH BRANCH)
-        // ==========================================
+        // =========================================================================
+        // BULK CSV EMPLOYEE IMPORT SYSTEM (WORKFORCE DIRECTORY & ZK MACHINE DATA)
+        // =========================================================================
         window.downloadSampleEmployeeCSV = function () {
-            const sampleHeaders = "Machine_ID,Name,Email,Phone,Designation,Department,Branch,Joining_Date,Salary\n";
+            const sampleHeaders = "Employee,Email,Phone #,Department,Weekly Day Off,Status,Branch,Salary\n";
             const sampleRows =
-                "1,Tanvir Islam Soaib,tanvir@example.com,01711111111,Software Engineer,IT,Head Office,2024-01-01,45000\n" +
-                "6,Rafin Mir,rafin@gmail.com,01822222222,Accounts Manager,Accounts,Gulshan Branch,2022-11-07,40000\n" +
-                "16,Ssnim Ahmed,ssnim@gmail.com,01933333333,Courier Senior Executive,Courier,Chattogram Branch,2024-02-15,30000\n" +
-                "21,Ashikur Rahman,ashik@example.com,01644444444,Operations Officer,Operations,Sylhet Branch,2023-05-10,35000\n" +
-                "47,Naim Khan,naim@example.com,01555555555,HR Executive,HR,Uttara Branch,2024-03-01,28000\n";
+                "Abdur Rohim,abdur.rohim@sanvee.com,-,Operations,Sunday,Inactive,Head Office,25000\n" +
+                "Abul Hasnat,abulhasnat@sanvees.com,01956363216,Moderator,Wednesday,Active,Head Office,25000\n" +
+                "Ahmed Bin Sharif,ahmed.bin.sharif@sanvee.com,01780211183,CCTV Inspector,Saturday,Active,Head Office,25000\n" +
+                "Aklima,aklima@sanvee.com,-,Tailor,Friday,Active,Head Office,25000\n" +
+                "Alamgir Tailor,alamgir.tailor@sanvee.com,-,Operations,Friday,Inactive (2026-05-01),Head Office,25000\n";
 
             const csvBlob = new Blob(["\uFEFF" + sampleHeaders + sampleRows], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(csvBlob);
-            link.download = "ZKTeco_Employee_Import_Template.csv";
+            link.download = "Sanvees_Workforce_Employee_Template.csv";
             link.click();
         };
 
@@ -5231,6 +5330,30 @@
             reader.readAsText(file);
         };
 
+        function splitCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if ((char === ',' || char === '\t') && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result.map(col => col.replace(/^["']|["']$/g, '').trim());
+        }
+
         function parseEmployeeCSV(csvText) {
             const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
             if (lines.length < 2) {
@@ -5245,71 +5368,140 @@
             parsedBulkEmployees = [];
             let skippedDuplicatesCount = 0;
             const seenNamesInFile = new Set();
-            const seenCodesInFile = new Set();
+            const seenEmailsInFile = new Set();
 
-            const headerLine = lines[0].toLowerCase();
-            const headers = headerLine.split(/[,;\t]/).map(h => h.trim().replace(/^["']|["']$/g, ''));
+            const headerLine = lines[0];
+            const headerCols = splitCSVLine(headerLine).map(h => h.toLowerCase());
 
-            const idIdx = headers.findIndex(h => h.includes('id') || h.includes('pin') || h.includes('code') || h.includes('badge') || h.includes('machine'));
-            const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('first'));
-            const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
-            const phoneIdx = headers.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('tel') || h.includes('contact'));
-            const desigIdx = headers.findIndex(h => h.includes('desig') || h.includes('title') || h.includes('position') || h.includes('role'));
-            const deptIdx = headers.findIndex(h => h.includes('dept') || h.includes('department'));
-            const branchIdx = headers.findIndex(h => h.includes('branch') || h.includes('location') || h.includes('office'));
-            const joinIdx = headers.findIndex(h => h.includes('join') || h.includes('date') || h.includes('hire'));
-            const salaryIdx = headers.findIndex(h => h.includes('salary') || h.includes('basic') || h.includes('pay') || h.includes('amount'));
+            // Flexible header detection for Workforce Directory and ZKTeco CSVs
+            const idIdx = headerCols.findIndex(h => /^(machine_?id|badge|pin|emp_?id|id|code)$/i.test(h.replace(/[^a-z0-9]/gi, '')) || h.includes('machine') || (h.includes('id') && !h.includes('email') && !h.includes('paid')));
+            const nameIdx = headerCols.findIndex(h => h.includes('employee') || h.includes('name') || h.includes('staff') || h.includes('person'));
+            const emailIdx = headerCols.findIndex(h => h.includes('email') || h.includes('mail'));
+            const phoneIdx = headerCols.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('tel'));
+            const deptIdx = headerCols.findIndex(h => h.includes('dept') || h.includes('department'));
+            const desigIdx = headerCols.findIndex(h => h.includes('desig') || h.includes('title') || h.includes('position') || h.includes('role'));
+            const dayOffIdx = headerCols.findIndex(h => h.includes('day off') || h.includes('weekly') || h.includes('dayoff') || h.includes('off day'));
+            const statusIdx = headerCols.findIndex(h => h.includes('status') || h.includes('active') || h.includes('state'));
+            const branchIdx = headerCols.findIndex(h => h.includes('branch') || h.includes('location') || h.includes('office'));
+            const joinIdx = headerCols.findIndex(h => h.includes('join') || h.includes('hire') || h.includes('date'));
+            const salaryIdx = headerCols.findIndex(h => h.includes('salary') || h.includes('basic') || h.includes('pay') || h.includes('amount'));
+
+            // Auto-generate employee codes if no ID column in CSV
+            const existingCodes = new Set(employeeList.map(e => String(e.customEmpCode || '').trim().toLowerCase()).filter(Boolean));
+            let maxNumId = 0;
+            employeeList.forEach(e => {
+                const raw = String(e.customEmpCode || '').replace(/\D/g, '');
+                const num = parseInt(raw, 10);
+                if (!isNaN(num) && num > maxNumId) {
+                    maxNumId = num;
+                }
+            });
+
+            function getNextEmpCode() {
+                maxNumId++;
+                let candidate = String(maxNumId);
+                while (existingCodes.has(candidate.toLowerCase())) {
+                    maxNumId++;
+                    candidate = String(maxNumId);
+                }
+                existingCodes.add(candidate.toLowerCase());
+                return candidate;
+            }
 
             for (let i = 1; i < lines.length; i++) {
-                const row = lines[i].split(/[,;\t]/).map(col => col.trim().replace(/^["']|["']$/g, ''));
-                if (row.length === 0 || !row[0]) continue;
+                const row = splitCSVLine(lines[i]);
+                if (row.length === 0 || row.every(c => !c)) continue;
 
-                const customEmpCode = (idIdx !== -1 && row[idIdx]) ? row[idIdx] : (row[0] || `EMP-${i}`);
-                const name = (nameIdx !== -1 && row[nameIdx]) ? row[nameIdx] : (row[1] || 'Employee ' + customEmpCode);
-                const email = (emailIdx !== -1 && row[emailIdx]) ? row[emailIdx] : `emp${customEmpCode}@company.com`;
-                const phone = (phoneIdx !== -1 && row[phoneIdx]) ? row[phoneIdx] : '01700000000';
-                const designation = (desigIdx !== -1 && row[desigIdx]) ? row[desigIdx] : 'Staff';
-                const department = (deptIdx !== -1 && row[deptIdx]) ? row[deptIdx] : 'General';
-                const branch = (branchIdx !== -1 && row[branchIdx]) ? row[branchIdx] : defaultBranchFallback;
-                const joiningDate = (joinIdx !== -1 && row[joinIdx]) ? row[joinIdx] : new Date().toISOString().split('T')[0];
-                const salary = (salaryIdx !== -1 && row[salaryIdx]) ? (Number(row[salaryIdx].replace(/[^0-9.]/g, '')) || 25000) : 25000;
-
-                const normName = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
-                const normCode = String(customEmpCode).trim().toLowerCase();
-
-                // ১. চেক করা হচ্ছে এই নামের অথবা মেশিন আইডির কর্মচারী ডাটাবেজে আগে থেকেই আছে কি না
-                const existsInDb = employeeList.some(e => {
-                    const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                    const eCode = String(e.customEmpCode || '').trim().toLowerCase();
-                    const isNameMatch = normName && eName && normName === eName;
-                    const isCodeMatch = normCode && eCode && (normCode === eCode || (!isNaN(normCode) && !isNaN(eCode) && parseInt(normCode, 10) === parseInt(eCode, 10)));
-                    return isNameMatch || isCodeMatch;
-                });
-
-                // ২. একই ফাইলে নাম বা কোড একাধিকবার রিপিট হয়েছে কি না
-                const existsInCurrentBatch = (normName && seenNamesInFile.has(normName)) || (normCode && seenCodesInFile.has(normCode));
-
-                if (existsInDb || existsInCurrentBatch) {
-                    skippedDuplicatesCount++;
-                    continue; // পূর্ববর্তী নাম পাওয়া গেলে তা স্বয়ংক্রিয়ভাবে বাদ দেওয়া হবে
+                // Extract values intelligently
+                let rawName = (nameIdx !== -1 && row[nameIdx]) ? row[nameIdx] : '';
+                if (!rawName) {
+                    rawName = (idIdx === -1) ? (row[0] || '') : (row[1] || '');
                 }
+                if (!rawName || !rawName.trim()) continue;
 
+                const name = rawName.trim();
+                const rawEmail = (emailIdx !== -1 && row[emailIdx]) ? row[emailIdx] : '';
+                const email = (rawEmail && rawEmail !== '-') ? rawEmail.trim().toLowerCase() : '';
+                const rawPhone = (phoneIdx !== -1 && row[phoneIdx]) ? row[phoneIdx] : '';
+                const phone = (rawPhone && rawPhone !== '-') ? rawPhone.trim() : '-';
+                const department = (deptIdx !== -1 && row[deptIdx]) ? row[deptIdx].trim() : 'General';
+                const designation = (desigIdx !== -1 && row[desigIdx]) ? row[desigIdx].trim() : (department !== 'General' ? department : 'Staff');
+                const weeklyDayOff = (dayOffIdx !== -1 && row[dayOffIdx]) ? row[dayOffIdx].trim() : 'Friday';
+                
+                // Status parsing: "Inactive", "Inactive (2026-04-27)" -> Inactive; otherwise Active
+                const rawStatus = (statusIdx !== -1 && row[statusIdx]) ? row[statusIdx].trim() : 'Active';
+                const isInactive = rawStatus.toLowerCase().includes('inactive');
+                const status = isInactive ? 'Inactive' : 'Active';
+
+                const branch = (branchIdx !== -1 && row[branchIdx]) ? row[branchIdx].trim() : defaultBranchFallback;
+                const joiningDate = (joinIdx !== -1 && row[joinIdx]) ? row[joinIdx].trim() : new Date().toISOString().split('T')[0];
+                const rawSalary = (salaryIdx !== -1 && row[salaryIdx]) ? Number(row[salaryIdx].replace(/[^0-9.]/g, '')) : 25000;
+                const salary = (!isNaN(rawSalary) && rawSalary > 0) ? rawSalary : 25000;
+
+                const normName = name.toLowerCase().replace(/\s+/g, ' ').trim();
+                const normEmail = email;
+
+                // ১. ফাইলে একই নাম বা ইমেইল বারবার আসলে ডুপ্লিকেট না নিয়ে প্রথমটি নেওয়া হবে
+                const isDupInFile = (normName && seenNamesInFile.has(normName)) || (normEmail && seenEmailsInFile.has(normEmail));
+                if (isDupInFile) {
+                    skippedDuplicatesCount++;
+                    continue; // একই ব্যক্তির নাম ফাইলে একাধিকবার থাকলেও একবারই প্রসেস হবে
+                }
                 if (normName) seenNamesInFile.add(normName);
-                if (normCode) seenCodesInFile.add(normCode);
+                if (normEmail) seenEmailsInFile.add(normEmail);
 
-                parsedBulkEmployees.push({
-                    customEmpCode,
-                    name,
-                    email,
-                    phone,
-                    designation,
-                    department,
-                    branch,
-                    joiningDate,
-                    salary,
-                    photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`,
-                    docUrl: '#'
+                // ২. ডাটাবেজে আগে থেকেই আছে কি না ম্যাচ করা (ডুপ্লিকেট এন্ট্রি যাতে না হয়)
+                const existing = employeeList.find(e => {
+                    const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                    const eEmail = String(e.email || '').trim().toLowerCase();
+                    const isNameMatch = normName && eName && normName === eName;
+                    const isEmailMatch = normEmail && eEmail && normEmail === eEmail && !eEmail.endsWith('@company.com');
+                    return isNameMatch || isEmailMatch;
                 });
+
+                if (existing) {
+                    // পূর্বে বিদ্যমান কর্মচারী: ডুপ্লিকেট হবে না, শুধু স্ট্যাটাস ও তথ্য সিঙ্ক হবে
+                    parsedBulkEmployees.push({
+                        isNew: false,
+                        existingId: existing.id,
+                        existingEmp: existing,
+                        customEmpCode: existing.customEmpCode || (idIdx !== -1 && row[idIdx] ? row[idIdx].trim() : 'N/A'),
+                        name: existing.name || name,
+                        email: email || existing.email || '',
+                        phone: (phone && phone !== '-') ? phone : (existing.phone || '-'),
+                        designation: designation || existing.designation || 'Staff',
+                        department: department || existing.department || 'General',
+                        branch: existing.branch || branch,
+                        weeklyDayOff: weeklyDayOff || existing.weeklyDayOff || 'Friday',
+                        status: status,
+                        joiningDate: existing.joiningDate || joiningDate,
+                        salary: existing.salary || salary,
+                        photoUrl: existing.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`
+                    });
+                } else {
+                    // একদম নতুন কর্মচারী: সিস্টেমে নতুন হিসেবে যুক্ত হবে
+                    let customEmpCode = (idIdx !== -1 && row[idIdx]) ? row[idIdx].trim() : '';
+                    if (!customEmpCode) {
+                        customEmpCode = getNextEmpCode();
+                    }
+
+                    parsedBulkEmployees.push({
+                        isNew: true,
+                        customEmpCode,
+                        name,
+                        email: email || `${normName.replace(/[^a-z0-9]/g, '')}@sanvee.com`,
+                        phone: phone || '-',
+                        designation,
+                        department,
+                        branch,
+                        weeklyDayOff,
+                        status,
+                        joiningDate,
+                        salary,
+                        photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`,
+                        docUrl: '#'
+                    });
+                }
             }
 
             renderBulkPreviewTable(skippedDuplicatesCount);
@@ -5324,36 +5516,56 @@
             if (!tbody) return;
             tbody.innerHTML = '';
 
+            const newCount = parsedBulkEmployees.filter(e => e.isNew).length;
+            const updateCount = parsedBulkEmployees.filter(e => !e.isNew).length;
+
             if (parsedBulkEmployees.length === 0) {
                 if (previewBox) previewBox.classList.remove('hidden');
                 if (commitBtn) commitBtn.disabled = true;
                 if (countLabel) {
-                    countLabel.innerHTML = `<span class="text-rose-600 font-bold">০ জন নতুন কর্মচারী পাওয়া গেছে</span>` +
-                        (skippedCount > 0 ? ` <span class="text-slate-500 font-normal">(${skippedCount} জন কর্মচারী পূর্বে থেকেই থাকায় বাদ দেওয়া হয়েছে)</span>` : '');
+                    countLabel.innerHTML = `<span class="text-rose-600 font-bold">০ জন কর্মচারী প্রসেস হয়েছে</span>` +
+                        (skippedCount > 0 ? ` <span class="text-slate-500 font-normal">(${skippedCount} জন ডুপ্লিকেট স্কিপ হয়েছে)</span>` : '');
                 }
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-medium">কোনো নতুন কর্মচারী পাওয়া যায়নি (পূর্ববর্তী কর্মচারীরা স্বয়ংক্রিয়ভাবে স্কিপ হয়েছে)</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400 font-medium">কোনো কর্মচারী পাওয়া যায়নি</td></tr>';
                 return;
             }
 
             if (previewBox) previewBox.classList.remove('hidden');
             if (commitBtn) commitBtn.disabled = false;
             if (countLabel) {
-                countLabel.innerHTML = `<span class="text-emerald-700 font-bold">মোট ${parsedBulkEmployees.length} জন নতুন কর্মচারী যুক্ত হবে</span>` +
-                    (skippedCount > 0 ? ` <span class="text-slate-500 font-normal">(${skippedCount} জন পূর্ববর্তী কর্মচারী বাদ দেওয়া হয়েছে)</span>` : '');
+                countLabel.innerHTML = `
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">🟢 নতুন যুক্ত হবে: ${newCount} জন</span>
+                        <span class="text-sky-700 font-bold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">🔵 স্ট্যাটাস সিঙ্ক হবে: ${updateCount} জন (ডুপ্লিকেট হবে না)</span>
+                        ${skippedCount > 0 ? `<span class="text-amber-700 font-semibold bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">⚠️ ফাইলে ডুপ্লিকেট থাকায় বাদ: ${skippedCount} জন</span>` : ''}
+                    </div>
+                `;
             }
 
             let rowsHtml = '';
             parsedBulkEmployees.forEach((emp, index) => {
+                const isAct = emp.status === 'Active';
+                const statusBadge = isAct
+                    ? `<span class="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold text-[10px] flex items-center w-max"><i class="fa-solid fa-circle-check mr-1 text-[9px]"></i>Active</span>`
+                    : `<span class="bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full font-bold text-[10px] flex items-center w-max"><i class="fa-solid fa-circle-xmark mr-1 text-[9px]"></i>Inactive</span>`;
+
+                const typeBadge = emp.isNew
+                    ? `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-bold text-[10px]">🟢 NEW</span>`
+                    : `<span class="bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded font-bold text-[10px]">🔵 SYNC</span>`;
+
                 rowsHtml += `
           <tr class="border-b border-slate-100 text-xs hover:bg-slate-50 transition">
-            <td class="px-4 py-2.5 font-bold text-indigo-700">${emp.customEmpCode}</td>
-            <td class="px-4 py-2.5 font-bold text-slate-800">${emp.name} <span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-bold ml-1">NEW</span></td>
-            <td class="px-4 py-2.5 text-slate-600">${emp.designation}</td>
-            <td class="px-4 py-2.5 text-slate-600">${emp.department}</td>
+            <td class="px-4 py-2.5 font-bold text-indigo-700 font-mono">${emp.customEmpCode}</td>
+            <td class="px-4 py-2.5">
+                <div class="font-bold text-slate-800">${emp.name} ${typeBadge}</div>
+                <div class="text-[11px] text-slate-400 truncate max-w-[180px]">${emp.email || 'N/A'}</div>
+            </td>
+            <td class="px-4 py-2.5 text-slate-600 font-medium">${emp.department}</td>
+            <td class="px-4 py-2.5 text-slate-600">${emp.weeklyDayOff || 'Friday'}</td>
+            <td class="px-4 py-2.5">${statusBadge}</td>
             <td class="px-4 py-2.5 font-semibold text-emerald-700">🏢 ${emp.branch}</td>
-            <td class="px-4 py-2.5 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
             <td class="px-4 py-2.5 text-right">
-              <button onclick="removeBulkParsedItem(${index})" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash-can"></i></button>
+              <button onclick="removeBulkParsedItem(${index})" title="Remove item" class="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>
             </td>
           </tr>
         `;
@@ -5368,82 +5580,92 @@
 
         window.commitBulkEmployeeUpload = async function () {
             if (parsedBulkEmployees.length === 0) {
-                showToast('warning', 'যুক্ত করার জন্য কোনো নতুন কর্মচারী পাওয়া যায়নি');
+                showToast('warning', 'আপলোড করার জন্য কোনো কর্মচারী পাওয়া যায়নি');
                 return;
             }
 
+            const newCount = parsedBulkEmployees.filter(e => e.isNew).length;
+            const updateCount = parsedBulkEmployees.filter(e => !e.isNew).length;
+
             Swal.fire({
-                title: 'ডাটাবেজে যুক্ত হচ্ছে...',
-                html: `মোট <strong>${parsedBulkEmployees.length}</strong> জন নতুন কর্মচারীকে যুক্ত করা হচ্ছে। অপেক্ষা করুন...`,
+                title: 'ডাটাবেজে সিঙ্ক হচ্ছে...',
+                html: `মোট <strong>${newCount}</strong> জন নতুন কর্মচারী যুক্ত হচ্ছে এবং <strong>${updateCount}</strong> জন কর্মচারীর স্ট্যাটাস আপডেট হচ্ছে। অপেক্ষা করুন...`,
                 allowOutsideClick: false,
                 didOpen: () => { Swal.showLoading(); }
             });
 
             let addedCount = 0;
-            let skippedCount = 0;
+            let updatedCount = 0;
 
             try {
                 for (let emp of parsedBulkEmployees) {
-                    const normName = String(emp.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                    const normCode = String(emp.customEmpCode || '').trim().toLowerCase();
+                    if (emp.isNew) {
+                        // চূড়ান্ত ডুপ্লিকেট সেফটি চেক
+                        const normName = String(emp.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                        const existing = employeeList.find(e => String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim() === normName);
 
-                    // চূড়ান্ত সেফটি চেক: আগের কোনো নামের বা আইডির সাথে মিলে গেলে তা বাদ দেওয়া হবে
-                    const existing = employeeList.find(e => {
-                        const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                        const eCode = String(e.customEmpCode || '').trim().toLowerCase();
-                        return (normName && eName === normName) || (normCode && eCode && (normCode === eCode || (!isNaN(normCode) && !isNaN(eCode) && parseInt(normCode, 10) === parseInt(eCode, 10))));
-                    });
+                        if (existing) {
+                            // নাম পাওয়া গেলে ডুপ্লিকেট এন্ট্রি তৈরি না করে বিদ্যমানটি আপডেট হবে
+                            await updateDoc(doc(db, "employees", existing.id), {
+                                status: emp.status,
+                                department: emp.department || existing.department || 'General',
+                                weeklyDayOff: emp.weeklyDayOff || existing.weeklyDayOff || 'Friday',
+                                phone: (emp.phone && emp.phone !== '-') ? emp.phone : (existing.phone || '-'),
+                                updatedAt: new Date().toISOString()
+                            });
+                            updatedCount++;
+                            continue;
+                        }
 
-                    if (existing) {
-                        skippedCount++;
-                        continue; // কোনো অবস্থাতেই আগের নামের ডাটা পুনরায় যুক্ত হবে না
+                        await addDoc(collection(db, "employees"), {
+                            customEmpCode: emp.customEmpCode,
+                            name: emp.name,
+                            email: emp.email,
+                            phone: emp.phone,
+                            photoUrl: emp.photoUrl,
+                            designation: emp.designation,
+                            department: emp.department,
+                            branch: emp.branch || 'Head Office',
+                            weeklyDayOff: emp.weeklyDayOff || 'Friday',
+                            status: emp.status || 'Active',
+                            joiningDate: emp.joiningDate,
+                            lastIncrementDate: emp.joiningDate,
+                            salary: Number(emp.salary),
+                            docUrl: '#',
+                            createdAt: new Date().toISOString()
+                        });
+                        addedCount++;
+                    } else {
+                        // বিদ্যমান কর্মচারীর স্ট্যাটাস ও তথ্য সিঙ্ক (কোনো ডুপ্লিকেট তৈরি হবে না)
+                        await updateDoc(doc(db, "employees", emp.existingId), {
+                            status: emp.status,
+                            department: emp.department || emp.existingEmp.department || 'General',
+                            weeklyDayOff: emp.weeklyDayOff || emp.existingEmp.weeklyDayOff || 'Friday',
+                            phone: (emp.phone && emp.phone !== '-') ? emp.phone : (emp.existingEmp.phone || '-'),
+                            updatedAt: new Date().toISOString()
+                        });
+                        updatedCount++;
                     }
-
-                    await addDoc(collection(db, "employees"), {
-                        customEmpCode: emp.customEmpCode,
-                        name: emp.name,
-                        email: emp.email,
-                        phone: emp.phone,
-                        photoUrl: emp.photoUrl,
-                        designation: emp.designation,
-                        department: emp.department,
-                        branch: emp.branch || 'Head Office',
-                        joiningDate: emp.joiningDate,
-                        lastIncrementDate: emp.joiningDate,
-                        salary: Number(emp.salary),
-                        docUrl: '#',
-                        createdAt: new Date().toISOString()
-                    });
-                    addedCount++;
                 }
 
                 await logSystemActivity(
-                    'BULK_CREATE',
+                    'BULK_SYNC',
                     'Employee',
-                    `${currentUserEmail} bulk added ${addedCount} new employees (skipped ${skippedCount} existing)`,
-                    { addedCount, skippedCount }
+                    `${currentUserEmail} bulk synced employees: added ${addedCount} new, updated ${updatedCount} existing without duplicates`,
+                    { addedCount, updatedCount }
                 );
 
                 parsedBulkEmployees = [];
                 toggleModal('bulk-emp-modal', false);
 
-                if (addedCount > 0) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'সফলভাবে যুক্ত হয়েছে! 🎉',
-                        html: `মোট <b>${addedCount}</b> জন নতুন কর্মচারী যুক্ত হয়েছে।` +
-                            (skippedCount > 0 ? `<br><small class="text-slate-500">(${skippedCount} জন পূর্ববর্তী কর্মচারী থাকায় বাদ দেওয়া হয়েছে)</small>` : ''),
-                        confirmButtonColor: '#4f46e5'
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'কোনো নতুন কর্মচারী যুক্ত হয়নি',
-                        text: 'ফাইলের সব কর্মচারীর নাম/আইডি ইতোমধ্যে সিস্টেমে থাকায় কাউকে ডুপ্লিকেট হিসেবে এন্ট্রি করা হয়নি।',
-                        confirmButtonColor: '#4f46e5'
-                    });
-                }
+                Swal.fire({
+                    icon: 'success',
+                    title: 'সফলভাবে সিঙ্ক সম্পন্ন হয়েছে! 🎉',
+                    html: `মোট <b>${addedCount}</b> জন নতুন কর্মচারী যুক্ত হয়েছে এবং <b>${updatedCount}</b> জন কর্মচারীর স্ট্যাটাস আপডেট হয়েছে।<br><small class="text-slate-500">কোনো ডুপ্লিকেট এন্ট্রি তৈরি হয়নি।</small>`,
+                    confirmButtonColor: '#4f46e5'
+                });
             } catch (err) {
+                console.error('Bulk upload error:', err);
                 Swal.fire('ব্যর্থ!', err.message, 'error');
             }
         };
@@ -8525,13 +8747,13 @@ ${messageText}
             if (document.getElementById('pay-stat-net')) document.getElementById('pay-stat-net').innerText = `৳ ${totalNet.toLocaleString()}`;
         };
 
-        // Filter Employee dropdown in Add Payroll modal by ID number / Name
+        // Filter Employee dropdown in Add Payroll modal by ID number / Name (Active employees only)
         window.filterPayrollEmpDropdown = function (query) {
             const q = (query || '').toLowerCase().trim();
             const select = document.getElementById('pay-emp-id');
             if (!select) return;
 
-            const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+            const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch) && (emp.status || 'Active').toLowerCase() !== 'inactive');
             let matchedEmpId = null;
             let optionsHtml = '<option value="">-- কর্মচারী নির্বাচন করুন (Select Employee) --</option>';
 
@@ -8701,6 +8923,11 @@ ${messageText}
             const attBox = document.getElementById('pay-att-summary-box');
             if (!emp) return;
 
+            if ((emp.status || 'Active').toLowerCase() === 'inactive') {
+                showToast('warning', `⚠️ "${emp.name}" নিষ্ক্রিয় (Inactive)। নিষ্ক্রিয় কর্মচারীর পে-রোল তৈরি করা যাবে না।`);
+                return;
+            }
+
             const baseSalary = Number(emp.salary) || 0;
 
             // 1. Calculate Advance & Fine for that month
@@ -8864,6 +9091,11 @@ ${messageText}
             const net = Number(document.getElementById('pay-net').value) || 0;
 
             const emp = employeeList.find(e => e.id === empId);
+
+            if (emp && (emp.status || 'Active').toLowerCase() === 'inactive') {
+                showToast('warning', `⚠️ "${emp.name}" নিষ্ক্রিয় (Inactive)। নিষ্ক্রিয় কর্মচারীর পে-রোল তৈরি বা সংরক্ষণ করা যাবে না।`);
+                return;
+            }
 
             const presentCount = document.getElementById('pay-sum-present-input') ? (parseInt(document.getElementById('pay-sum-present-input').value) || 0) : 0;
             const dayOffCount = document.getElementById('pay-sum-dayoff-input') ? (parseInt(document.getElementById('pay-sum-dayoff-input').value) || 0) : 0;
@@ -9087,10 +9319,11 @@ ${messageText}
                 }
             }
 
-            // Filter target employees
+            // Filter target employees (Active only)
             const targetEmployees = employeeList.filter(emp => {
                 if (!isItemInActiveBranch(emp.branch)) return false;
                 if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
+                if ((emp.status || 'Active').toLowerCase() === 'inactive') return false;
                 return true;
             });
 
@@ -14745,15 +14978,25 @@ ${messageText}
                         </div>
                     </div>
 
-                    <!-- Quick Search & Select-All Filter Bar -->
+                    <!-- Quick Search, Status Filter & Select-All Filter Bar -->
                     <div
                         class="flex flex-wrap items-center justify-between gap-3 bg-white/70 dark:bg-[#1a0c36]/80 p-3.5 rounded-2xl border border-slate-200/80 dark:border-purple-500/25 shadow-xs backdrop-blur-md">
-                        <div class="relative flex-1 min-w-[200px] max-w-md">
-                            <i
-                                class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 dark:text-purple-400 text-xs"></i>
-                            <input type="text" id="emp-search-input" oninput="filterEmployeeCards()"
-                                placeholder="Search employees by name, ID, department..."
-                                class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-500/30 rounded-xl text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 transition">
+                        <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-[200px] max-w-xl">
+                            <div class="relative flex-1 min-w-[220px]">
+                                <i
+                                    class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 dark:text-purple-400 text-xs"></i>
+                                <input type="text" id="emp-search-input" oninput="filterEmployeeCards()"
+                                    placeholder="Search employees by name, ID, department..."
+                                    class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-500/30 rounded-xl text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500 transition">
+                            </div>
+
+                            <!-- Status Filter Dropdown -->
+                            <select id="emp-status-filter" onchange="filterEmployeeCards()"
+                                class="px-3 py-2 bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-500/30 rounded-xl text-xs font-bold text-slate-700 dark:text-purple-200 outline-none focus:ring-2 focus:ring-purple-500 transition cursor-pointer">
+                                <option value="ALL">All Status (সব স্ট্যাটাস)</option>
+                                <option value="Active">🟢 Active Only (সক্রিয়)</option>
+                                <option value="Inactive">🔴 Inactive Only (নিষ্ক্রিয়)</option>
+                            </select>
                         </div>
 
                         <div class="flex items-center space-x-3">
@@ -14792,6 +15035,7 @@ ${messageText}
                                         <th class="px-6 py-3.5">Branch</th>
                                         <th class="px-6 py-3.5">Joining Date</th>
                                         <th class="px-6 py-3.5">Basic Salary</th>
+                                        <th class="px-6 py-3.5 text-center">Status</th>
                                         <th class="px-6 py-3.5 text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -16814,8 +17058,8 @@ ${messageText}
             class="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div>
-                    <h3 class="text-base font-bold text-slate-900">Bulk Employee CSV Import (ZK Machine Data)</h3>
-                    <p class="text-xs text-slate-500">ZKTeco সফটওয়্যার থেকে নামানো CSV ফাইল আপলোড করুন</p>
+                    <h3 class="text-base font-bold text-slate-900">Bulk Employee CSV Import (Workforce Directory & ZK Machine Data)</h3>
+                    <p class="text-xs text-slate-500">Workforce People Directory বা ZKTeco সফটওয়্যার থেকে নামানো CSV ফাইল আপলোড করুন</p>
                 </div>
                 <button onclick="toggleModal('bulk-emp-modal', false)"
                     class="text-slate-400 hover:text-slate-700 text-sm"><i class="fa-solid fa-xmark"></i></button>
@@ -16824,12 +17068,11 @@ ${messageText}
             <div class="space-y-4 flex-1 overflow-y-auto pr-1">
                 <div class="bg-indigo-50/70 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
                     <div class="space-y-0.5">
-                        <h4 class="text-xs font-bold text-indigo-900">Sample CSV Template</h4>
-                        <p class="text-[11px] text-indigo-700">Machine_ID, Name, Email, Designation, Department, Branch,
-                            Salary</p>
+                        <h4 class="text-xs font-bold text-indigo-900">Sample CSV Template (Workforce Directory Format)</h4>
+                        <p class="text-[11px] text-indigo-700">Employee, Email, Phone #, Department, Weekly Day Off, Status</p>
                     </div>
                     <button onclick="downloadSampleEmployeeCSV()"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1">
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer">
                         <i class="fa-solid fa-download"></i>
                         <span>Sample Template</span>
                     </button>
@@ -16847,7 +17090,7 @@ ${messageText}
                         <label class="block text-xs font-bold text-slate-700 mb-1">Select CSV / Excel File</label>
                         <input type="file" id="bulk-csv-input" onchange="handleBulkEmployeeCSVSelect(event)"
                             accept=".csv,.txt,.tsv"
-                            class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50">
+                            class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 cursor-pointer">
                     </div>
                 </div>
 
@@ -16858,16 +17101,16 @@ ${messageText}
                         <span class="text-[11px] text-slate-400">আপলোড করার আগে প্রিভিউ দেখে নিন</span>
                     </div>
 
-                    <div class="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                    <div class="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0">
                                 <tr>
                                     <th class="px-4 py-2">ID</th>
-                                    <th class="px-4 py-2">Name</th>
-                                    <th class="px-4 py-2">Designation</th>
+                                    <th class="px-4 py-2">Name & Email</th>
                                     <th class="px-4 py-2">Department</th>
+                                    <th class="px-4 py-2">Weekly Off</th>
+                                    <th class="px-4 py-2">Status</th>
                                     <th class="px-4 py-2">Branch</th>
-                                    <th class="px-4 py-2">Salary</th>
                                     <th class="px-4 py-2 text-right">Action</th>
                                 </tr>
                             </thead>
@@ -16879,10 +17122,10 @@ ${messageText}
 
             <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
                 <button onclick="toggleModal('bulk-emp-modal', false)"
-                    class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancel</button>
+                    class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold cursor-pointer">Cancel</button>
                 <button id="bulk-commit-btn" onclick="commitBulkEmployeeUpload()" disabled
-                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition">
-                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Upload All to Database
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer">
+                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Sync & Upload to Database
                 </button>
             </div>
         </div>
@@ -16968,10 +17211,20 @@ ${messageText}
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Basic Salary (৳) *</label>
-                    <input type="number" id="emp-salary" required
-                        class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Basic Salary (৳) *</label>
+                        <input type="number" id="emp-salary" required
+                            class="w-full p-2.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Status (অবস্থা) *</label>
+                        <select id="emp-status" required
+                            class="w-full p-2.5 border rounded-xl text-xs bg-white font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="Active">🟢 Active (সক্রিয়)</option>
+                            <option value="Inactive">🔴 Inactive (নিষ্ক্রিয়)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">

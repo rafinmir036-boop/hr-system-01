@@ -5374,8 +5374,17 @@
             const headerCols = splitCSVLine(headerLine).map(h => h.toLowerCase());
 
             // Flexible header detection for Workforce Directory and ZKTeco CSVs
-            const idIdx = headerCols.findIndex(h => /^(machine_?id|badge|pin|emp_?id|id|code)$/i.test(h.replace(/[^a-z0-9]/gi, '')) || h.includes('machine') || (h.includes('id') && !h.includes('email') && !h.includes('paid')));
-            const nameIdx = headerCols.findIndex(h => h.includes('employee') || h.includes('name') || h.includes('staff') || h.includes('person'));
+            const idIdx = headerCols.findIndex(h => {
+                const cleaned = h.replace(/[^a-z0-9]/gi, '');
+                return /^(employee_?id|emp_?id|machine_?id|badge|pin|id|code|biometric_?id|user_?id)$/i.test(cleaned) ||
+                    ((h.includes('id') || h.includes('code') || h.includes('badge') || h.includes('pin') || h.includes('machine')) && !h.includes('email') && !h.includes('paid'));
+            });
+            const nameIdx = headerCols.findIndex(h => {
+                const cleaned = h.replace(/[^a-z0-9]/gi, '');
+                // Do not match if header is for an ID/code column (e.g., 'employee id', 'emp id')
+                if (h.includes('id') || h.includes('code') || h.includes('badge') || h.includes('pin')) return false;
+                return h.includes('name') || /^(employee|staff|person|worker)$/i.test(cleaned) || h.includes('full name') || h.includes('emp name');
+            });
             const emailIdx = headerCols.findIndex(h => h.includes('email') || h.includes('mail'));
             const phoneIdx = headerCols.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('tel'));
             const deptIdx = headerCols.findIndex(h => h.includes('dept') || h.includes('department'));
@@ -5415,7 +5424,7 @@
                 // Extract values intelligently
                 let rawName = (nameIdx !== -1 && row[nameIdx]) ? row[nameIdx] : '';
                 if (!rawName) {
-                    rawName = (idIdx === -1) ? (row[0] || '') : (row[1] || '');
+                    rawName = (idIdx === 0) ? (row[1] || '') : (row[0] || '');
                 }
                 if (!rawName || !rawName.trim()) continue;
 
@@ -5451,32 +5460,35 @@
                 if (normEmail) seenEmailsInFile.add(normEmail);
 
                 // ২. ডাটাবেজে আগে থেকেই আছে কি না ম্যাচ করা (ডুপ্লিকেট এন্ট্রি যাতে না হয়)
+                const currentCode = (idIdx !== -1 && row[idIdx]) ? row[idIdx].trim().toLowerCase() : '';
                 const existing = employeeList.find(e => {
+                    const eCode = String(e.customEmpCode || '').trim().toLowerCase();
                     const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
                     const eEmail = String(e.email || '').trim().toLowerCase();
+                    const isCodeMatch = currentCode && eCode && currentCode === eCode;
                     const isNameMatch = normName && eName && normName === eName;
                     const isEmailMatch = normEmail && eEmail && normEmail === eEmail && !eEmail.endsWith('@company.com');
-                    return isNameMatch || isEmailMatch;
+                    return isCodeMatch || isNameMatch || isEmailMatch;
                 });
 
                 if (existing) {
-                    // পূর্বে বিদ্যমান কর্মচারী: ডুপ্লিকেট হবে না, শুধু স্ট্যাটাস ও তথ্য সিঙ্ক হবে
+                    // পূর্বে বিদ্যমান কর্মচারী: ডুপ্লিকেট হবে না, শুধু স্ট্যাটাস ও তথ্য এবং সঠিক নাম সিঙ্ক হবে
                     parsedBulkEmployees.push({
                         isNew: false,
                         existingId: existing.id,
                         existingEmp: existing,
-                        customEmpCode: existing.customEmpCode || (idIdx !== -1 && row[idIdx] ? row[idIdx].trim() : 'N/A'),
-                        name: existing.name || name,
+                        customEmpCode: (idIdx !== -1 && row[idIdx] ? row[idIdx].trim() : '') || existing.customEmpCode || 'N/A',
+                        name: name || existing.name,
                         email: email || existing.email || '',
                         phone: (phone && phone !== '-') ? phone : (existing.phone || '-'),
                         designation: designation || existing.designation || 'Staff',
                         department: department || existing.department || 'General',
-                        branch: existing.branch || branch,
+                        branch: branch || existing.branch,
                         weeklyDayOff: weeklyDayOff || existing.weeklyDayOff || 'Friday',
                         status: status,
                         joiningDate: existing.joiningDate || joiningDate,
                         salary: existing.salary || salary,
-                        photoUrl: existing.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`
+                        photoUrl: existing.photoUrl && !existing.photoUrl.includes('ui-avatars') ? existing.photoUrl : `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=6366f1&color=fff`
                     });
                 } else {
                     // একদম নতুন কর্মচারী: সিস্টেমে নতুন হিসেবে যুক্ত হবে
@@ -5602,15 +5614,28 @@
                     if (emp.isNew) {
                         // চূড়ান্ত ডুপ্লিকেট সেফটি চেক
                         const normName = String(emp.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                        const existing = employeeList.find(e => String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim() === normName);
+                        const existing = employeeList.find(e => {
+                            const eCode = String(e.customEmpCode || '').trim().toLowerCase();
+                            const eName = String(e.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                            const eEmail = String(e.email || '').trim().toLowerCase();
+                            const isCodeMatch = emp.customEmpCode && eCode && String(emp.customEmpCode).trim().toLowerCase() === eCode;
+                            const isNameMatch = normName && eName && normName === eName;
+                            const isEmailMatch = emp.email && eEmail && String(emp.email).trim().toLowerCase() === eEmail && !eEmail.endsWith('@company.com');
+                            return isCodeMatch || isNameMatch || isEmailMatch;
+                        });
 
                         if (existing) {
-                            // নাম পাওয়া গেলে ডুপ্লিকেট এন্ট্রি তৈরি না করে বিদ্যমানটি আপডেট হবে
+                            // নাম বা আইডি পাওয়া গেলে ডুপ্লিকেট এন্ট্রি তৈরি না করে বিদ্যমানটি আপডেট হবে
                             await updateDoc(doc(db, "employees", existing.id), {
+                                name: emp.name,
+                                customEmpCode: emp.customEmpCode,
                                 status: emp.status,
                                 department: emp.department || existing.department || 'General',
+                                designation: emp.designation || existing.designation || 'Staff',
+                                branch: emp.branch || existing.branch || 'Head Office',
                                 weeklyDayOff: emp.weeklyDayOff || existing.weeklyDayOff || 'Friday',
                                 phone: (emp.phone && emp.phone !== '-') ? emp.phone : (existing.phone || '-'),
+                                photoUrl: emp.photoUrl || existing.photoUrl,
                                 updatedAt: new Date().toISOString()
                             });
                             updatedCount++;
@@ -5638,10 +5663,15 @@
                     } else {
                         // বিদ্যমান কর্মচারীর স্ট্যাটাস ও তথ্য সিঙ্ক (কোনো ডুপ্লিকেট তৈরি হবে না)
                         await updateDoc(doc(db, "employees", emp.existingId), {
+                            name: emp.name,
+                            customEmpCode: emp.customEmpCode,
                             status: emp.status,
                             department: emp.department || emp.existingEmp.department || 'General',
+                            designation: emp.designation || emp.existingEmp.designation || 'Staff',
+                            branch: emp.branch || emp.existingEmp.branch || 'Head Office',
                             weeklyDayOff: emp.weeklyDayOff || emp.existingEmp.weeklyDayOff || 'Friday',
                             phone: (emp.phone && emp.phone !== '-') ? emp.phone : (emp.existingEmp.phone || '-'),
+                            photoUrl: emp.photoUrl || emp.existingEmp.photoUrl,
                             updatedAt: new Date().toISOString()
                         });
                         updatedCount++;

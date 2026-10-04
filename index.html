@@ -1579,6 +1579,7 @@
             renderFineTable();
             renderPayrollTable();
             checkIncrementDues();
+            if (typeof renderIncrementHistoryTable === 'function') renderIncrementHistoryTable();
             generateReport();
             renderDashboardCharts();
             loadEmployeesRealtime();
@@ -3473,6 +3474,7 @@
                 updateAttendanceDashboardMetrics();
                 renderAttendanceTable();
                 checkIncrementDues();
+                if (typeof loadSalaryIncrementsRealtime === 'function') loadSalaryIncrementsRealtime();
                 renderAdvanceTable();
                 renderFineTable();
                 generateReport();
@@ -8976,7 +8978,15 @@ ${messageText}
                 return;
             }
 
-            const baseSalary = Number(emp.salary) || 0;
+            let baseSalary = Number(emp.salary) || 0;
+            if (month && window.salaryIncrementsList && window.salaryIncrementsList.length > 0) {
+                const applicableIncs = window.salaryIncrementsList
+                    .filter(inc => inc.employeeId === emp.id && inc.effectiveMonth && inc.effectiveMonth <= month)
+                    .sort((a, b) => (b.effectiveMonth || '').localeCompare(a.effectiveMonth || ''));
+                if (applicableIncs.length > 0 && applicableIncs[0].newSalary) {
+                    baseSalary = Math.max(baseSalary, Number(applicableIncs[0].newSalary) || baseSalary);
+                }
+            }
 
             // 1. Calculate Advance & Fine for that month
             let autoAdvance = 0;
@@ -9105,7 +9115,15 @@ ${messageText}
 
             const [yearStr, mStr] = month.split('-');
             const daysInMonth = new Date(parseInt(yearStr), parseInt(mStr), 0).getDate();
-            const baseSalary = Number(emp.salary) || 0;
+            let baseSalary = Number(emp.salary) || 0;
+            if (month && window.salaryIncrementsList && window.salaryIncrementsList.length > 0) {
+                const applicableIncs = window.salaryIncrementsList
+                    .filter(inc => inc.employeeId === emp.id && inc.effectiveMonth && inc.effectiveMonth <= month)
+                    .sort((a, b) => (b.effectiveMonth || '').localeCompare(a.effectiveMonth || ''));
+                if (applicableIncs.length > 0 && applicableIncs[0].newSalary) {
+                    baseSalary = Math.max(baseSalary, Number(applicableIncs[0].newSalary) || baseSalary);
+                }
+            }
             const perDaySalary = daysInMonth > 0 ? (baseSalary / daysInMonth) : 0;
 
             const absent = Number(document.getElementById('pay-sum-absent-input')?.value) || 0;
@@ -9447,7 +9465,15 @@ ${messageText}
                 const batchOps = [];
 
                 for (const emp of targetEmployees) {
-                    const baseSalary = Number(emp.salary) || 0;
+                    let baseSalary = Number(emp.salary) || 0;
+                    if (selectedMonth && window.salaryIncrementsList && window.salaryIncrementsList.length > 0) {
+                        const applicableIncs = window.salaryIncrementsList
+                            .filter(inc => inc.employeeId === emp.id && inc.effectiveMonth && inc.effectiveMonth <= selectedMonth)
+                            .sort((a, b) => (b.effectiveMonth || '').localeCompare(a.effectiveMonth || ''));
+                        if (applicableIncs.length > 0 && applicableIncs[0].newSalary) {
+                            baseSalary = Math.max(baseSalary, Number(applicableIncs[0].newSalary) || baseSalary);
+                        }
+                    }
 
                     // Attendance calculation
                     let presentDays = 0;
@@ -11145,23 +11171,505 @@ ${messageText}
             setTimeout(() => { printWindow.print(); }, 600);
         };
 
-        // Employee Increment Logic
+        // ==========================================
+        // SALARY INCREMENT MANAGEMENT ENGINE
+        // ==========================================
+        window.salaryIncrementsList = [];
+        window.currentIncrementTab = 'history';
+
+        window.switchIncrementTab = function (tab) {
+            window.currentIncrementTab = tab;
+            const viewHistory = document.getElementById('inc-view-history');
+            const viewDue = document.getElementById('inc-view-due');
+            const tabHistory = document.getElementById('inc-tab-history');
+            const tabDue = document.getElementById('inc-tab-due');
+
+            if (tab === 'history') {
+                if (viewHistory) viewHistory.classList.remove('hidden');
+                if (viewDue) viewDue.classList.add('hidden');
+                if (tabHistory) {
+                    tabHistory.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs cursor-pointer";
+                }
+                if (tabDue) {
+                    tabDue.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-purple-300 hover:bg-slate-100 dark:hover:bg-purple-900/30 cursor-pointer";
+                }
+                renderIncrementHistoryTable();
+            } else {
+                if (viewHistory) viewHistory.classList.add('hidden');
+                if (viewDue) viewDue.classList.remove('hidden');
+                if (tabDue) {
+                    tabDue.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs cursor-pointer";
+                }
+                if (tabHistory) {
+                    tabHistory.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-purple-300 hover:bg-slate-100 dark:hover:bg-purple-900/30 cursor-pointer";
+                }
+                checkIncrementDues();
+            }
+        };
+
+        window.openAddIncrementModal = function (preselectedEmpId = '') {
+            const form = document.getElementById('increment-form');
+            if (form) form.reset();
+
+            const select = document.getElementById('inc-add-emp-id');
+            if (select) {
+                let options = '<option value="">-- Choose Employee (কর্মচারী নির্বাচন করুন) --</option>';
+                // Active employees sorted alphabetically A to Z
+                const activeEmployees = employeeList.filter(e => {
+                    const st = (e.status || 'Active').trim().toLowerCase();
+                    return st !== 'inactive' && isItemInActiveBranch(e.branch);
+                });
+
+                activeEmployees.forEach(emp => {
+                    const code = emp.customEmpCode ? ` [ID: ${emp.customEmpCode}]` : '';
+                    const branch = emp.branch ? ` - 🏢 ${emp.branch}` : '';
+                    options += `<option value="${emp.id}">${emp.name} (${emp.designation || 'Staff'})${code}${branch}</option>`;
+                });
+                select.innerHTML = options;
+            }
+
+            const monthInput = document.getElementById('inc-add-effective-month');
+            if (monthInput) {
+                monthInput.value = new Date().toISOString().substring(0, 7);
+            }
+
+            const detailsCard = document.getElementById('inc-emp-details-card');
+            if (detailsCard) detailsCard.classList.add('hidden');
+
+            if (preselectedEmpId) {
+                if (select) select.value = preselectedEmpId;
+                onSelectIncrementEmployee(preselectedEmpId);
+            } else {
+                updateNewSalaryPreview();
+            }
+
+            toggleModal('add-increment-modal', true);
+        };
+
+        window.onSelectIncrementEmployee = function (empId) {
+            const detailsCard = document.getElementById('inc-emp-details-card');
+            if (!empId) {
+                if (detailsCard) detailsCard.classList.add('hidden');
+                updateNewSalaryPreview();
+                return;
+            }
+
+            const emp = employeeList.find(e => e.id === empId);
+            if (!emp) {
+                if (detailsCard) detailsCard.classList.add('hidden');
+                updateNewSalaryPreview();
+                return;
+            }
+
+            if (detailsCard) detailsCard.classList.remove('hidden');
+
+            const desigBranch = document.getElementById('inc-emp-desig-branch');
+            if (desigBranch) {
+                desigBranch.innerText = `${emp.designation || 'Staff'} • 🏢 ${emp.branch || 'Head Office'}`;
+            }
+
+            const joinElem = document.getElementById('inc-emp-join-date');
+            if (joinElem) {
+                const joinDate = emp.joiningDate || 'N/A';
+                const lastInc = emp.lastIncrementDate ? ` • শেষ ইনক্রিমেন্ট: ${emp.lastIncrementDate}` : '';
+                joinElem.innerText = `যোগদান: ${joinDate}${lastInc}`;
+            }
+
+            const currSalElem = document.getElementById('inc-emp-curr-salary');
+            if (currSalElem) {
+                currSalElem.innerText = `৳ ${Number(emp.salary || 0).toLocaleString()}`;
+            }
+
+            // Auto-fill designation input as current placeholder
+            const newDesigInput = document.getElementById('inc-add-new-desig');
+            if (newDesigInput && !newDesigInput.value) {
+                newDesigInput.placeholder = `বর্তমান: ${emp.designation || 'Staff'} (পরিবর্তন করতে চাইলে লিখুন)`;
+            }
+
+            updateNewSalaryPreview();
+        };
+
+        window.updateNewSalaryPreview = function () {
+            const empId = document.getElementById('inc-add-emp-id')?.value;
+            const emp = employeeList.find(e => e.id === empId);
+            const currSalary = emp ? (Number(emp.salary) || 0) : 0;
+            const incAmount = Number(document.getElementById('inc-add-amount')?.value) || 0;
+            const newSalary = currSalary + incAmount;
+            const effectiveMonth = document.getElementById('inc-add-effective-month')?.value || '';
+
+            const previewNewSal = document.getElementById('inc-preview-new-salary');
+            if (previewNewSal) {
+                previewNewSal.innerText = `৳ ${newSalary.toLocaleString()}`;
+            }
+
+            const previewDiff = document.getElementById('inc-preview-diff-badge');
+            if (previewDiff) {
+                previewDiff.innerText = `(+৳ ${incAmount.toLocaleString()} বৃদ্ধি)`;
+            }
+
+            const previewMonth = document.getElementById('inc-preview-month-label');
+            if (previewMonth) {
+                if (effectiveMonth) {
+                    const [y, m] = effectiveMonth.split('-');
+                    const dateObj = new Date(parseInt(y), parseInt(m) - 1, 1);
+                    const monthName = dateObj.toLocaleString('bn-BD', { month: 'long', year: 'numeric' });
+                    previewMonth.innerText = `${monthName} (${effectiveMonth})`;
+                } else {
+                    previewMonth.innerText = 'বর্তমান মাস';
+                }
+            }
+        };
+
+        window.saveNewSalaryIncrement = async function (e) {
+            e.preventDefault();
+            if (currentUserRole === 'Employee') {
+                showToast('error', 'কর্মচারীদের ইনক্রিমেন্ট প্রসেস করার অনুমতি নেই (Action Denied)');
+                return;
+            }
+
+            const empId = document.getElementById('inc-add-emp-id')?.value;
+            const incAmount = Number(document.getElementById('inc-add-amount')?.value) || 0;
+            const effectiveMonth = document.getElementById('inc-add-effective-month')?.value;
+            const newDesig = document.getElementById('inc-add-new-desig')?.value?.trim() || '';
+            const note = document.getElementById('inc-add-note')?.value?.trim() || '';
+
+            if (!empId) {
+                showToast('warning', 'দয়া করে একজন কর্মচারী নির্বাচন করুন');
+                return;
+            }
+            if (incAmount <= 0) {
+                showToast('warning', 'দয়া করে সঠিক ইনক্রিমেন্ট বৃদ্ধির পরিমাণ (৳) লিখুন');
+                return;
+            }
+            if (!effectiveMonth) {
+                showToast('warning', 'দয়া করে ইনক্রিমেন্ট কার্যকর হওয়ার মাস নির্বাচন করুন');
+                return;
+            }
+
+            const emp = employeeList.find(e => e.id === empId);
+            if (!emp) {
+                showToast('error', 'কর্মচারী পাওয়া যায়নি');
+                return;
+            }
+
+            const currentSalary = Number(emp.salary) || 0;
+            const newSalary = currentSalary + incAmount;
+            const currentMonthStr = new Date().toISOString().substring(0, 7);
+            const isImmediate = effectiveMonth <= currentMonthStr;
+
+            Swal.fire({
+                title: 'ইনক্রিমেন্ট প্রসেস হচ্ছে...',
+                text: 'ডাটাবেজে ইনক্রিমেন্ট সংরক্ষণ ও বেসিকে যুক্ত করা হচ্ছে...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                // 1. If effective immediately or current month, update employee document right away!
+                if (isImmediate) {
+                    const empUpdates = {
+                        salary: newSalary,
+                        lastIncrementDate: `${effectiveMonth}-01`,
+                        lastIncrementAmount: incAmount,
+                        updatedAt: new Date().toISOString()
+                    };
+                    if (newDesig) empUpdates.designation = newDesig;
+
+                    await updateDoc(doc(db, "employees", empId), empUpdates);
+                    emp.salary = newSalary;
+                    if (newDesig) emp.designation = newDesig;
+
+                    // Also if a payroll record already exists for this effectiveMonth, update its basic salary!
+                    const existingPayroll = payrollList.find(p => (p.employeeId === empId || (!p.employeeId && isItemForEmployee(p, emp))) && p.month === effectiveMonth);
+                    if (existingPayroll) {
+                        const daysInMonth = new Date(parseInt(effectiveMonth.split('-')[0]), parseInt(effectiveMonth.split('-')[1]), 0).getDate();
+                        const perDay = daysInMonth > 0 ? (newSalary / daysInMonth) : 0;
+                        const absentDays = Number(existingPayroll.absentDays) || 0;
+                        const absentDeduct = Math.round(absentDays * perDay);
+                        const earnedBasic = Math.max(0, Math.round(newSalary - absentDeduct));
+                        const curBonus = Number(existingPayroll.bonus) || 0;
+                        const curAdv = Number(existingPayroll.advance) || 0;
+                        const curFine = Number(existingPayroll.fine) || 0;
+                        const newNet = Math.max(0, (earnedBasic + curBonus) - (curAdv + curFine));
+
+                        await updateDoc(doc(db, "payrolls", existingPayroll.id), {
+                            baseSalary: newSalary,
+                            basicSalary: earnedBasic,
+                            netSalary: newNet,
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                }
+
+                // 2. Record in salary_increments collection
+                const incPayload = {
+                    employeeId: empId,
+                    employeeName: emp.name,
+                    customEmpCode: emp.customEmpCode || '',
+                    branch: emp.branch || 'Head Office',
+                    designation: emp.designation || '',
+                    newDesignation: newDesig || emp.designation || '',
+                    previousSalary: currentSalary,
+                    incrementAmount: incAmount,
+                    newSalary: newSalary,
+                    effectiveMonth: effectiveMonth,
+                    note: note || (isImmediate ? 'ইনক্রিমেন্ট কার্যকর হয়েছে' : `শিডিউল করা ইনক্রিমেন্ট (${effectiveMonth} থেকে কার্যকর)`),
+                    status: isImmediate ? 'Active' : 'Scheduled',
+                    applied: isImmediate,
+                    appliedAt: isImmediate ? new Date().toISOString() : null,
+                    createdBy: currentUserEmail || 'Admin',
+                    createdAt: new Date().toISOString()
+                };
+
+                const incDocRef = await addDoc(collection(db, "salary_increments"), incPayload);
+
+                // 3. Auto-sync into company_documents under the 'increment' folder
+                try {
+                    await addDoc(collection(db, "company_documents"), {
+                        title: `ইনক্রিমেন্ট অনুমোদন - ${emp.name} (+৳${incAmount.toLocaleString()})`,
+                        category: 'Appointment Letter',
+                        folder: 'increment',
+                        targetEmployee: emp.name,
+                        fileUrl: 'https://ui-avatars.com/api/?name=Increment&background=7c3aed&color=fff',
+                        fileName: `Increment_${(emp.name || 'Staff').replace(/\s+/g, '_')}_${effectiveMonth}.pdf`,
+                        fileType: 'application/pdf',
+                        relatedModule: 'Increment',
+                        relatedId: incDocRef.id,
+                        uploadedBy: currentUserEmail || 'Admin',
+                        uploadedAt: new Date().toISOString()
+                    });
+                } catch (docErr) {
+                    console.warn('Sync increment document warning:', docErr);
+                }
+
+                // 4. Log system activity
+                await logSystemActivity(
+                    'INCREMENT',
+                    'Employee',
+                    `${currentUserEmail} recorded salary increment +৳${incAmount.toLocaleString()} for "${emp.name}" (Effective Month: ${effectiveMonth}, New Basic: ৳${newSalary.toLocaleString()})`,
+                    { employeeId: empId, employeeName: emp.name, incrementAmount: incAmount, newSalary, effectiveMonth }
+                );
+
+                toggleModal('add-increment-modal', false);
+                document.getElementById('increment-form').reset();
+
+                const statusMessage = isImmediate
+                    ? `ইনক্রিমেন্ট সফলভাবে কার্যকর হয়েছে! <b>${emp.name}</b> এর নতুন মূল বেতন: <b class="text-emerald-700">৳ ${newSalary.toLocaleString()}</b>`
+                    : `ইনক্রিমেন্ট সফলভাবে শিডিউল করা হয়েছে! <b>${effectiveMonth}</b> মাস শুরু হলে এই ইনক্রিমেন্ট স্বয়ংক্রিয়ভাবে মূল বেতনের সাথে যুক্ত হবে।`;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ইনক্রিমেন্ট সফল হয়েছে! 🎉',
+                    html: statusMessage,
+                    confirmButtonColor: '#4f46e5'
+                });
+
+                checkIncrementDues();
+                renderIncrementHistoryTable();
+            } catch (err) {
+                Swal.fire('Error', err.message, 'error');
+            }
+        };
+
+        // Realtime Listener for salary_increments collection
+        window.loadSalaryIncrementsRealtime = function () {
+            if (window._hasInitIncrementListener) return;
+            window._hasInitIncrementListener = true;
+
+            onSnapshot(collection(db, "salary_increments"), (snapshot) => {
+                window.salaryIncrementsList = [];
+                const currentMonthStr = new Date().toISOString().substring(0, 7);
+
+                snapshot.forEach((docSnap) => {
+                    const data = { id: docSnap.id, ...docSnap.data() };
+                    window.salaryIncrementsList.push(data);
+
+                    // Check if this scheduled increment is now due to auto-apply
+                    if (!data.applied && data.effectiveMonth && currentMonthStr >= data.effectiveMonth) {
+                        applyScheduledIncrement(data);
+                    }
+                });
+
+                window.salaryIncrementsList.sort((a, b) => (b.effectiveMonth || '').localeCompare(a.effectiveMonth || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+                renderIncrementHistoryTable();
+                checkIncrementDues();
+            });
+        };
+
+        async function applyScheduledIncrement(incData) {
+            try {
+                const emp = employeeList.find(e => e.id === incData.employeeId);
+                if (emp) {
+                    const updatePayload = {
+                        salary: incData.newSalary,
+                        lastIncrementDate: `${incData.effectiveMonth}-01`,
+                        lastIncrementAmount: incData.incrementAmount,
+                        updatedAt: new Date().toISOString()
+                    };
+                    if (incData.newDesignation) updatePayload.designation = incData.newDesignation;
+
+                    await updateDoc(doc(db, "employees", emp.id), updatePayload);
+                    emp.salary = incData.newSalary;
+                    if (incData.newDesignation) emp.designation = incData.newDesignation;
+                }
+
+                await updateDoc(doc(db, "salary_increments", incData.id), {
+                    applied: true,
+                    status: 'Active',
+                    appliedAt: new Date().toISOString()
+                });
+            } catch (err) {
+                console.warn('Auto apply increment error:', err);
+            }
+        }
+
+        window.renderIncrementHistoryTable = function () {
+            const tbody = document.getElementById('inc-history-table-body');
+            const totalRecElem = document.getElementById('inc-stat-total-records');
+            const totalAmtElem = document.getElementById('inc-stat-total-amount');
+            const tabHistoryCount = document.getElementById('inc-tab-history-count');
+
+            if (!tbody) return;
+
+            const list = window.salaryIncrementsList || [];
+            const searchTxt = document.getElementById('inc-search-input')?.value?.toLowerCase()?.trim() || '';
+
+            let filtered = list.filter(item => {
+                if (!isItemInActiveBranch(item.branch)) return false;
+                if (searchTxt) {
+                    const name = (item.employeeName || '').toLowerCase();
+                    const branch = (item.branch || '').toLowerCase();
+                    const desig = (item.designation || '').toLowerCase();
+                    const month = (item.effectiveMonth || '').toLowerCase();
+                    return name.includes(searchTxt) || branch.includes(searchTxt) || desig.includes(searchTxt) || month.includes(searchTxt);
+                }
+                return true;
+            });
+
+            // Update stats
+            if (totalRecElem) totalRecElem.innerText = `${list.length} টি`;
+            if (tabHistoryCount) tabHistoryCount.innerText = list.length;
+            const totalAmount = list.reduce((sum, item) => sum + (Number(item.incrementAmount) || 0), 0);
+            if (totalAmtElem) totalAmtElem.innerText = `৳ ${totalAmount.toLocaleString()}`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-10">
+                            <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-arrow-trend-up"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-600 dark:text-purple-300">কোনো ইনক্রিমেন্ট হিস্ট্রি পাওয়া যায়নি</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">নতুন ইনক্রিমেন্ট যুক্ত করতে উপরের "+ Add Increment" বাটনে ক্লিক করুন</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let rowsHtml = '';
+            filtered.forEach(item => {
+                const isApplied = item.applied || item.status === 'Active';
+                const statusBadge = isApplied
+                    ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">কার্যকর (Active)</span>'
+                    : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">শিডিউল (Scheduled)</span>';
+
+                rowsHtml += `
+                    <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50/70 dark:hover:bg-purple-950/40 transition text-xs">
+                        <td class="px-6 py-4 font-bold text-slate-800 dark:text-white">
+                            <div class="font-bold">${item.employeeName}</div>
+                            <div class="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                <span class="bg-slate-100 dark:bg-purple-950/60 px-1.5 py-0.5 rounded text-slate-600 dark:text-purple-300">🏢 ${item.branch || 'Head Office'}</span>
+                                ${item.customEmpCode ? `<span class="ml-1 text-purple-600">ID: ${item.customEmpCode}</span>` : ''}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-600 dark:text-purple-200">
+                            <div>${item.newDesignation || item.designation || 'Staff'}</div>
+                            ${item.newDesignation && item.newDesignation !== item.designation ? `<span class="text-[10px] text-emerald-600 font-semibold">(Promotion)</span>` : ''}
+                        </td>
+                        <td class="px-6 py-4 text-slate-500 dark:text-purple-300">৳ ${Number(item.previousSalary || 0).toLocaleString()}</td>
+                        <td class="px-6 py-4 font-black text-emerald-600 dark:text-emerald-400">+৳ ${Number(item.incrementAmount || 0).toLocaleString()}</td>
+                        <td class="px-6 py-4 font-black text-indigo-700 dark:text-purple-300">৳ ${Number(item.newSalary || 0).toLocaleString()}</td>
+                        <td class="px-6 py-4 font-bold text-slate-800 dark:text-white">
+                            <span class="bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800 text-[11px]">
+                                📅 ${item.effectiveMonth || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">${statusBadge}</td>
+                        <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                            ${currentUserRole === 'Admin' ? `
+                                <button onclick="deleteSalaryIncrementRecord('${item.id}')" title="Delete / Revert Increment" class="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer">
+                                    <i class="fa-solid fa-trash-can text-xs"></i>
+                                </button>
+                            ` : '<span class="text-slate-400 text-[11px]">-</span>'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rowsHtml;
+        };
+
+        window.deleteSalaryIncrementRecord = async function (id) {
+            const inc = (window.salaryIncrementsList || []).find(x => x.id === id);
+            if (!inc) return;
+
+            const result = await Swal.fire({
+                title: 'ইনক্রিমেন্ট রেকর্ড মুছে ফেলবেন?',
+                html: `<b>${inc.employeeName}</b>-এর <b>+৳${Number(inc.incrementAmount).toLocaleString()}</b> ইনক্রিমেন্ট রেকর্ডটি মুছে ফেলতে চান?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'হ্যাঁ, মুছে ফেলুন',
+                cancelButtonText: 'বাতিল'
+            });
+
+            if (!result.isConfirmed) return;
+
+            try {
+                await deleteDoc(doc(db, "salary_increments", id));
+                await logSystemActivity(
+                    'DELETE',
+                    'Employee',
+                    `${currentUserEmail} deleted salary increment record for "${inc.employeeName}" (+৳${inc.incrementAmount})`,
+                    { incrementId: id, employeeName: inc.employeeName }
+                );
+                showToast('success', 'ইনক্রিমেন্ট রেকর্ড মুছে ফেলা হয়েছে');
+            } catch (err) {
+                showToast('error', err.message);
+            }
+        };
+
+        // Employee Increment Dues Logic (1-Year Eligible Staff)
         function checkIncrementDues() {
             const tbody = document.getElementById('increment-table-body');
             const incAlertBox = document.getElementById('increment-alert-box');
             const incAlertList = document.getElementById('inc-alert-list');
             const incAlertCount = document.getElementById('inc-alert-count');
             const dashIncDue = document.getElementById('dash-inc-due');
+            const tabDueCount = document.getElementById('inc-tab-due-count');
+            const statDueCount = document.getElementById('inc-stat-due-count');
 
             const today = new Date();
             let dueCount = 0;
             let rowsHtml = '';
             let alertsHtml = '';
 
+            const searchTxt = document.getElementById('inc-search-input')?.value?.toLowerCase()?.trim() || '';
+
             employeeList.forEach(emp => {
                 if (!isItemInActiveBranch(emp.branch)) return;
                 const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
                 if (!isEmpActive) return; // Inactive employees do not trigger increment dues
+
+                if (searchTxt) {
+                    const name = (emp.name || '').toLowerCase();
+                    const branch = (emp.branch || '').toLowerCase();
+                    const desig = (emp.designation || '').toLowerCase();
+                    if (!name.includes(searchTxt) && !branch.includes(searchTxt) && !desig.includes(searchTxt)) return;
+                }
 
                 const joinDate = new Date(emp.joiningDate || emp.createdAt);
                 const lastIncDate = emp.lastIncrementDate ? new Date(emp.lastIncrementDate) : joinDate;
@@ -11180,22 +11688,23 @@ ${messageText}
 
                 if (tbody) {
                     rowsHtml += `
-            <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
-              <td class="px-6 py-4 font-bold text-slate-800">${emp.name} <span class="bg-slate-100 px-1.5 rounded text-slate-600 font-bold ml-1">🏢 ${emp.branch || 'Head Office'}</span></td>
-              <td class="px-6 py-4 text-slate-600">${emp.designation}</td>
-              <td class="px-6 py-4 text-slate-600">${emp.lastIncrementDate || emp.joiningDate || 'Initial'}</td>
-              <td class="px-6 py-4 font-bold text-slate-900">৳ ${emp.salary.toLocaleString()}</td>
+            <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50 transition text-xs">
+              <td class="px-6 py-4 font-bold text-slate-800 dark:text-white">${emp.name} <span class="bg-slate-100 dark:bg-purple-950/60 px-1.5 rounded text-slate-600 dark:text-purple-300 font-bold ml-1">🏢 ${emp.branch || 'Head Office'}</span></td>
+              <td class="px-6 py-4 text-slate-600 dark:text-purple-200">${emp.designation}</td>
+              <td class="px-6 py-4 text-slate-600 dark:text-purple-200">${emp.lastIncrementDate || emp.joiningDate || 'Initial'}</td>
+              <td class="px-6 py-4 font-bold text-slate-900 dark:text-white">৳ ${(emp.salary || 0).toLocaleString()}</td>
               <td class="px-6 py-4">
                 <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${isEligible ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600'}">
-                  ${isEligible ? '১ বছর পূর্ণ' : `${12 - diffMonths} Months Remaining`}
+                  ${isEligible ? '১ বছর পূর্ণ' : `${Math.max(0, 12 - diffMonths)} Months Remaining`}
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                ${isEligible && (currentUserRole === 'Admin' || hasPermission('can_increment')) ? `
-                  <button onclick="promptIncrementModal('${emp.id}', ${emp.salary})" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs">
-                    Process Increment
+                ${(currentUserRole === 'Admin' || hasPermission('can_increment')) ? `
+                  <button onclick="openAddIncrementModal('${emp.id}')" class="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center space-x-1 inline-flex">
+                    <i class="fa-solid fa-arrow-trend-up text-[10px]"></i>
+                    <span>Process Increment</span>
                   </button>
-                ` : '<span class="text-slate-400 font-medium text-xs">Not Due</span>'}
+                ` : '<span class="text-slate-400 font-medium text-xs">Not Authorized</span>'}
               </td>
             </tr>
           `;
@@ -11207,66 +11716,17 @@ ${messageText}
 
             if (dashIncDue) dashIncDue.innerText = dueCount;
             if (incAlertCount) incAlertCount.innerText = dueCount;
+            if (tabDueCount) tabDueCount.innerText = dueCount;
+            if (statDueCount) statDueCount.innerText = `${dueCount} জন`;
+
             if (incAlertBox) {
                 if (dueCount > 0 && currentUserRole !== 'Employee') incAlertBox.classList.remove('hidden');
                 else incAlertBox.classList.add('hidden');
             }
         }
 
-        window.promptIncrementModal = async function (empId, currentSalary) {
-            const emp = employeeList.find(e => e.id === empId);
-            const empName = emp ? emp.name : 'কর্মচারী';
-
-            const { value: formValues } = await Swal.fire({
-                title: 'বেতন ইনক্রিমেন্ট প্রসেস',
-                html: `
-          <div class="space-y-3 text-left">
-            <div>
-              <label class="text-xs font-bold text-slate-700">কর্মচারী</label>
-              <div class="p-2 border rounded-lg text-xs font-bold bg-slate-50 text-slate-800">${empName} (${emp ? emp.designation : ''})</div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-700">বর্তমান বেতন (৳)</label>
-              <input id="swal-curr-salary" class="w-full p-2 border rounded-lg text-sm bg-slate-100" value="${currentSalary}" readonly>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-700">ইনক্রিমেন্ট বৃদ্ধির পরিমাণ (৳)</label>
-              <input id="swal-inc-amount" type="number" class="w-full p-2 border rounded-lg text-sm" placeholder="e.g. 5000" required>
-            </div>
-          </div>
-        `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Confirm Increment',
-                confirmButtonColor: '#4f46e5',
-                preConfirm: () => {
-                    const incAmount = Number(document.getElementById('swal-inc-amount').value);
-                    if (!incAmount || incAmount <= 0) {
-                        Swal.showValidationMessage('দয়া করে সঠিক বৃদ্ধির পরিমাণ দিন');
-                        return false;
-                    }
-                    return incAmount;
-                }
-            });
-
-            if (formValues) {
-                const newTotalSalary = currentSalary + formValues;
-                const todayStr = new Date().toISOString().split('T')[0];
-
-                await updateDoc(doc(db, "employees", empId), {
-                    salary: newTotalSalary,
-                    lastIncrementDate: todayStr
-                });
-
-                await logSystemActivity(
-                    'INCREMENT',
-                    'Employee',
-                    `${currentUserEmail} processed salary increment +৳${formValues.toLocaleString()} for "${empName}" (New Basic: ৳${newTotalSalary.toLocaleString()})`,
-                    { employeeId: empId, employeeName: empName, incrementAmount: formValues, newTotalSalary }
-                );
-
-                Swal.fire('অভিনন্দন!', `ইনক্রিমেন্ট সম্পন্ন হয়েছে। নতুন বেতন: ৳ ${newTotalSalary.toLocaleString()}`, 'success');
-            }
+        window.promptIncrementModal = function (empId) {
+            openAddIncrementModal(empId);
         };
 
         // Notice Board Visibility & Branch Filter Engine
@@ -13666,6 +14126,10 @@ ${messageText}
             if (secId === 'payroll' && typeof renderPayrollTable === 'function') {
                 renderPayrollTable();
             }
+            if (secId === 'increment') {
+                if (typeof checkIncrementDues === 'function') checkIncrementDues();
+                if (typeof renderIncrementHistoryTable === 'function') renderIncrementHistoryTable();
+            }
             if (secId === 'employees' && typeof window.updateEmployeeClock === 'function') {
                 window.updateEmployeeClock();
             }
@@ -15870,16 +16334,111 @@ ${messageText}
 
                 <!-- 7. INCREMENT SECTION -->
                 <section id="sec-increment" class="hidden space-y-5">
-                    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-                        <h2 class="text-base font-bold text-slate-800">Salary Increment Management</h2>
-                        <p class="text-xs text-slate-500">১ বছর পূর্ণ হওয়া কর্মচারীদের ইনক্রিমেন্ট প্রসেসিং</p>
+                    <!-- Header Card with Add Increment Button -->
+                    <div class="bg-white dark:bg-[#1a0c36] p-5 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 flex items-center space-x-1">
+                                    <i class="fa-solid fa-arrow-trend-up text-purple-500"></i>
+                                    <span>Salary Increment Suite</span>
+                                </span>
+                                <span class="text-[11px] text-slate-400 font-semibold">• Automated Payroll Sync</span>
+                            </div>
+                            <h2 class="text-base font-bold text-slate-800 dark:text-white mt-1">Salary Increment Management (বেতন ইনক্রিমেন্ট ব্যবস্থাপনা)</h2>
+                            <p class="text-xs text-slate-500 dark:text-purple-300/70">কর্মচারীদের বার্ষিক বা পারফরম্যান্স ইনক্রিমেন্ট নির্ধারণ ও নির্দিষ্ট কার্যকর মাস থেকে স্বয়ংক্রিয়ভাবে মূল বেসিকে যুক্তকরণ</p>
+                        </div>
+                        <button type="button" onclick="openAddIncrementModal()"
+                            class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5 cursor-pointer">
+                            <i class="fa-solid fa-circle-plus"></i>
+                            <span>Add Increment (ইনক্রিমেন্ট যোগ করুন)</span>
+                        </button>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <!-- 3 Quick Metrics Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <div class="bg-white dark:bg-[#1a0c36] p-4 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex items-center space-x-3.5">
+                            <div class="w-11 h-11 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-300 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-slate-500 dark:text-purple-300/70 font-semibold">মোট ইনক্রিমেন্ট রেকর্ড</div>
+                                <div id="inc-stat-total-records" class="text-xl font-black text-slate-900 dark:text-white mt-0.5">0 টি</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-[#1a0c36] p-4 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex items-center space-x-3.5">
+                            <div class="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-300 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-slate-500 dark:text-purple-300/70 font-semibold">১ বছর পূর্ণ (Due) কর্মচারী</div>
+                                <div id="inc-stat-due-count" class="text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5">0 জন</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-[#1a0c36] p-4 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex items-center space-x-3.5">
+                            <div class="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-money-bill-trend-up"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-slate-500 dark:text-purple-300/70 font-semibold">সর্বমোট বৃদ্ধিপ্রাপ্ত বেতন</div>
+                                <div id="inc-stat-total-amount" class="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">৳ 0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Tabs between Eligible Due & Increment History -->
+                    <div class="bg-white dark:bg-[#1a0c36] p-2 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" id="inc-tab-history" onclick="switchIncrementTab('history')"
+                                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs cursor-pointer">
+                                <i class="fa-solid fa-list-check"></i>
+                                <span>ইনক্রিমেন্ট হিস্ট্রি ও শিডিউল (Increment History)</span>
+                                <span id="inc-tab-history-count" class="bg-white/20 text-white px-2 py-0.5 rounded-full text-[10px] ml-1">0</span>
+                            </button>
+                            <button type="button" id="inc-tab-due" onclick="switchIncrementTab('due')"
+                                class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 text-slate-600 dark:text-purple-300 hover:bg-slate-100 dark:hover:bg-purple-900/30 cursor-pointer">
+                                <i class="fa-solid fa-user-clock"></i>
+                                <span>১ বছর পূর্ণ ও ডিউ তালিকা (Due Staff)</span>
+                                <span id="inc-tab-due-count" class="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full text-[10px] ml-1">0</span>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="inc-search-input" oninput="renderIncrementHistoryTable(); checkIncrementDues();" placeholder="কর্মচারীর নাম দিয়ে খুঁজুন..."
+                                    class="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-500/30 rounded-xl text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 1: INCREMENT HISTORY & SCHEDULED LIST -->
+                    <div id="inc-view-history" class="bg-white dark:bg-[#1a0c36] rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs overflow-hidden">
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs text-slate-600">
-                                <thead
-                                    class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
+                            <table class="w-full text-left text-xs text-slate-600 dark:text-purple-200">
+                                <thead class="bg-slate-100/60 dark:bg-purple-950/60 uppercase text-slate-700 dark:text-purple-200 font-bold border-b border-slate-200 dark:border-purple-500/20">
+                                    <tr>
+                                        <th class="px-6 py-3.5">Employee Name & Branch</th>
+                                        <th class="px-6 py-3.5">Designation</th>
+                                        <th class="px-6 py-3.5">Previous Salary</th>
+                                        <th class="px-6 py-3.5">Increment (+৳)</th>
+                                        <th class="px-6 py-3.5">New Basic Salary</th>
+                                        <th class="px-6 py-3.5">Effective Month</th>
+                                        <th class="px-6 py-3.5 text-center">Status</th>
+                                        <th class="px-6 py-3.5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inc-history-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 2: DUE & ELIGIBLE EMPLOYEES TABLE -->
+                    <div id="inc-view-due" class="hidden bg-white dark:bg-[#1a0c36] rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600 dark:text-purple-200">
+                                <thead class="bg-slate-100/60 dark:bg-purple-950/60 uppercase text-slate-700 dark:text-purple-200 font-bold border-b border-slate-200 dark:border-purple-500/20">
                                     <tr>
                                         <th class="px-6 py-3.5">EMPLOYEE NAME</th>
                                         <th class="px-6 py-3.5">DESIGNATION</th>
@@ -18616,6 +19175,116 @@ ${messageText}
                     <button type="submit"
                         class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">Save
                         Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ADD SALARY INCREMENT MODAL -->
+    <div id="add-increment-modal"
+        class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-100 my-auto">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg shadow-2xs shrink-0">
+                        <i class="fa-solid fa-arrow-trend-up"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">Add Salary Increment</h3>
+                        <p class="text-[11px] text-slate-500">বেতন ইনক্রিমেন্ট নির্ধারণ ও কার্যকর মাস নির্বাচন</p>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleModal('add-increment-modal', false)" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="increment-form" onsubmit="saveNewSalaryIncrement(event)" class="space-y-3.5">
+                <!-- 1. Employee Select -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Select Employee (কর্মচারী নির্বাচন করুন) *</label>
+                    <select id="inc-add-emp-id" required onchange="onSelectIncrementEmployee(this.value)"
+                        class="w-full p-2.5 border rounded-xl text-xs bg-white font-medium outline-none text-slate-800">
+                        <option value="">-- Choose Employee (কর্মচারী নির্বাচন করুন) --</option>
+                    </select>
+                </div>
+
+                <!-- 2. Selected Employee Current Details Box (Auto-filled) -->
+                <div id="inc-emp-details-card" class="hidden p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+                    <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200/60">
+                        <span class="text-slate-500 font-semibold">শাখা ও বর্তমান পদবী:</span>
+                        <span id="inc-emp-desig-branch" class="font-bold text-slate-800">--</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200/60">
+                        <span class="text-slate-500 font-semibold">যোগদান / শেষ ইনক্রিমেন্ট:</span>
+                        <span id="inc-emp-join-date" class="font-bold text-slate-700">--</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-600 font-bold">বর্তমান মূল বেতন (Current Salary):</span>
+                        <span id="inc-emp-curr-salary" class="font-black text-indigo-700 text-sm">৳ 0</span>
+                    </div>
+                </div>
+
+                <!-- 3. Increment Amount & Effective Month -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Increment Amount (বৃদ্ধির পরিমাণ ৳) *</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-slate-400 font-bold text-xs">৳</span>
+                            <input type="number" id="inc-add-amount" min="1" step="1" required
+                                placeholder="যেমন: ৩০০০" oninput="updateNewSalaryPreview()"
+                                class="w-full pl-7 pr-3 p-2.5 border rounded-xl text-xs font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Effective Month (কার্যকর হওয়ার মাস) *</label>
+                        <input type="month" id="inc-add-effective-month" required onchange="updateNewSalaryPreview()"
+                            class="w-full p-2.5 border rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                </div>
+
+                <!-- 4. Live Calculation & Preview Box -->
+                <div id="inc-preview-box" class="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl text-xs space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <span class="text-emerald-900 font-semibold">নতুন মূল বেতন (New Basic Salary):</span>
+                        <span id="inc-preview-new-salary" class="font-black text-emerald-700 text-base">৳ 0</span>
+                    </div>
+                    <div class="text-[11px] text-emerald-800/80 flex items-center justify-between">
+                        <span>কার্যকর কাল: <b id="inc-preview-month-label" class="text-emerald-900">বর্তমান মাস</b></span>
+                        <span id="inc-preview-diff-badge" class="font-bold text-emerald-600">(+৳ ০ বৃদ্ধি)</span>
+                    </div>
+                </div>
+
+                <!-- 5. Optional Designation Promotion -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">New Designation / Promotion (পদোন্নতি - অপশনাল)</label>
+                    <input type="text" id="inc-add-new-desig"
+                        placeholder="পদবী অপরিবর্তিত থাকলে খালি রাখুন, অথবা নতুন পদবী লিখুন"
+                        class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <!-- 6. Reason / Note -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Increment Note / Reason (কারণ বা মন্তব্য)</label>
+                    <input type="text" id="inc-add-note"
+                        placeholder="যেমন: ১ বছর পূর্ণ হওয়া বাৎসরিক ইনক্রিমেন্ট / বিক্রয় পারফরম্যান্স"
+                        class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <div class="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start space-x-2">
+                    <i class="fa-solid fa-circle-info text-amber-600 mt-0.5 shrink-0 text-xs"></i>
+                    <span>নির্বাচিত কার্যকর মাসের পে-রোল (Payroll) এবং ভবিষ্যৎ সকল মাসের বেতনে এই ইনক্রিমেন্ট স্বয়ংক্রিয়ভাবে মূল বেতনের সাথে যোগ হবে।</span>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+                    <button type="button" onclick="toggleModal('add-increment-modal', false)"
+                        class="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">বাতিল (Cancel)</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5 cursor-pointer">
+                        <i class="fa-solid fa-check"></i>
+                        <span>ইনক্রিমেন্ট নিশ্চিত করুন</span>
+                    </button>
                 </div>
             </form>
         </div>

@@ -11569,6 +11569,56 @@ ${messageText}
             reader.readAsDataURL(file);
         };
 
+        window.selectedDocFolder = 'all';
+
+        const DOC_FOLDERS = [
+            { id: 'all', name: 'All Files', bn: 'সকল ফাইল', icon: 'fa-folder-open', color: 'indigo', border: 'border-indigo-200', bg: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400' },
+            { id: 'advance', name: 'Advance', bn: 'অগ্রিম বেতন', icon: 'fa-hand-holding-dollar', color: 'amber', border: 'border-amber-200', bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400' },
+            { id: 'increment', name: 'Increment', bn: 'ইনক্রিমেন্ট', icon: 'fa-arrow-trend-up', color: 'purple', border: 'border-purple-200', bg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400' },
+            { id: 'document', name: 'Document', bn: 'অফিসিয়াল ফাইল', icon: 'fa-file-lines', color: 'sky', border: 'border-sky-200', bg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400' },
+            { id: 'notice', name: 'Notice', bn: 'নোটিশ ও সার্কুলার', icon: 'fa-bullhorn', color: 'emerald', border: 'border-emerald-200', bg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' },
+            { id: 'leave', name: 'Leave', bn: 'ছুটি ও প্রমাণপত্র', icon: 'fa-umbrella-beach', color: 'rose', border: 'border-rose-200', bg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400' }
+        ];
+
+        window.getDocumentFolder = function (docItem) {
+            if (!docItem) return 'document';
+            if (docItem.folder) return docItem.folder.toLowerCase();
+            if (docItem.relatedModule) {
+                const m = docItem.relatedModule.toLowerCase();
+                if (m === 'advance') return 'advance';
+                if (m === 'leave') return 'leave';
+                if (m === 'increment') return 'increment';
+                if (m === 'notice') return 'notice';
+            }
+
+            const cat = (docItem.category || '').toLowerCase();
+            const title = (docItem.title || '').toLowerCase();
+
+            // 1. Advance
+            if (cat.includes('advance') || title.includes('advance') || title.includes('অগ্রিম') || title.includes('এডভান্স')) {
+                return 'advance';
+            }
+            // 2. Increment
+            if (cat.includes('increment') || title.includes('increment') || title.includes('ইনক্রিমেন্ট')) {
+                return 'increment';
+            }
+            // 3. Notice
+            if (cat.includes('notice') || title.includes('notice') || title.includes('নোটিশ') || title.includes('circular') || title.includes('সার্কুলার')) {
+                return 'notice';
+            }
+            // 4. Leave
+            if (cat.includes('leave') || title.includes('leave') || title.includes('ছুটি') || title.includes('medical') || title.includes('sick')) {
+                return 'leave';
+            }
+            // 5. Document
+            return 'document';
+        };
+
+        window.selectDocFolder = function (folderId) {
+            window.selectedDocFolder = folderId;
+            renderDocsTable();
+        };
+
         function loadCompanyDocsRealtime() {
             onSnapshot(collection(db, "company_documents"), (snapshot) => {
                 docList = [];
@@ -11582,44 +11632,155 @@ ${messageText}
             });
         }
 
-        function renderDocsTable() {
-            const tbody = document.getElementById('docs-table-body');
-            if (!tbody) return;
+        function renderDocsFolderCards() {
+            const grid = document.getElementById('doc-folders-grid');
+            if (!grid) return;
 
-            const listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
+            const baseList = (currentUserRole === 'Employee' && myEmployeeProfile)
                 ? docList.filter(d => d.targetEmployee === 'General' || d.targetEmployee === myEmployeeProfile.name)
                 : docList;
 
+            // Calculate count for each folder
+            const counts = { all: baseList.length, advance: 0, increment: 0, document: 0, notice: 0, leave: 0 };
+            baseList.forEach(d => {
+                const f = getDocumentFolder(d);
+                if (counts[f] !== undefined) counts[f]++;
+                else counts.document++;
+            });
+
+            let cardsHtml = '';
+            DOC_FOLDERS.forEach(folder => {
+                const isSelected = window.selectedDocFolder === folder.id;
+                const count = counts[folder.id] || 0;
+                const activeRing = isSelected
+                    ? 'ring-2 ring-indigo-500 shadow-md scale-[1.02] bg-indigo-50/70 dark:bg-indigo-950/60 border-indigo-400 dark:border-indigo-600'
+                    : 'bg-white dark:bg-[#1a0c36] hover:shadow-sm border-slate-200/80 dark:border-purple-500/20 hover:border-slate-300';
+
+                cardsHtml += `
+                    <div onclick="selectDocFolder('${folder.id}')" 
+                        class="p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between group ${activeRing}">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-10 h-10 rounded-xl ${folder.bg} flex items-center justify-center text-lg shadow-2xs group-hover:scale-110 transition">
+                                <i class="fa-solid ${folder.icon}"></i>
+                            </div>
+                            <span class="text-[11px] font-black px-2 py-0.5 rounded-full ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-purple-900/40 text-slate-700 dark:text-purple-200'}">
+                                ${count} Files
+                            </span>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <h4 class="font-extrabold text-sm text-slate-900 dark:text-white">${folder.name}</h4>
+                                ${isSelected ? '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>' : ''}
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-purple-300/70 font-medium mt-0.5">${folder.bn}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = cardsHtml;
+
+            // Update current folder badge
+            const currentObj = DOC_FOLDERS.find(f => f.id === window.selectedDocFolder) || DOC_FOLDERS[0];
+            const activeBadge = document.getElementById('doc-active-folder-name');
+            if (activeBadge) activeBadge.innerText = `${currentObj.name} (${currentObj.bn})`;
+            const countBadge = document.getElementById('doc-folder-count-badge');
+            if (countBadge) {
+                const c = counts[window.selectedDocFolder] || 0;
+                countBadge.innerText = `(${c} টি ফাইল)`;
+            }
+        }
+
+        function renderDocsTable() {
+            renderDocsFolderCards();
+
+            const tbody = document.getElementById('docs-table-body');
+            if (!tbody) return;
+
+            let listToRender = (currentUserRole === 'Employee' && myEmployeeProfile)
+                ? docList.filter(d => d.targetEmployee === 'General' || d.targetEmployee === myEmployeeProfile.name)
+                : docList;
+
+            // 1. Filter by Folder
+            if (window.selectedDocFolder && window.selectedDocFolder !== 'all') {
+                listToRender = listToRender.filter(d => getDocumentFolder(d) === window.selectedDocFolder);
+            }
+
+            // 2. Filter by Search input
+            const searchInput = document.getElementById('doc-search-input');
+            const searchTxt = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            if (searchTxt) {
+                listToRender = listToRender.filter(d => {
+                    const t = (d.title || '').toLowerCase();
+                    const c = (d.category || '').toLowerCase();
+                    const e = (d.targetEmployee || '').toLowerCase();
+                    const fn = (d.fileName || '').toLowerCase();
+                    return t.includes(searchTxt) || c.includes(searchTxt) || e.includes(searchTxt) || fn.includes(searchTxt);
+                });
+            }
+
+            const currentFolderObj = DOC_FOLDERS.find(f => f.id === window.selectedDocFolder) || DOC_FOLDERS[0];
+
             if (listToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 font-medium">কোনো ডকুমেন্ট বা ছবি আপলোড করা হয়নি</td></tr>`;
+                const folderName = window.selectedDocFolder === 'all' ? 'কোনো ফাইল পাওয়া যায়নি' : `"${currentFolderObj.name}" ফোল্ডারে কোনো ফাইল নেই`;
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-10">
+                            <div class="w-12 h-12 mx-auto mb-2 rounded-2xl bg-indigo-50 dark:bg-purple-900/40 text-indigo-500 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </div>
+                            <p class="text-xs font-bold text-slate-500 dark:text-purple-300">${folderName}</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">নতুন ফাইল যুক্ত করতে উপরের "Upload Document" বাটনে ক্লিক করুন</p>
+                        </td>
+                    </tr>
+                `;
                 return;
             }
 
             let rowsHtml = '';
             listToRender.forEach(docItem => {
+                const fId = getDocumentFolder(docItem);
+                const folderInfo = DOC_FOLDERS.find(f => f.id === fId) || { name: 'Document', color: 'indigo', icon: 'fa-folder' };
+                
                 const isImage = docItem.fileType ? docItem.fileType.startsWith('image/') : (docItem.fileUrl && docItem.fileUrl.startsWith('data:image'));
                 const iconClass = isImage ? 'fa-image text-emerald-500' : 'fa-file-lines text-indigo-500';
 
+                const badgeColorClasses = {
+                    advance: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+                    increment: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
+                    document: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800',
+                    notice: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+                    leave: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                };
+                const badgeClass = badgeColorClasses[fId] || 'bg-slate-100 text-slate-700 border-slate-200';
+
                 rowsHtml += `
-          <tr class="border-b border-slate-100 hover:bg-slate-50 transition text-xs">
-            <td class="px-6 py-4 font-bold text-slate-800 flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-lg ${isImage ? 'bg-emerald-50' : 'bg-indigo-50'} flex items-center justify-center">
+          <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50/70 dark:hover:bg-purple-950/40 transition text-xs">
+            <td class="px-6 py-4 font-bold text-slate-800 dark:text-white flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-xl ${isImage ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'} flex items-center justify-center shrink-0 shadow-2xs">
                 <i class="fa-solid ${iconClass} text-sm"></i>
               </div>
-              <div>
-                <div>${docItem.title}</div>
-                <span class="text-[10px] text-slate-400 font-normal">${docItem.fileName || 'Direct File'}</span>
+              <div class="min-w-0">
+                <div class="font-bold truncate max-w-md">${docItem.title}</div>
+                <div class="text-[10px] text-slate-400 font-normal truncate mt-0.5">${docItem.fileName || 'Attached File'}</div>
               </div>
             </td>
-            <td class="px-6 py-4"><span class="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-semibold text-[11px]">${docItem.category}</span></td>
-            <td class="px-6 py-4 text-slate-600 font-medium">${docItem.targetEmployee || 'General'}</td>
-            <td class="px-6 py-4 text-slate-500">${new Date(docItem.uploadedAt).toLocaleDateString()}</td>
-            <td class="px-6 py-4 text-right space-x-1">
-              <button onclick="viewOrDownloadDoc('${docItem.id}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition inline-flex items-center space-x-1">
+            <td class="px-6 py-4">
+              <div class="flex items-center space-x-1.5">
+                <span class="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] border ${badgeClass}">
+                  <i class="fa-solid ${folderInfo.icon} text-[10px]"></i>
+                  <span>${folderInfo.name}</span>
+                </span>
+                ${docItem.category && docItem.category !== folderInfo.name ? `<span class="text-[10px] text-slate-400 font-medium">(${docItem.category})</span>` : ''}
+              </div>
+            </td>
+            <td class="px-6 py-4 text-slate-600 dark:text-purple-200/90 font-medium">${docItem.targetEmployee || 'General'}</td>
+            <td class="px-6 py-4 text-slate-500 dark:text-purple-300/80">${new Date(docItem.uploadedAt).toLocaleDateString()}</td>
+            <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+              <button onclick="viewOrDownloadDoc('${docItem.id}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-purple-900/40 dark:hover:bg-purple-900/60 text-indigo-700 dark:text-purple-200 rounded-lg text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer">
                 <i class="fa-solid fa-arrow-up-right-from-square"></i> <span>View / Download</span>
               </button>
               ${currentUserRole === 'Admin' ? `
-                <button onclick="deleteDocRecord('${docItem.id}')" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Delete Document (Admin Only)"><i class="fa-solid fa-trash-can"></i></button>
+                <button onclick="deleteDocRecord('${docItem.id}')" class="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer" title="Delete Document"><i class="fa-solid fa-trash-can"></i></button>
               ` : ''}
             </td>
           </tr>
@@ -11700,6 +11861,7 @@ ${messageText}
         window.saveCompanyDocument = async function (e) {
             e.preventDefault();
             const title = document.getElementById('doc-title').value.trim();
+            const folder = document.getElementById('doc-folder') ? document.getElementById('doc-folder').value : 'document';
             const category = document.getElementById('doc-category').value;
             const targetEmp = document.getElementById('doc-emp-id').value;
             const url = document.getElementById('doc-url').value;
@@ -11714,6 +11876,7 @@ ${messageText}
             try {
                 await addDoc(collection(db, "company_documents"), {
                     title,
+                    folder,
                     category,
                     targetEmployee: targetEmp,
                     fileUrl: url,
@@ -15732,28 +15895,59 @@ ${messageText}
                     </div>
                 </section>
 
-                <!-- 8. COMPANY DOCUMENTS -->
+                <!-- 8. COMPANY DOCUMENTS (FOLDER-BASED VAULT) -->
                 <section id="sec-documents" class="hidden space-y-5">
                     <div
-                        class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex justify-between items-center">
+                        class="bg-white dark:bg-[#1a0c36] p-5 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
-                            <h2 class="text-base font-bold text-slate-800">Company Documents Vault</h2>
-                            <p class="text-xs text-slate-500">কোম্পানির নীতিমালা ও অফিশিয়াল ফাইলপত্র</p>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 flex items-center space-x-1">
+                                    <i class="fa-solid fa-folder-tree text-indigo-500"></i>
+                                    <span>Folder File Manager</span>
+                                </span>
+                                <span class="text-[11px] text-slate-400 font-semibold">• Organized Vault</span>
+                            </div>
+                            <h2 class="text-base font-bold text-slate-800 dark:text-white mt-1">Company Documents Vault (ফোল্ডারভিত্তিক নথিপত্র)</h2>
+                            <p class="text-xs text-slate-500 dark:text-purple-300/70">অগ্রিম বেতন (Advance), ইনক্রিমেন্ট (Increment), অফিসিয়াল ডকুমেন্টস (Document), নোটিশ (Notice) ও ছুটির (Leave) ফাইল ফোল্ডার অনুযায়ী আলাদাভাবে সংরক্ষিত</p>
                         </div>
                         <button id="doc-upload-btn" onclick="toggleModal('add-doc-modal', true)"
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm">
-                            <i class="fa-solid fa-upload mr-1"></i> Upload Document
+                            class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1.5 cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span>Upload Document</span>
                         </button>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                    <!-- 5 Main Interactive Folder Cards (+ All Files) -->
+                    <div id="doc-folders-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4"></div>
+
+                    <!-- Folder Breadcrumb Toolbar & Search -->
+                    <div class="bg-white dark:bg-[#1a0c36] p-3.5 rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="font-bold text-slate-500 dark:text-purple-300">বর্তমান ফোল্ডার:</span>
+                            <span id="doc-active-folder-badge" class="px-3 py-1 rounded-xl text-xs font-extrabold bg-indigo-50 dark:bg-purple-900/50 text-indigo-700 dark:text-purple-200 border border-indigo-200 dark:border-purple-500/30 flex items-center space-x-1.5">
+                                <i class="fa-solid fa-folder-open text-amber-500"></i>
+                                <span id="doc-active-folder-name">All Files</span>
+                            </span>
+                            <span id="doc-folder-count-badge" class="font-bold text-slate-400 text-[11px]">(০ টি ফাইল)</span>
+                        </div>
+
+                        <div class="flex items-center space-x-2 flex-1 max-w-xs">
+                            <div class="relative w-full">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="doc-search-input" oninput="renderDocsTable()" placeholder="ডকুমেন্ট বা কর্মচারীর নাম খুঁজুন..." class="w-full pl-9 pr-3.5 py-1.5 bg-slate-50 dark:bg-purple-950/40 border border-slate-200 dark:border-purple-500/30 rounded-xl text-xs text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtered Folder Documents Table -->
+                    <div class="bg-white dark:bg-[#1a0c36] rounded-2xl border border-slate-200/80 dark:border-purple-500/20 shadow-xs overflow-hidden">
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs text-slate-600">
+                            <table class="w-full text-left text-xs text-slate-600 dark:text-purple-200">
                                 <thead
-                                    class="bg-slate-100/60 uppercase text-slate-700 font-bold border-b border-slate-200">
+                                    class="bg-slate-100/60 dark:bg-purple-950/60 uppercase text-slate-700 dark:text-purple-200 font-bold border-b border-slate-200 dark:border-purple-500/20">
                                     <tr>
                                         <th class="px-6 py-3.5">Document Title</th>
-                                        <th class="px-6 py-3.5">Category</th>
+                                        <th class="px-6 py-3.5">Folder & Category</th>
                                         <th class="px-6 py-3.5">Target Employee</th>
                                         <th class="px-6 py-3.5">Upload Date</th>
                                         <th class="px-6 py-3.5 text-right">View / Download</th>
@@ -18370,6 +18564,17 @@ ${messageText}
                     <input type="text" id="doc-title" required
                         class="w-full p-2.5 border rounded-xl text-xs outline-none"
                         placeholder="যেমন: Company HR Policy 2026">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Target Folder (ফোল্ডার নির্বাচন করুন) *</label>
+                    <select id="doc-folder" required
+                        class="w-full p-2.5 border rounded-xl text-xs bg-white font-medium outline-none text-slate-800">
+                        <option value="advance">📁 Advance (অগ্রিম বেতন স্লিপ/আবেদন)</option>
+                        <option value="increment">📁 Increment (ইনক্রিমেন্ট কপি/চিঠি)</option>
+                        <option value="document" selected>📁 Document (অফিসিয়াল ডকুমেন্টস ও পলিসি)</option>
+                        <option value="notice">📁 Notice (নোটিশ ও সার্কুলার)</option>
+                        <option value="leave">📁 Leave (ছুটি ও মেডিকেল সনদপত্র)</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Category *</label>

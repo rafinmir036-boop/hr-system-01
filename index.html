@@ -11207,9 +11207,79 @@ ${messageText}
             }
         };
 
+        window.handleIncrementLetterFileSelected = function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('warning', 'ফাইলের সাইজ সর্বোচ্চ 5 MB হতে পারবে');
+                e.target.value = '';
+                return;
+            }
+
+            const infoBox = document.getElementById('inc-letter-selected-info');
+            const nameElem = document.getElementById('inc-letter-filename-text');
+            const sizeElem = document.getElementById('inc-letter-filesize-text');
+            const iconElem = document.getElementById('inc-letter-type-icon');
+            const prevContainer = document.getElementById('inc-letter-preview-container');
+            const prevImg = document.getElementById('inc-letter-preview-img');
+
+            if (nameElem) nameElem.innerText = file.name;
+            if (sizeElem) sizeElem.innerText = `${(file.size / 1024).toFixed(1)} KB`;
+            if (iconElem) {
+                if (file.type === 'application/pdf') {
+                    iconElem.innerHTML = '<i class="fa-solid fa-file-pdf text-rose-600"></i>';
+                } else if (file.type.startsWith('image/')) {
+                    iconElem.innerHTML = '<i class="fa-solid fa-file-image text-emerald-600"></i>';
+                } else {
+                    iconElem.innerHTML = '<i class="fa-solid fa-file-lines text-purple-600"></i>';
+                }
+            }
+            if (infoBox) infoBox.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                const dataUrl = evt.target.result;
+                const urlInput = document.getElementById('inc-letter-url');
+                const nameInput = document.getElementById('inc-letter-name');
+                const typeInput = document.getElementById('inc-letter-type');
+
+                if (urlInput) urlInput.value = dataUrl;
+                if (nameInput) nameInput.value = file.name;
+                if (typeInput) typeInput.value = file.type || 'application/pdf';
+
+                if (file.type && file.type.startsWith('image/')) {
+                    if (prevImg) prevImg.src = dataUrl;
+                    if (prevContainer) prevContainer.classList.remove('hidden');
+                } else {
+                    if (prevContainer) prevContainer.classList.add('hidden');
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.removeIncrementLetterFile = function () {
+            const fileInput = document.getElementById('inc-letter-file');
+            if (fileInput) fileInput.value = '';
+            const urlInput = document.getElementById('inc-letter-url');
+            if (urlInput) urlInput.value = '';
+            const nameInput = document.getElementById('inc-letter-name');
+            if (nameInput) nameInput.value = '';
+            const typeInput = document.getElementById('inc-letter-type');
+            if (typeInput) typeInput.value = '';
+
+            const infoBox = document.getElementById('inc-letter-selected-info');
+            if (infoBox) infoBox.classList.add('hidden');
+            const prevContainer = document.getElementById('inc-letter-preview-container');
+            if (prevContainer) prevContainer.classList.add('hidden');
+            const prevImg = document.getElementById('inc-letter-preview-img');
+            if (prevImg) prevImg.src = '';
+        };
+
         window.openAddIncrementModal = function (preselectedEmpId = '') {
             const form = document.getElementById('increment-form');
             if (form) form.reset();
+            removeIncrementLetterFile();
 
             const select = document.getElementById('inc-add-emp-id');
             if (select) {
@@ -11332,6 +11402,9 @@ ${messageText}
             const effectiveMonth = document.getElementById('inc-add-effective-month')?.value;
             const newDesig = document.getElementById('inc-add-new-desig')?.value?.trim() || '';
             const note = document.getElementById('inc-add-note')?.value?.trim() || '';
+            const letterUrl = document.getElementById('inc-letter-url')?.value || '';
+            const letterName = document.getElementById('inc-letter-name')?.value || '';
+            const letterType = document.getElementById('inc-letter-type')?.value || '';
 
             if (!empId) {
                 showToast('warning', 'দয়া করে একজন কর্মচারী নির্বাচন করুন');
@@ -11413,6 +11486,9 @@ ${messageText}
                     incrementAmount: incAmount,
                     newSalary: newSalary,
                     effectiveMonth: effectiveMonth,
+                    letterUrl: letterUrl,
+                    letterName: letterName,
+                    letterType: letterType,
                     note: note || (isImmediate ? 'ইনক্রিমেন্ট কার্যকর হয়েছে' : `শিডিউল করা ইনক্রিমেন্ট (${effectiveMonth} থেকে কার্যকর)`),
                     status: isImmediate ? 'Active' : 'Scheduled',
                     applied: isImmediate,
@@ -11426,13 +11502,13 @@ ${messageText}
                 // 3. Auto-sync into company_documents under the 'increment' folder
                 try {
                     await addDoc(collection(db, "company_documents"), {
-                        title: `ইনক্রিমেন্ট অনুমোদন - ${emp.name} (+৳${incAmount.toLocaleString()})`,
+                        title: `ইনক্রিমেন্ট লেটার - ${emp.name} (+৳${incAmount.toLocaleString()})`,
                         category: 'Appointment Letter',
                         folder: 'increment',
                         targetEmployee: emp.name,
-                        fileUrl: 'https://ui-avatars.com/api/?name=Increment&background=7c3aed&color=fff',
-                        fileName: `Increment_${(emp.name || 'Staff').replace(/\s+/g, '_')}_${effectiveMonth}.pdf`,
-                        fileType: 'application/pdf',
+                        fileUrl: letterUrl || 'https://ui-avatars.com/api/?name=Increment&background=7c3aed&color=fff',
+                        fileName: letterName || `Increment_Letter_${(emp.name || 'Staff').replace(/\s+/g, '_')}_${effectiveMonth}.pdf`,
+                        fileType: letterType || 'application/pdf',
                         relatedModule: 'Increment',
                         relatedId: incDocRef.id,
                         uploadedBy: currentUserEmail || 'Admin',
@@ -11446,12 +11522,13 @@ ${messageText}
                 await logSystemActivity(
                     'INCREMENT',
                     'Employee',
-                    `${currentUserEmail} recorded salary increment +৳${incAmount.toLocaleString()} for "${emp.name}" (Effective Month: ${effectiveMonth}, New Basic: ৳${newSalary.toLocaleString()})`,
-                    { employeeId: empId, employeeName: emp.name, incrementAmount: incAmount, newSalary, effectiveMonth }
+                    `${currentUserEmail} recorded salary increment +৳${incAmount.toLocaleString()} for "${emp.name}" (Effective Month: ${effectiveMonth}, New Basic: ৳${newSalary.toLocaleString()}${letterUrl ? ', Letter Attached' : ''})`,
+                    { employeeId: empId, employeeName: emp.name, incrementAmount: incAmount, newSalary, effectiveMonth, hasLetter: !!letterUrl }
                 );
 
                 toggleModal('add-increment-modal', false);
                 document.getElementById('increment-form').reset();
+                removeIncrementLetterFile();
 
                 const statusMessage = isImmediate
                     ? `ইনক্রিমেন্ট সফলভাবে কার্যকর হয়েছে! <b>${emp.name}</b> এর নতুন মূল বেতন: <b class="text-emerald-700">৳ ${newSalary.toLocaleString()}</b>`
@@ -11578,7 +11655,10 @@ ${messageText}
                 rowsHtml += `
                     <tr class="border-b border-slate-100 dark:border-purple-500/20 hover:bg-slate-50/70 dark:hover:bg-purple-950/40 transition text-xs">
                         <td class="px-6 py-4 font-bold text-slate-800 dark:text-white">
-                            <div class="font-bold">${item.employeeName}</div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold">${item.employeeName}</span>
+                                ${item.letterUrl ? `<span onclick="viewOrDownloadIncrementLetter('${item.id}')" title="ইনক্রিমেন্ট লেটার দেখুন" class="cursor-pointer inline-flex items-center text-[10px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/50 border border-purple-200 dark:border-purple-800 px-1.5 py-0.5 rounded-md font-bold hover:bg-purple-100 transition"><i class="fa-solid fa-paperclip mr-1 text-[9px]"></i>Letter</span>` : ''}
+                            </div>
                             <div class="text-[10px] text-slate-400 font-semibold mt-0.5">
                                 <span class="bg-slate-100 dark:bg-purple-950/60 px-1.5 py-0.5 rounded text-slate-600 dark:text-purple-300">🏢 ${item.branch || 'Head Office'}</span>
                                 ${item.customEmpCode ? `<span class="ml-1 text-purple-600">ID: ${item.customEmpCode}</span>` : ''}
@@ -11598,17 +11678,63 @@ ${messageText}
                         </td>
                         <td class="px-6 py-4 text-center">${statusBadge}</td>
                         <td class="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                            ${item.letterUrl ? `
+                                <button onclick="viewOrDownloadIncrementLetter('${item.id}')" title="ইনক্রিমেন্ট লেটার দেখুন বা ডাউনলোড করুন" class="p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg transition cursor-pointer">
+                                    <i class="fa-solid fa-file-arrow-down text-xs"></i>
+                                </button>
+                            ` : ''}
                             ${currentUserRole === 'Admin' ? `
                                 <button onclick="deleteSalaryIncrementRecord('${item.id}')" title="Delete / Revert Increment" class="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer">
                                     <i class="fa-solid fa-trash-can text-xs"></i>
                                 </button>
-                            ` : '<span class="text-slate-400 text-[11px]">-</span>'}
+                            ` : (!item.letterUrl ? '<span class="text-slate-400 text-[11px]">-</span>' : '')}
                         </td>
                     </tr>
                 `;
             });
 
             tbody.innerHTML = rowsHtml;
+        };
+
+        window.viewOrDownloadIncrementLetter = function (id) {
+            const inc = (window.salaryIncrementsList || []).find(x => x.id === id);
+            if (!inc || !inc.letterUrl) {
+                showToast('warning', 'কোনো ইনক্রিমেন্ট লেটার ফাইল পাওয়া যায়নি');
+                return;
+            }
+
+            const isImg = inc.letterType ? inc.letterType.startsWith('image/') : (inc.letterUrl.startsWith('data:image') || inc.letterUrl.match(/\.(jpeg|jpg|png|webp)/i));
+
+            if (isImg) {
+                Swal.fire({
+                    title: `ইনক্রিমেন্ট লেটার - ${inc.employeeName}`,
+                    text: `কার্যকর মাস: ${inc.effectiveMonth || ''} (+৳${Number(inc.incrementAmount || 0).toLocaleString()})`,
+                    imageUrl: inc.letterUrl,
+                    imageAlt: 'Increment Letter',
+                    showCancelButton: true,
+                    confirmButtonText: 'Download Letter',
+                    cancelButtonText: 'Close',
+                    confirmButtonColor: '#7c3aed'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        const a = document.createElement('a');
+                        a.href = inc.letterUrl;
+                        a.download = inc.letterName || `Increment_Letter_${(inc.employeeName || 'Staff').replace(/\s+/g, '_')}.png`;
+                        a.click();
+                        showToast('success', 'লেটার ডাউনলোড শুরু হয়েছে');
+                    }
+                });
+            } else {
+                if (inc.letterUrl.startsWith('data:')) {
+                    const a = document.createElement('a');
+                    a.href = inc.letterUrl;
+                    a.download = inc.letterName || `Increment_Letter_${(inc.employeeName || 'Staff').replace(/\s+/g, '_')}.pdf`;
+                    a.click();
+                    showToast('success', 'ইনক্রিমেন্ট লেটার ডাউনলোড শুরু হয়েছে');
+                } else {
+                    window.open(inc.letterUrl, '_blank');
+                }
+            }
         };
 
         window.deleteSalaryIncrementRecord = async function (id) {
@@ -11630,13 +11756,24 @@ ${messageText}
 
             try {
                 await deleteDoc(doc(db, "salary_increments", id));
+
+                // Also delete related document in company_documents if any
+                try {
+                    const docSnap = await getDocs(query(collection(db, "company_documents"), where("relatedId", "==", id)));
+                    docSnap.forEach(async (d) => {
+                        await deleteDoc(doc(db, "company_documents", d.id));
+                    });
+                } catch (delDocErr) {
+                    console.warn('Doc deletion cleanup:', delDocErr);
+                }
+
                 await logSystemActivity(
                     'DELETE',
                     'Employee',
                     `${currentUserEmail} deleted salary increment record for "${inc.employeeName}" (+৳${inc.incrementAmount})`,
                     { incrementId: id, employeeName: inc.employeeName }
                 );
-                showToast('success', 'ইনক্রিমেন্ট রেকর্ড মুছে ফেলা হয়েছে');
+                showToast('success', 'ইনক্রিমেন্ট রেকর্ড সফলভাবে মুছে ফেলা হয়েছে');
             } catch (err) {
                 showToast('error', err.message);
             }
@@ -19269,6 +19406,47 @@ ${messageText}
                     <input type="text" id="inc-add-note"
                         placeholder="যেমন: ১ বছর পূর্ণ হওয়া বাৎসরিক ইনক্রিমেন্ট / বিক্রয় পারফরম্যান্স"
                         class="w-full p-2.5 border rounded-xl text-xs outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <!-- 7. Upload Increment Letter / Approval Document -->
+                <div class="space-y-1.5 p-3.5 bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-800/40 rounded-2xl">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-800 dark:text-purple-200">
+                            <i class="fa-solid fa-file-arrow-up text-purple-600 mr-1"></i>
+                            Increment Letter / Approval Copy (ইনক্রিমেন্ট লেটার আপলোড)
+                        </label>
+                        <span class="text-[10px] text-purple-600 dark:text-purple-400 font-bold bg-purple-100/70 dark:bg-purple-900/60 px-2 py-0.5 rounded-full">PDF / Image</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-purple-300/70">ইনক্রিমেন্ট অনুমোদনের চিঠি, অফিসিয়াল অর্ডার বা স্বাক্ষরিত কপি আপলোড করুন</p>
+
+                    <div class="relative mt-1">
+                        <input type="file" id="inc-letter-file" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange="handleIncrementLetterFileSelected(event)"
+                            class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer border border-dashed border-purple-300 dark:border-purple-700/60 rounded-xl p-2 bg-white dark:bg-[#130826]">
+                        <input type="hidden" id="inc-letter-url">
+                        <input type="hidden" id="inc-letter-name">
+                        <input type="hidden" id="inc-letter-type">
+                    </div>
+
+                    <!-- Selected File Info & Remove Button -->
+                    <div id="inc-letter-selected-info" class="hidden flex items-center justify-between p-2 bg-white dark:bg-[#1a0c36] border border-purple-200 dark:border-purple-800/60 rounded-xl text-xs">
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <span id="inc-letter-type-icon" class="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 flex items-center justify-center text-xs shrink-0">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <div id="inc-letter-filename-text" class="font-bold text-slate-800 dark:text-purple-100 truncate text-[11px]">Letter.pdf</div>
+                                <div id="inc-letter-filesize-text" class="text-[10px] text-slate-400">0 KB</div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="removeIncrementLetterFile()" class="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs" title="Remove File">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+
+                    <!-- Image Preview Container -->
+                    <div id="inc-letter-preview-container" class="hidden pt-1">
+                        <img id="inc-letter-preview-img" src="" alt="Letter Preview" class="w-full max-h-36 object-contain rounded-xl border border-purple-200 dark:border-purple-800 bg-white">
+                    </div>
                 </div>
 
                 <div class="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start space-x-2">

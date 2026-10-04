@@ -2707,6 +2707,9 @@
 
             employeeList.forEach(emp => {
                 if (!isItemInActiveBranch(emp.branch)) return;
+                const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
+                if (!isEmpActive) return; // Inactive employees are excluded from dashboard counts!
+
                 totalEmpInScope++;
 
                 const att = findAttendanceForEmployee(emp, todayAttendanceData);
@@ -2862,6 +2865,8 @@
 
             employeeList.forEach(emp => {
                 if (!isItemInActiveBranch(emp.branch)) return;
+                const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
+                if (!isEmpActive) return; // Inactive employees are excluded from dashboard status lists
 
                 allScopeList.push(emp);
 
@@ -3153,17 +3158,28 @@
                 let monthAttOptions = '<option value="">-- কর্মচারী নির্বাচন করুন (Select Employee) --</option>';
                 let tableRows = '';
                 let cardItems = '';
-
                 let savedPermEmpVal = permEmpSelect ? permEmpSelect.value : '';
-                employeeList = [];
 
-                const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
-                myEmployeeProfile = null;
+                employeeList = [];
 
                 snapshot.forEach((docSnap) => {
                     const emp = docSnap.data();
                     const id = docSnap.id;
                     employeeList.push({ id, ...emp });
+                });
+
+                // A -> B -> C serial alphabetical sort by employee name:
+                employeeList.sort((a, b) => {
+                    const nameA = String(a.name || '').trim().toLowerCase();
+                    const nameB = String(b.name || '').trim().toLowerCase();
+                    return nameA.localeCompare(nameB, 'en', { sensitivity: 'base' });
+                });
+
+                const assignedRoleInfo = userPermissions[currentUserEmail.toLowerCase()];
+                myEmployeeProfile = null;
+
+                employeeList.forEach((emp) => {
+                    const id = emp.id;
 
                     permOptions += `<option value="${id}">${emp.name} (${emp.designation}) [ID: ${emp.customEmpCode || 'N/A'}] - 🏢 ${emp.branch || 'Head Office'}</option>`;
 
@@ -4302,6 +4318,8 @@
 
             listToRender.forEach((emp) => {
                 if (!isItemInActiveBranch(emp.branch)) return;
+                const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
+                if (!isEmpActive) return; // Inactive employees are excluded from daily attendance log
 
                 // Apply Search Filter (by ID number, name, branch, designation, department)
                 if (searchTxt) {
@@ -5025,7 +5043,7 @@
                 return;
             }
 
-            const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch));
+            const targetList = employeeList.filter(emp => isItemInActiveBranch(emp.branch) && (emp.status || 'Active').trim().toLowerCase() !== 'inactive');
             if (targetList.length === 0) {
                 showToast('warning', 'কোনো কর্মচারী পাওয়া যায়নি');
                 return;
@@ -11142,6 +11160,8 @@ ${messageText}
 
             employeeList.forEach(emp => {
                 if (!isItemInActiveBranch(emp.branch)) return;
+                const isEmpActive = (emp.status || 'Active').trim().toLowerCase() !== 'inactive';
+                if (!isEmpActive) return; // Inactive employees do not trigger increment dues
 
                 const joinDate = new Date(emp.joiningDate || emp.createdAt);
                 const lastIncDate = emp.lastIncrementDate ? new Date(emp.lastIncrementDate) : joinDate;
@@ -12478,7 +12498,7 @@ ${messageText}
 
         function _execRenderDashboardCharts() {
             if (currentUserRole === 'Employee') return;
-            const activeEmployees = employeeList.filter(e => isItemInActiveBranch(e.branch));
+            const activeEmployees = employeeList.filter(e => isItemInActiveBranch(e.branch) && (e.status || 'Active').trim().toLowerCase() !== 'inactive');
 
             // 1. Department Distribution Chart (Normalized names)
             const deptCounts = {};
@@ -12685,6 +12705,7 @@ ${messageText}
                     if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
                     if (!isItemInActiveBranch(emp.branch)) return false;
                     if (filterEmpId !== 'ALL' && emp.id !== filterEmpId) return false;
+                    if (filterEmpId === 'ALL' && (emp.status || 'Active').trim().toLowerCase() === 'inactive') return false;
                     return true;
                 });
 
@@ -12826,6 +12847,7 @@ ${messageText}
                     if (filterBranch && !window.matchesBranchFilter(emp.branch, filterBranch)) return false;
                     if (!isItemInActiveBranch(emp.branch)) return false;
                     if (filterEmpId !== 'ALL' && emp.id !== filterEmpId) return false;
+                    if (filterEmpId === 'ALL' && (emp.status || 'Active').trim().toLowerCase() === 'inactive') return false;
                     return true;
                 });
 
